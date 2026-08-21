@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 1934d99..23204d6 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -388,7 +388,7 @@ export function editionBytes(edition: Edition): Uint8Array {
+   writeU32(out, edition.engineVersion, 'engineVersion');
+   writeI64(out, edition.priceCents);
+ 
+-  const slots = sortedSlots(edition.slots);
++  const slots = [...edition.slots];
+   writeU32(out, slots.length, 'slotCount');
+   for (const slot of slots) {
+     writeU32(out, slot.slotIndex, 'slotIndex');

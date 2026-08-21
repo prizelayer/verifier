@@ -33,6 +33,28 @@ const FIXTURE = JSON.parse(
 
 const SERVER_SEED = bytesFromHex(FIXTURE.draw.serverSeedHex);
 
+/**
+ * Every `family/id` this suite actually asserted, and how many sweep rows it replayed.
+ *
+ * The loops below iterate the fixture directly, so within a family no vector can be missed. The
+ * gap this ledger closes is one level up: the families themselves are named by hand, so a NEW
+ * family added on the platform side would be ignored here in silence — and both repositories would
+ * stay green while the verifier proved strictly less than the fixture claims. KAN-50 (the 0x03
+ * snapshot preimage, which binds a slot to the item in it) is headed for exactly that shape.
+ *
+ * Recorded at the top of each test body rather than the bottom, so a vector that fails its
+ * assertions still counts as attempted and reports one clear failure instead of two.
+ */
+const asserted = new Set<string>();
+let sweepRowsAsserted = 0;
+
+function record(family: string, id: string): void {
+  asserted.add(`${family}/${id}`);
+}
+
+/** Top-level keys that describe the fixture rather than carrying vectors. Everything else is a family. */
+const METADATA_KEYS = new Set(['formatVersion', 'source', 'specification', 'notes']);
+
 describe('fixture contract', () => {
   it('is the format version this library implements', () => {
     assert.equal(FIXTURE.formatVersion, 1);
@@ -60,6 +82,7 @@ describe('the commitment', () => {
 describe('the draw — rng-fairness.md §3', () => {
   for (const vector of FIXTURE.draw.vectors) {
     it(`reproduces ${vector.id} byte for byte`, async () => {
+      record('draw', vector.id);
       const actual = await derive(SERVER_SEED, vector.clientSeed, vector.nonce);
 
       assert.equal(actual.message, vector.message);
@@ -92,6 +115,7 @@ describe('the draw — rng-fairness.md §3', () => {
     const { clientSeed, rows } = FIXTURE.draw.sweep;
     assert.ok(rows.length > 0);
     for (const row of rows) {
+      sweepRowsAsserted++;
       const actual = await derive(SERVER_SEED, clientSeed, row.nonce);
       assert.deepEqual(
         { nonce: row.nonce, attempt: actual.attempt, offset: actual.offset, ppm: actual.value },
@@ -108,6 +132,7 @@ describe('the draw — rng-fairness.md §3', () => {
 describe('the slot mapping — rng-fairness.md §4', () => {
   for (const vector of FIXTURE.slotMapping.vectors) {
     it(`reproduces ${vector.id}`, async () => {
+      record('slotMapping', vector.id);
       // slotsAsGiven is deliberately NOT in ascending order. Passing it through untouched is the
       // point: an implementation that walks the published array as-is gets a different slot.
       const derivation = await derive(SERVER_SEED, vector.clientSeed, vector.nonce);
@@ -138,6 +163,7 @@ describe('the slot mapping — rng-fairness.md §4', () => {
 describe('the edition fingerprint — the 0x01 preimage', () => {
   for (const vector of FIXTURE.editionFingerprint.vectors) {
     it(`reproduces ${vector.id}`, async () => {
+      record('editionFingerprint', vector.id);
       // slotsAsGiven carries requiredBuyBackRateBps and requiredCategory, which are NOT in the
       // preimage. Feeding them in unfiltered is deliberate: an implementation that hashes them
       // produces a different digest and fails right here.
@@ -234,5 +260,41 @@ describe('verify() end to end', () => {
     assert.equal(report.checks.editionFingerprint.ok, false);
     assert.equal(report.checks.commitment.ok, true);
     assert.equal(report.checks.drawnPpmValue.ok, true);
+  });
+});
+
+/**
+ * Declared LAST on purpose. `node --test` runs top-level suites in definition order and does not
+ * overlap them unless asked to, so by the time this runs the ledger above is complete.
+ */
+describe('no vector in the fixture is left unasserted', () => {
+  const families = Object.entries(FIXTURE).filter(([key]) => !METADATA_KEYS.has(key));
+
+  it('exercises every vector in every family the fixture carries', () => {
+    // A NEW family is a hard failure, never a skip. This is the assertion that makes it impossible
+    // to add vectors on the platform side and have this library quietly go on proving less: the
+    // build here breaks until somebody writes the conformance test for them.
+    //
+    // One test rather than two (family coverage, then vector coverage) because a new family fails
+    // both for the same cause, and one red per cause is easier to act on than two.
+    const expected = families.flatMap(([family, body]) => {
+      const vectors = (body as { vectors?: { id: string }[] }).vectors;
+      assert.ok(
+        vectors?.length,
+        `the fixture carries '${family}', which this suite never asserts. If it is a vector ` +
+          'family, write its conformance test — a family the verifier ignores is a claim it ' +
+          'cannot make. If it is new metadata, add it to METADATA_KEYS.',
+      );
+      return vectors.map((vector) => `${family}/${vector.id}`);
+    });
+
+    // Sorted so a failure names the missing vectors rather than showing two shuffled lists.
+    assert.deepEqual([...asserted].sort(), expected.sort());
+  });
+
+  it('replays the bulk sweep in full', () => {
+    // The sweep has no per-row ids, so it is counted rather than keyed. A `.slice()` or an early
+    // `break` slipped into the sweep loop would otherwise shrink coverage invisibly.
+    assert.equal(sweepRowsAsserted, FIXTURE.draw.sweep.rows.length);
   });
 });

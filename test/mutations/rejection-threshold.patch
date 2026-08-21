@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 1934d99..027b7bc 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -40,7 +40,7 @@ export const SERVER_SEED_BYTES = 32;
+  * 1,000,000, so a bare `mod` would over-represent low ppm values. Discarding the short tail leaves
+  * a range 1,000,000 divides exactly.
+  */
+-export const ACCEPTANCE_THRESHOLD = 4_294_000_000;
++export const ACCEPTANCE_THRESHOLD = 4_295_000_000;
+ 
+ /** Big-endian 4-byte chunk offsets, tried in exactly this order. */
+ export const CHUNK_OFFSETS: readonly number[] = [0, 4, 8, 12, 16, 20, 24, 28];

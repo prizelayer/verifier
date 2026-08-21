@@ -105,5 +105,23 @@ export async function runConformance(fixture) {
   eq('verify.ok', report.ok, true);
   eq('verify.trace.hmac', report.trace.hmacHex, fixture.draw.vectors[0].hmacHex);
 
+  // --- the same fail-closed family check the Node suite makes ---
+  // Without this the guarantee would hold in Node only: a family added on the platform side would
+  // redden `npm test` while this pass went on silently proving less, in the three engines a player
+  // actually runs. Kept as literals rather than imported because this file is deliberately plain
+  // JS loaded straight into the page; it must stay in step with METADATA_KEYS and the loops above
+  // in `test/vectors.test.ts`.
+  const METADATA_KEYS = ['formatVersion', 'source', 'specification', 'notes'];
+  const COVERED_FAMILIES = ['draw', 'slotMapping', 'editionFingerprint'];
+  for (const key of Object.keys(fixture)) {
+    checked++;
+    if (!METADATA_KEYS.includes(key) && !COVERED_FAMILIES.includes(key)) {
+      failures.push(
+        `fixture carries '${key}', which this browser pass never asserts. If it is a vector ` +
+          'family, add it here and to test/vectors.test.ts; if it is new metadata, list it above.',
+      );
+    }
+  }
+
   return { checked, failures };
 }
