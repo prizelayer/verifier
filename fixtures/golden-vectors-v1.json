@@ -1,0 +1,859 @@
+{
+  "formatVersion": 1,
+  "source": "prizelayer/platform — :fairness-vectors (KAN-36)",
+  "specification": {
+    "draw": "specs/rng-fairness.md §1–§4, §7",
+    "slotMapping": "specs/rng-fairness.md §4 (cumulative lookup)",
+    "editionFingerprint": "specs/domain-model.md §B · ADR-KAN-14 (0x01 preimage)"
+  },
+  "notes": [
+    "Generated from the certified Kotlin perimeter. Neither implementation may edit this file to make itself pass (KAN-29 S4).",
+    "All numbers are JSON integers. No floats appear anywhere in either algorithm.",
+    "The attempt>=1 branch (all 8 chunks of one HMAC rejected) has probability ~6.6e-30 and therefore has NO golden vector and can never have one. It is specified in rng-fairness.md §3 and covered in both implementations by code review alone. Its absence here is a property of the algorithm, not a gap in coverage."
+  ],
+  "draw": {
+    "serverSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "commitmentHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+    "constants": {
+      "serverSeedBytes": 32,
+      "acceptanceThreshold": 4294000000,
+      "chunkOffsets": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ppmTotal": 1000000,
+      "messageFormat": "<clientSeed>:<nonce>:<attempt>, US-ASCII, attempt spelled from 0",
+      "hmac": "HMAC-SHA256 keyed with the RAW 32 seed bytes, never the hex string"
+    },
+    "vectors": [
+      {
+        "id": "spec-nonce-1",
+        "note": "rng-fairness.md §7 table row 1 — accepted at offset 0, no rejection.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "message": "alice-seed:1:0",
+        "hmacHex": "bf76142d4a26d2f6b01b61fe966bad4c24d13c64346d5043b86119caacc8fe2e",
+        "rejected": [],
+        "attempt": 0,
+        "offset": 0,
+        "acceptedChunk": 3212186669,
+        "ppm": 186669
+      },
+      {
+        "id": "spec-nonce-2",
+        "note": "rng-fairness.md §7 table row 2.",
+        "clientSeed": "alice-seed",
+        "nonce": 2,
+        "message": "alice-seed:2:0",
+        "hmacHex": "8eb88e949a30c8c4cc997275c7da4ad6a2c13f51d0bee2308738b586cfce1ff9",
+        "rejected": [],
+        "attempt": 0,
+        "offset": 0,
+        "acceptedChunk": 2394459796,
+        "ppm": 459796
+      },
+      {
+        "id": "spec-nonce-3",
+        "note": "rng-fairness.md §7 table row 3.",
+        "clientSeed": "alice-seed",
+        "nonce": 3,
+        "message": "alice-seed:3:0",
+        "hmacHex": "6e950cce36f545fc5ee2086556a0c01d063229fd9432ae88004ab25599db96a4",
+        "rejected": [],
+        "attempt": 0,
+        "offset": 0,
+        "acceptedChunk": 1855261902,
+        "ppm": 261902
+      },
+      {
+        "id": "spec-rejection-nonce-7599",
+        "note": "rng-fairness.md §7 rejection vector — offset 0 rejected, offset 4 accepted.",
+        "clientSeed": "alice-seed",
+        "nonce": 7599,
+        "message": "alice-seed:7599:0",
+        "hmacHex": "fff73905c869ae6000ed2e72b4fd809183a2c4dc5d2caff5dc46cacb99abb94e",
+        "rejected": [
+          {
+            "attempt": 0,
+            "offset": 0,
+            "chunk": 4294392069
+          }
+        ],
+        "attempt": 0,
+        "offset": 4,
+        "acceptedChunk": 3362369120,
+        "ppm": 369120
+      },
+      {
+        "id": "multi-rejection",
+        "note": "The multi-rejection case §7 requires: offsets 0 and 4 both rejected, offset 8 accepted. Found by search over client seeds so the nonce stays inside the 1,000-open rotation cap.",
+        "clientSeed": "alice-seed-8948",
+        "nonce": 200,
+        "message": "alice-seed-8948:200:0",
+        "hmacHex": "fffb8bc9fff16189af11fa23664f95d49ac899a4d916080f94e88694a6841386",
+        "rejected": [
+          {
+            "attempt": 0,
+            "offset": 0,
+            "chunk": 4294675401
+          },
+          {
+            "attempt": 0,
+            "offset": 4,
+            "chunk": 4294009225
+          }
+        ],
+        "attempt": 0,
+        "offset": 8,
+        "acceptedChunk": 2937190947,
+        "ppm": 190947
+      }
+    ],
+    "sweep": {
+      "note": "The \"larger generated set\" of rng-fairness.md §7, compact: every implementation must reproduce attempt/offset/ppm for each nonce from the same seed and client seed. The second window brackets nonce 7599 so the sweep covers the rejection branch — nonces 1-64 all accept at offset 0 and cannot detect a missing rejection loop.",
+      "clientSeed": "alice-seed",
+      "windows": [
+        {
+          "firstNonce": 1,
+          "lastNonce": 64
+        },
+        {
+          "firstNonce": 7590,
+          "lastNonce": 7610
+        }
+      ],
+      "rows": [
+        {
+          "nonce": 1,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 186669
+        },
+        {
+          "nonce": 2,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 459796
+        },
+        {
+          "nonce": 3,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 261902
+        },
+        {
+          "nonce": 4,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 789662
+        },
+        {
+          "nonce": 5,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 133803
+        },
+        {
+          "nonce": 6,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 971210
+        },
+        {
+          "nonce": 7,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 823017
+        },
+        {
+          "nonce": 8,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 879435
+        },
+        {
+          "nonce": 9,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 100553
+        },
+        {
+          "nonce": 10,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 426053
+        },
+        {
+          "nonce": 11,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 892372
+        },
+        {
+          "nonce": 12,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 603723
+        },
+        {
+          "nonce": 13,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 919883
+        },
+        {
+          "nonce": 14,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 104836
+        },
+        {
+          "nonce": 15,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 351905
+        },
+        {
+          "nonce": 16,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 576534
+        },
+        {
+          "nonce": 17,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 228610
+        },
+        {
+          "nonce": 18,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 893068
+        },
+        {
+          "nonce": 19,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 465284
+        },
+        {
+          "nonce": 20,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 579413
+        },
+        {
+          "nonce": 21,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 987887
+        },
+        {
+          "nonce": 22,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 173162
+        },
+        {
+          "nonce": 23,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 219222
+        },
+        {
+          "nonce": 24,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 470482
+        },
+        {
+          "nonce": 25,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 761325
+        },
+        {
+          "nonce": 26,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 404820
+        },
+        {
+          "nonce": 27,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 738328
+        },
+        {
+          "nonce": 28,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 298482
+        },
+        {
+          "nonce": 29,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 228357
+        },
+        {
+          "nonce": 30,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 918010
+        },
+        {
+          "nonce": 31,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 747803
+        },
+        {
+          "nonce": 32,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 485645
+        },
+        {
+          "nonce": 33,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 714630
+        },
+        {
+          "nonce": 34,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 995411
+        },
+        {
+          "nonce": 35,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 364158
+        },
+        {
+          "nonce": 36,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 333294
+        },
+        {
+          "nonce": 37,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 586625
+        },
+        {
+          "nonce": 38,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 923285
+        },
+        {
+          "nonce": 39,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 299939
+        },
+        {
+          "nonce": 40,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 588430
+        },
+        {
+          "nonce": 41,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 168289
+        },
+        {
+          "nonce": 42,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 60516
+        },
+        {
+          "nonce": 43,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 496869
+        },
+        {
+          "nonce": 44,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 293741
+        },
+        {
+          "nonce": 45,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 532795
+        },
+        {
+          "nonce": 46,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 744461
+        },
+        {
+          "nonce": 47,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 894480
+        },
+        {
+          "nonce": 48,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 480401
+        },
+        {
+          "nonce": 49,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 746968
+        },
+        {
+          "nonce": 50,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 885765
+        },
+        {
+          "nonce": 51,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 198929
+        },
+        {
+          "nonce": 52,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 683160
+        },
+        {
+          "nonce": 53,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 936463
+        },
+        {
+          "nonce": 54,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 832092
+        },
+        {
+          "nonce": 55,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 78336
+        },
+        {
+          "nonce": 56,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 984594
+        },
+        {
+          "nonce": 57,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 199878
+        },
+        {
+          "nonce": 58,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 213941
+        },
+        {
+          "nonce": 59,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 325914
+        },
+        {
+          "nonce": 60,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 499993
+        },
+        {
+          "nonce": 61,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 946404
+        },
+        {
+          "nonce": 62,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 131997
+        },
+        {
+          "nonce": 63,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 173493
+        },
+        {
+          "nonce": 64,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 706853
+        },
+        {
+          "nonce": 7590,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 246613
+        },
+        {
+          "nonce": 7591,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 884735
+        },
+        {
+          "nonce": 7592,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 725710
+        },
+        {
+          "nonce": 7593,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 261415
+        },
+        {
+          "nonce": 7594,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 684124
+        },
+        {
+          "nonce": 7595,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 298053
+        },
+        {
+          "nonce": 7596,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 1174
+        },
+        {
+          "nonce": 7597,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 27222
+        },
+        {
+          "nonce": 7598,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 672440
+        },
+        {
+          "nonce": 7599,
+          "attempt": 0,
+          "offset": 4,
+          "ppm": 369120
+        },
+        {
+          "nonce": 7600,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 17777
+        },
+        {
+          "nonce": 7601,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 98066
+        },
+        {
+          "nonce": 7602,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 501236
+        },
+        {
+          "nonce": 7603,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 782563
+        },
+        {
+          "nonce": 7604,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 723018
+        },
+        {
+          "nonce": 7605,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 873545
+        },
+        {
+          "nonce": 7606,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 938243
+        },
+        {
+          "nonce": 7607,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 18898
+        },
+        {
+          "nonce": 7608,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 520144
+        },
+        {
+          "nonce": 7609,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 585947
+        },
+        {
+          "nonce": 7610,
+          "attempt": 0,
+          "offset": 0,
+          "ppm": 835852
+        }
+      ]
+    }
+  },
+  "slotMapping": {
+    "specification": "specs/rng-fairness.md §4 — cumulative lookup in slot_index order",
+    "note": "cum_0 = p_0, cum_i = cum_{i-1} + p_i, and v yields slot i where cum_{i-1} <= v < cum_i (cum_{-1} = 0). The comparison is STRICTLY less-than: a v equal to a cumulative bound belongs to the NEXT slot, and a slot with probabilityPpm 0 can never be selected.",
+    "canonicalOrder": "The lookup runs in ASCENDING slotIndex order. slotsAsGiven below is deliberately NOT ascending: caller order is never trusted, exactly as the 0x01 edition preimage sorts before hashing. An implementation that walks the published array as-is disagrees.",
+    "vectors": [
+      {
+        "id": "boundary-v-equals-cum0",
+        "note": "v is EXACTLY cum_0 (186669). Strictly-less-than puts it in slot 1; an implementation using <= returns slot 0. The single most likely §4 defect.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "v": 186669,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 500000
+          },
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 186669
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 313331
+          }
+        ],
+        "slotIndex": 1
+      },
+      {
+        "id": "boundary-v-below-cum0",
+        "note": "The other side of the same edge: the identical v (186669) against cum_0 = 186670 lands in slot 0. Paired with the case above, the bound is pinned from both directions.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "v": 186669,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 313330
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 500000
+          },
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 186670
+          }
+        ],
+        "slotIndex": 0
+      },
+      {
+        "id": "falls-through-to-last-slot",
+        "note": "v = 459796 clears both leading bounds and resolves on the final slot, so the loop is exercised to its last iteration rather than returning early every time.",
+        "clientSeed": "alice-seed",
+        "nonce": 2,
+        "v": 459796,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 813330
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 1
+          },
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 186669
+          }
+        ],
+        "slotIndex": 2
+      },
+      {
+        "id": "zero-ppm-slot-is-skipped",
+        "note": "Slot 0 carries probabilityPpm 0, so the cumulative total does not advance and no v can ever select it. An implementation using <= returns slot 0 for every draw here.",
+        "clientSeed": "alice-seed",
+        "nonce": 3,
+        "v": 261902,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 1000000
+          },
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 0
+          }
+        ],
+        "slotIndex": 1
+      },
+      {
+        "id": "single-slot-full-ppm",
+        "note": "The degenerate table: one slot holding the whole million. Every v resolves to slot 0, and an implementation that mishandles a one-element table fails here.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "v": 186669,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 1000000
+          }
+        ],
+        "slotIndex": 0
+      }
+    ]
+  },
+  "editionFingerprint": {
+    "domainByte": "01",
+    "note": "The ppm probabilities are NOT in snapshot_hash (0x03) — they live only in this preimage. A verifier that accepts a published ppm table on trust proves nothing, so it must recompute edition_fingerprint and match it against the win row.",
+    "excludedFromPreimage": [
+      "requiredBuyBackRateBps",
+      "requiredCategory"
+    ],
+    "numberEncoding": "Every i64 field (priceCents, requiredBuyBackValueCents, requiredMarketValueCents) is a DECIMAL STRING, because signed 64-bit values exceed JavaScript's safe integer range and a bare numeric literal would be rounded by JSON.parse before any code saw it. Parse them into BigInt. u32 fields stay JSON numbers — they cannot overflow.",
+    "layout": [
+      "version: 1 byte = 0x01",
+      "engineId: 16 bytes, raw UUID big-endian (most-significant long first)",
+      "engineVersion: u32 BE",
+      "priceCents: i64 BE, signed two's complement",
+      "slotCount: u32 BE",
+      "per slot, ASCENDING slotIndex: slotIndex u32 BE, probabilityPpm u32 BE, requiredBuyBackValueCents i64 BE, requiredMarketValueCents i64 BE"
+    ],
+    "vectors": [
+      {
+        "id": "canonical-unsorted-slots",
+        "note": "The pinned ADR-KAN-14 golden edition. Slots are supplied 2, 0, 1 — caller order is never trusted, the serializer sorts ascending. Excluded fields carry values here on purpose: an implementation that hashes them disagrees.",
+        "domainValid": true,
+        "edition": {
+          "engineId": "11111111-2222-3333-4444-555555555555",
+          "engineVersion": 7,
+          "priceCents": "1000",
+          "slotsAsGiven": [
+            {
+              "slotIndex": 2,
+              "probabilityPpm": 500000,
+              "requiredBuyBackValueCents": "1500",
+              "requiredMarketValueCents": "5000",
+              "requiredBuyBackRateBps": 2500,
+              "requiredCategory": "electronics"
+            },
+            {
+              "slotIndex": 0,
+              "probabilityPpm": 250000,
+              "requiredBuyBackValueCents": "800",
+              "requiredMarketValueCents": "2000",
+              "requiredBuyBackRateBps": 4000,
+              "requiredCategory": "giftcard"
+            },
+            {
+              "slotIndex": 1,
+              "probabilityPpm": 250000,
+              "requiredBuyBackValueCents": "300",
+              "requiredMarketValueCents": "1000",
+              "requiredBuyBackRateBps": 3000,
+              "requiredCategory": "voucher"
+            }
+          ]
+        },
+        "preimageHex": "01111111112222333344445555555555550000000700000000000003e800000003000000000003d090000000000000032000000000000007d0000000010003d090000000000000012c00000000000003e8000000020007a12000000000000005dc0000000000001388",
+        "editionFingerprint": "290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44"
+      },
+      {
+        "id": "single-slot-full-ppm",
+        "note": "Boundary: one slot holding the entire 1,000,000 ppm, engineVersion 0, price 0. Catches an off-by-one in the slot-count length prefix and a u32 that cannot hold TOTAL.",
+        "domainValid": true,
+        "edition": {
+          "engineId": "00000000-0000-0000-0000-000000000000",
+          "engineVersion": 0,
+          "priceCents": "0",
+          "slotsAsGiven": [
+            {
+              "slotIndex": 0,
+              "probabilityPpm": 1000000,
+              "requiredBuyBackValueCents": "0",
+              "requiredMarketValueCents": "0",
+              "requiredBuyBackRateBps": 0,
+              "requiredCategory": ""
+            }
+          ]
+        },
+        "preimageHex": "01000000000000000000000000000000000000000000000000000000000000000100000000000f424000000000000000000000000000000000",
+        "editionFingerprint": "322dd0ffa73b7f5e0632d3f09b33dd2129e69caaa806bdd2c0e27334b39b4005"
+      },
+      {
+        "id": "negative-cents",
+        "note": "SERIALIZER-LEVEL ONLY — this is NOT a legal edition: no real edition has a negative price or a negative buy-back value, and no validation control would pass it. It exists solely to pin the signed i64 two's-complement encoding, which is where a JavaScript implementation reaching for >>> 0 or a bare Number silently produces the wrong bytes.",
+        "domainValid": false,
+        "edition": {
+          "engineId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+          "engineVersion": 2147483647,
+          "priceCents": "-1",
+          "slotsAsGiven": [
+            {
+              "slotIndex": 0,
+              "probabilityPpm": 400000,
+              "requiredBuyBackValueCents": "-12345",
+              "requiredMarketValueCents": "-1",
+              "requiredBuyBackRateBps": 10000,
+              "requiredCategory": "x"
+            },
+            {
+              "slotIndex": 1,
+              "probabilityPpm": 600000,
+              "requiredBuyBackValueCents": "-9223372036854775807",
+              "requiredMarketValueCents": "9223372036854775807",
+              "requiredBuyBackRateBps": 0,
+              "requiredCategory": "y"
+            }
+          ]
+        },
+        "preimageHex": "01ffffffffffffffffffffffffffffffff7fffffffffffffffffffffff000000020000000000061a80ffffffffffffcfc7ffffffffffffffff00000001000927c080000000000000017fffffffffffffff",
+        "editionFingerprint": "e58b220e552235eb7d15a2123ec2432cc291e446f90d4743cfe0417956ec8c50"
+      }
+    ]
+  }
+}

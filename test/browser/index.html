@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PrizeLayer verifier — browser conformance</title>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+
+    <script type="module">
+      // The fixture is FETCHED here because a browser page cannot read a local file — that is data
+      // delivery, not verification. Once the JSON is in hand the library touches the network for
+      // nothing at all, which `test/offline.test.ts` asserts by poisoning every entry point.
+      import { runConformance } from './conformance.js';
+
+      const out = document.getElementById('out');
+      try {
+        const fixture = await (await fetch('../../fixtures/golden-vectors-v1.json')).json();
+        const result = await runConformance(fixture);
+        window.__conformance = result;
+        out.textContent =
+          result.failures.length === 0
+            ? `PASS — ${result.checked} assertions`
+            : `FAIL — ${result.failures.length} of ${result.checked}\n${result.failures.join('\n')}`;
+      } catch (error) {
+        window.__conformance = { checked: 0, failures: [`threw: ${error?.stack ?? error}`] };
+        out.textContent = `ERROR — ${error?.message ?? error}`;
+      }
+    </script>
+  </body>
+</html>

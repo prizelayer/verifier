@@ -1,0 +1,77 @@
+name: verifier-ci
+
+# Hermetic. No secrets, no AWS, no network access to PrizeLayer — the library is judged entirely
+# against the committed fixture, which is the point: if this build needed our servers, the thing
+# it is trying to prove would already be false.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: verifier-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Type-check + Node conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install (locked, dev only — there are no runtime dependencies)
+        run: npm ci
+
+      - name: Assert the published artifact really has no dependencies
+        # The zero-dependency claim is load-bearing and easy to erode by accident, so it is a
+        # build step rather than a line in the README.
+        run: |
+          deps=$(node -p "Object.keys(require('./package.json').dependencies ?? {}).length")
+          if [ "$deps" != "0" ]; then echo "runtime dependencies appeared: $deps"; exit 1; fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Assert the built artifact is a single self-contained file
+        # "One file a skeptic can read" is a property of the OUTPUT, not of the source layout.
+        # Splitting src/ later would still build, but would quietly break the claim — so the
+        # absence of any module import in dist/ is checked rather than assumed.
+        run: |
+          test "$(ls dist/*.js | wc -l)" -eq 1 || { echo "dist must contain exactly one .js"; exit 1; }
+          if grep -nE "\bfrom\s+['\"]|\brequire\s*\(" dist/verifier.js; then
+            echo "dist/verifier.js imports something — it must be self-contained"; exit 1
+          fi
+
+      - name: Conformance + offline guarantee
+        run: npm test
+
+  browsers:
+    name: Browser conformance (chromium, firefox, webkit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Reproduce every vector in three independent Web Crypto stacks
+        run: npm run test:browser
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore

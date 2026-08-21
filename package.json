@@ -1,0 +1,40 @@
+{
+  "name": "@prizelayer/verifier",
+  "version": "0.1.0",
+  "description": "Trustless, zero-dependency verifier for PrizeLayer draws. Recomputes the draw and the edition fingerprint in your own browser, offline.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prizelayer/verifier.git"
+  },
+  "type": "module",
+  "main": "./dist/verifier.js",
+  "types": "./dist/verifier.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/verifier.d.ts",
+      "default": "./dist/verifier.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "fixtures"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build && npm run build:test && node --test build/test/*.test.js",
+    "test:browser": "npm run build && playwright test",
+    "verify-all": "npm test && npm run test:browser"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "typescript": "~5.6.0"
+  }
+}
