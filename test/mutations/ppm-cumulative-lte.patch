@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 1934d99..d90b084 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -325,7 +325,7 @@ export function slotFor(v: number, slots: readonly Pick<SlotOdds, 'slotIndex' |
+   let cumulative = 0;
+   for (const slot of sorted) {
+     cumulative += slot.probabilityPpm;
+-    if (v < cumulative) return slot.slotIndex;
++    if (v <= cumulative) return slot.slotIndex;
+   }
+   /* Unreachable: the table sums to PPM_TOTAL and v < PPM_TOTAL, both checked above. */
+   throw new Error(`ppm value ${v} exceeded the prize table's cumulative total`);

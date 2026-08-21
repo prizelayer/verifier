@@ -50,6 +50,60 @@ jobs:
       - name: Conformance + offline guarantee
         run: npm test
 
+  mutation-sentinel:
+    name: A broken verifier must fail the conformance suite
+    # KAN-29 S4. The suite above proves this library agrees with the fixture. It does NOT prove the
+    # agreement is load-bearing — a suite that had quietly stopped asserting anything would look
+    # exactly as green. So each patch in test/mutations/ breaks the implementation in a way a
+    # specific golden vector exists to catch, and the build fails if the suite still passes.
+    #
+    # Kept out of `npm test` deliberately: a developer running the suite locally should never see
+    # a red they did not cause. The equivalent proof on the Kotlin side is performed by hand and
+    # recorded in ADR-KAN-38, because mutating source inside a certified gate is a worse trade.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Every mutation must redden the build
+        run: |
+          shopt -s nullglob
+          patches=(test/mutations/*.patch)
+          if [ ${#patches[@]} -eq 0 ]; then
+            echo "no mutation patches found — the sentinel would pass vacuously"; exit 1
+          fi
+          for patch in "${patches[@]}"; do
+            echo "::group::$patch"
+            git apply "$patch" || { echo "::error::$patch no longer applies — rebase it onto src/verifier.ts"; exit 1; }
+
+            # The build must SUCCEED and the suite must FAIL. Asserting only that `npm test` exits
+            # non-zero would accept a patch that merely breaks the type-check: tsc fails, npm test
+            # exits non-zero, and this job reports "caught" for a mutation the conformance suite
+            # never even ran against. That is the false confidence the whole job exists to remove.
+            if ! npm run build || ! npm run build:test; then
+              echo "::error::$patch breaks the type-check rather than the algorithm. A mutation must"
+              echo "::error::compile, or it proves nothing about what the vectors catch."
+              exit 1
+            fi
+            if node --test build/test/*.test.js; then
+              echo "::error::$patch did NOT redden the build. The conformance suite is not catching"
+              echo "::error::the defect this patch introduces — a golden vector is missing or unasserted."
+              exit 1
+            fi
+
+            git apply -R "$patch"
+            echo "caught: $patch"
+            echo "::endgroup::"
+          done
+          # Nothing may survive the loop: a patch left applied would silently poison a later run.
+          git diff --exit-code src/
+
   browsers:
     name: Browser conformance (chromium, firefox, webkit)
     runs-on: ubuntu-latest

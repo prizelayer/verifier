@@ -1,0 +1,15 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 1934d99..43664ac 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -255,8 +255,8 @@ export function bigEndianUint32(bytes: Uint8Array, offset: number): number {
+     throw new Error(`offset ${offset} is out of range for ${bytes.length} bytes`);
+   }
+   return (
+-    bytes[offset] * 0x1000000 +
+-    ((bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3])
++    bytes[offset + 3] * 0x1000000 +
++    ((bytes[offset + 2] << 16) | (bytes[offset + 1] << 8) | bytes[offset])
+   );
+ }
+ 
