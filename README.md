@@ -36,15 +36,19 @@ const report = await verify({
     editionFingerprint: '290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44',
     drawnPpmValue: 186669,
     drawnSlotIndex: 0,
+    snapshotHash: '19159c52d22eaba0ad100d31b5b8b643ddeb24620d761ca05ddf907c92e40617',
+    itemId: '00112233-4455-6677-8899-aabbccddeeff',
   },
+  snapshot: parseSnapshotBody(publishedSnapshotBody),
 });
 
 report.ok;      // true only if every check below passed
 report.summary; // one line, safe to show a player
+report.caveats; // what this run did NOT prove — show these next to any pass
 report.trace;   // every intermediate value, so you can check the workings by hand
 ```
 
-Four independent claims are checked, and **all four must hold**:
+Up to **seven** independent claims are checked, and every one of them must hold:
 
 | Check | What a failure would mean |
 |---|---|
@@ -52,6 +56,13 @@ Four independent claims are checked, and **all four must hold**:
 | `editionFingerprint` | The odds you were shown aren't the odds that were frozen when the box was published. |
 | `drawnPpmValue` | The recorded random value isn't what the seed actually produces. |
 | `drawnSlotIndex` | The value doesn't land on the slot you were given. |
+| `snapshotHash` | The prize table you were shown isn't the one recorded against your win. |
+| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified. |
+| `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew. |
+
+The last three appear only when you pass a `snapshot`. Leave it out and they are absent — and
+`report.caveats` says, in plain language, that the item was never checked. A verifier that prints
+green about a link it never looked at is worse than one that stays silent.
 
 ### The second check is the one that matters
 
@@ -68,6 +79,21 @@ one place: the `edition_fingerprint` preimage, fixed when the box was published.
 rebuilds those canonical bytes itself and hashes them, then compares the result against the
 fingerprint recorded on the win. If someone swapped the odds, the fingerprint won't match, and
 `ok` is `false` no matter how honest the draw itself was.
+
+### And the slot is a position, not a prize
+
+Verifying the draw and the odds proves you legitimately won *slot 2* at its honest 5%. It says
+nothing about what was in slot 2.
+
+That gap is real and it survives every check above. An operator can run a genuinely fair draw, on
+genuinely fair odds, land you on a real slot — and then hand you a £20 voucher while reporting that
+slot 2 was always a £20 voucher. Four green checks, one substituted prize.
+
+Closing it is what the `0x03` snapshot preimage is for. It pins which item filled which slot at
+which displayed value, and it **opens with the raw bytes of the edition fingerprint** — so a
+snapshot is bound to one specific set of odds and cannot be lifted from another edition. Pass the
+published snapshot to `verify()` and the chain runs all the way from the seed to the thing in your
+hands.
 
 ## The algorithms, in full
 
@@ -160,6 +186,10 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `editionFingerprint(edition)` | `SHA-256` of the above, lowercase hex. |
 | `commitment(seedBytes)` | `SHA-256` of the raw seed. |
 | `parseEdition(json)` | Published JSON → typed edition, cents as `BigInt`. |
+| `snapshotBytes(snapshot)` | The canonical `0x03` preimage, for inspection. |
+| `snapshotHash(snapshot)` | `SHA-256` of the above — the `snapshot_hash` on the win. |
+| `parseSnapshotBody(body)` | The published `snapshot.body` JSON (or its text) → typed snapshot. |
+| `parseSnapshot(json)` | The camelCase, decimal-string form → typed snapshot. |
 | `bytesFromHex` / `hexFromBytes` | Hex helpers. |
 
 Everything is `async`, because Web Crypto is. There's no synchronous variant on purpose: a second
@@ -172,11 +202,28 @@ Cents are `bigint`, and published cents arrive as **decimal strings**. Signed 64
 ever ran — and no reviver can recover the lost digits afterwards. `parseEdition()` handles this and
 throws loudly if it's handed a number that has already lost precision.
 
+Two more, specific to the snapshot preimage:
+
+**`displayedMedia` is length-prefixed in UTF-8 bytes.** It's the only variable-width field in
+either preimage, and `String.length` gives you UTF-16 code units. They're equal for ASCII and
+different for everything else, so this bug passes every ASCII test you'll write. `'café'` is 5
+bytes and 4 code units; `'🎁'` is 4 bytes and 2 code units. Use `TextEncoder`.
+
+**`snapshot_hash` is taken over the canonical bytes, never over the body JSON.** So re-serialising
+the body — different whitespace, different key order — does *not* change the hash, and a verifier
+that hashes the bytes it received would wrongly reject an honest snapshot. Parse the body into
+fields and rebuild the preimage, which is what `parseSnapshotBody()` is for.
+
 ## What it does not do yet
 
-It verifies the draw, the odds behind it, and the slot you landed on. It does **not** yet verify
-which specific item occupied that slot — that binding lives in a different hash preimage
-(`0x03`) which isn't covered here. That's tracked, not forgotten.
+It verifies the draw, the odds behind it, the slot you landed on, and — given the published
+snapshot — the item that filled it. The chain from seed to prize is complete.
+
+What remains outside it is **provenance**, not cryptography: that the item really existed in stock
+and really shipped to you. That is inventory and fulfilment, and no hash can settle it.
+
+The `0x02` content preimage, which binds the whole item set to an edition, is also not implemented.
+`0x03` alone closes the player-facing slot → item gap, so `0x02` waits for a story that needs it.
 
 ## Licence
 

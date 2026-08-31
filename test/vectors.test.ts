@@ -23,7 +23,11 @@ import {
   editionFingerprint,
   hexFromBytes,
   parseEdition,
+  parseSnapshot,
+  parseSnapshotBody,
   slotFor,
+  snapshotBytes,
+  snapshotHash,
   verify,
 } from '../src/verifier.js';
 
@@ -32,6 +36,40 @@ const FIXTURE = JSON.parse(
 );
 
 const SERVER_SEED = bytesFromHex(FIXTURE.draw.serverSeedHex);
+
+/**
+ * Re-space JSON the way Postgres `jsonb` does on output: a space after every `:` and `,` outside
+ * of strings. Verified against a real `postgres:16` instance rather than assumed.
+ *
+ * Done as a TEXT scan, not `JSON.parse` + re-render, and that is the whole point of the test. The
+ * parse-and-render version of this helper rounded `-9223372036854775807` to
+ * `-9223372036854776000` before it could re-emit it — destroying in the fixture exactly the value
+ * the `extreme-signed-displayed-value` vector exists to protect. Real `jsonb` does not, because it
+ * holds numbers as `numeric`; only a JavaScript parser loses them.
+ *
+ * `jsonb` also reorders object KEYS (by length, then bytewise). Not simulated, and it does not need
+ * to be: array order is preserved by `jsonb`, so the nth `displayed_value_cents` literal is still
+ * the nth slot however the keys within each slot are arranged.
+ */
+function asJsonb(bodyText: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const char of bodyText) {
+    out += char;
+    if (escaped) {
+      escaped = false;
+    } else if (char === '\\' && inString) {
+      escaped = true;
+    } else if (char === '"') {
+      inString = !inString;
+    } else if (!inString && (char === ':' || char === ',')) {
+      out += ' ';
+    }
+  }
+  return out;
+}
 
 /**
  * Every `family/id` this suite actually asserted, and how many sweep rows it replayed.
@@ -201,6 +239,96 @@ describe('the edition fingerprint — the 0x01 preimage', () => {
   });
 });
 
+describe('the snapshot content address — the 0x03 preimage', () => {
+  for (const vector of FIXTURE.snapshot.vectors) {
+    it(`reproduces ${vector.id}`, async () => {
+      record('snapshot', vector.id);
+      // slotsAsGiven is unsorted for the multi-slot cases, exactly as in the other families.
+      const snapshot = parseSnapshot({
+        editionFingerprint: vector.editionFingerprint,
+        slots: vector.slotsAsGiven,
+      });
+
+      assert.equal(hexFromBytes(snapshotBytes(snapshot)), vector.preimageHex);
+      assert.equal(await snapshotHash(snapshot), vector.snapshotHash);
+    });
+
+    it(`reproduces ${vector.id} from the published body JSON`, async () => {
+      // The production path. `GET /verify/snapshots/{hash}` serves this exact text, so parsing it
+      // and rebuilding the preimage is what a real verification does — asserting only against the
+      // tidy camelCase form would leave the snake_case parser untested against real bytes.
+      assert.equal(await snapshotHash(parseSnapshotBody(vector.body)), vector.snapshotHash);
+    });
+  }
+
+  it('chains onto the 0x01 edition fingerprint rather than sitting beside it', async () => {
+    // The preimage opens with the DECODED edition digest, so verifying a snapshot transitively
+    // verifies the odds it was built over. If a snapshot could name any fingerprint it liked, the
+    // 0x03 check would prove only that some prize table hashes to some value.
+    const canonical = FIXTURE.editionFingerprint.vectors.find(
+      (v: { id: string }) => v.id === 'canonical-unsorted-slots',
+    );
+    for (const vector of FIXTURE.snapshot.vectors) {
+      assert.equal(vector.editionFingerprint, canonical.editionFingerprint);
+      assert.ok(vector.preimageHex.startsWith('03' + canonical.editionFingerprint));
+    }
+  });
+
+  it('the fixture still carries media that is longer in UTF-8 bytes than in UTF-16 units', () => {
+    // The guard on the guard. displayedMedia's length prefix counts BYTES; String.length counts
+    // code units. Every ASCII-only case passes under either reading, so if the fixture's media
+    // were ever "tidied" to ASCII this family would go on passing while proving nothing.
+    const media: string[] = FIXTURE.snapshot.vectors.flatMap(
+      (v: { slotsAsGiven: { displayedMedia: string }[] }) =>
+        v.slotsAsGiven.map((s) => s.displayedMedia),
+    );
+    const multiByte = media.filter((m) => new TextEncoder().encode(m).length !== m.length);
+
+    assert.ok(multiByte.length > 0, 'no displayedMedia in the fixture is multi-byte');
+    assert.ok(
+      multiByte.some((m) => [...m].length !== m.length),
+      'no displayedMedia contains a character outside the BMP (a surrogate pair)',
+    );
+  });
+
+  it('reproduces the hash from the jsonb-shaped body the API actually serves', async () => {
+    // The fixture's `body` is the platform WRITER's rendering: compact separators, alphabetical
+    // keys. That is not what crosses the wire. The column is Postgres `jsonb`, which re-renders on
+    // the way out with a space after every colon and its own key order (by key length, then
+    // bytewise). Verified against a real postgres:16 instance, not assumed.
+    //
+    // This is also the "re-serialised body" case in the flesh, and it must PASS: the content
+    // address is taken over canonical bytes, so re-rendering the JSON cannot legitimately change
+    // it. A verifier that failed here would reject honest snapshots.
+    for (const vector of FIXTURE.snapshot.vectors) {
+      assert.equal(await snapshotHash(parseSnapshotBody(asJsonb(vector.body))), vector.snapshotHash);
+    }
+  });
+
+  it('refuses a snapshot with two entries for one slot', () => {
+    // A duplicate leaves the preimage dependent on arrival order — the exact property sorting
+    // exists to remove. No legitimate snapshot has one.
+    assert.throws(
+      () =>
+        snapshotBytes({
+          editionFingerprint: 'ab'.repeat(32),
+          slots: [
+            { slotIndex: 0, currentItemId: '11111111-1111-1111-1111-111111111111', displayedValueCents: 1n, displayedMedia: 'a' },
+            { slotIndex: 0, currentItemId: '22222222-2222-2222-2222-222222222222', displayedValueCents: 2n, displayedMedia: 'b' },
+          ],
+        }),
+      /duplicate slotIndex/,
+    );
+  });
+
+  it('refuses a body whose format_version is not 0x03', () => {
+    assert.throws(
+      () => parseSnapshotBody({ edition_fingerprint: 'ab'.repeat(32), format_version: 2, slots: [] }),
+      /unsupported snapshot format_version/,
+    );
+  });
+});
+
 describe('verify() end to end', () => {
   /** The §7 seed and nonce 1, drawn against the pinned golden edition. */
   async function input(overrides: Record<string, unknown> = {}) {
@@ -222,6 +350,38 @@ describe('verify() end to end', () => {
         editionFingerprint: vector.editionFingerprint,
         drawnPpmValue: 186_669,
         drawnSlotIndex: slotFor(186_669, edition.slots),
+        ...(overrides.expected as object | undefined),
+      },
+    };
+  }
+
+  /** The snapshot vector built over the same canonical edition, and the item in the drawn slot. */
+  function snapshotVector() {
+    return FIXTURE.snapshot.vectors.find(
+      (v: { id: string }) => v.id === 'chains-onto-canonical-edition',
+    );
+  }
+
+  /** {@link input}, plus the published prize-table snapshot so the item is verified too. */
+  async function inputWithSnapshot(overrides: Record<string, unknown> = {}) {
+    const vector = snapshotVector();
+    const base = await input();
+    const snapshot = parseSnapshot({
+      editionFingerprint: vector.editionFingerprint,
+      slots: vector.slotsAsGiven,
+    });
+    const itemId = vector.slotsAsGiven.find(
+      (s: { slotIndex: number }) => s.slotIndex === base.expected.drawnSlotIndex,
+    ).currentItemId;
+
+    return {
+      ...base,
+      snapshot,
+      ...overrides,
+      expected: {
+        ...base.expected,
+        snapshotHash: vector.snapshotHash,
+        itemId,
         ...(overrides.expected as object | undefined),
       },
     };
@@ -260,6 +420,93 @@ describe('verify() end to end', () => {
     assert.equal(report.checks.editionFingerprint.ok, false);
     assert.equal(report.checks.commitment.ok, true);
     assert.equal(report.checks.drawnPpmValue.ok, true);
+  });
+
+  it('says plainly which item it did NOT verify when no snapshot is supplied', async () => {
+    // A verifier that stays quiet about the links it never checked turns an unexamined claim into
+    // an apparent proof. `ok: true` here is honest only because the caveat travels with it.
+    const report = await verify(await input());
+
+    assert.equal(report.ok, true);
+    assert.equal(report.checks.drawnItemId, undefined);
+    assert.equal(report.caveats.length, 1);
+    assert.match(report.caveats[0], /NOT VERIFIED: which item filled slot/);
+    assert.match(report.summary, /item in that slot was NOT verified/);
+  });
+
+  it('verifies the item in the drawn slot when the snapshot is supplied', async () => {
+    const report = await verify(await inputWithSnapshot());
+
+    assert.equal(report.ok, true);
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.equal(report.checks.drawnItemId?.ok, true);
+    assert.deepEqual(report.caveats, []);
+    assert.equal(report.trace.computedSnapshotHash, snapshotVector().snapshotHash);
+    assert.match(report.summary, /puts item [0-9a-f-]{36} in it\.$/);
+  });
+
+  it('fails when the item recorded on the win is not the item in the drawn slot', async () => {
+    // THE attack KAN-50 exists to stop: a genuinely fair draw, on genuinely fair odds, landing on
+    // a real slot — and then a different, cheaper prize reported for it. Every check that existed
+    // before this story still passes.
+    const report = await verify(
+      await inputWithSnapshot({ expected: { itemId: '99999999-9999-9999-9999-999999999999' } }),
+    );
+
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.drawnItemId?.ok, false);
+    assert.equal(report.checks.commitment.ok, true);
+    assert.equal(report.checks.editionFingerprint.ok, true);
+    assert.equal(report.checks.drawnPpmValue.ok, true);
+    assert.equal(report.checks.drawnSlotIndex.ok, true);
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.match(report.summary, /^FAILED: drawnItemId/);
+  });
+
+  it('fails when a displayed value in the snapshot was tampered with', async () => {
+    const vector = snapshotVector();
+    const tampered = parseSnapshot({
+      editionFingerprint: vector.editionFingerprint,
+      slots: vector.slotsAsGiven.map((s: Record<string, unknown>, i: number) =>
+        i === 0 ? { ...s, displayedValueCents: '1' } : s,
+      ),
+    });
+    const report = await verify(await inputWithSnapshot({ snapshot: tampered }));
+
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.snapshotHash?.ok, false);
+  });
+
+  it('fails when the snapshot is a valid one belonging to a DIFFERENT edition', async () => {
+    // Without the chain check this is the hole: a perfectly well-formed snapshot, hashing exactly
+    // to the value recorded against it, describing some other edition's prize table entirely.
+    const vector = snapshotVector();
+    const foreign = parseSnapshot({
+      editionFingerprint: 'ab'.repeat(32),
+      slots: vector.slotsAsGiven,
+    });
+    const report = await verify(
+      await inputWithSnapshot({
+        snapshot: foreign,
+        expected: { snapshotHash: await snapshotHash(foreign) },
+      }),
+    );
+
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.snapshotEditionLink?.ok, false);
+    assert.equal(report.checks.snapshotHash?.ok, true, 'the foreign snapshot hashes correctly — that is the point');
+  });
+
+  it('refuses to pretend when a snapshot arrives without the claims to check it against', async () => {
+    // The key is REMOVED, not set to undefined: `exactOptionalPropertyTypes` makes those two
+    // different types, and it is the absent-key case a real caller produces.
+    const base = await inputWithSnapshot();
+    const { itemId: _omitted, ...expectedWithoutItem } = base.expected;
+    await assert.rejects(
+      () => verify({ ...base, expected: expectedWithoutItem }),
+      /expected.snapshotHash and expected.itemId are required/,
+    );
   });
 });
 

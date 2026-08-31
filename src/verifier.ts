@@ -51,6 +51,13 @@ export const PPM_TOTAL = 1_000_000;
 /** Domain byte prefixing the `edition_fingerprint` preimage. */
 export const EDITION_DOMAIN_BYTE = 0x01;
 
+/**
+ * Domain byte of the snapshot preimage — the one that binds a slot to the ITEM that filled it.
+ * Distinct from {@link EDITION_DOMAIN_BYTE} so the two preimages can never be confused for one
+ * another even if every following byte happened to coincide.
+ */
+export const SNAPSHOT_DOMAIN_BYTE = 0x03;
+
 /** Client seeds are constrained by rng-fairness.md §2, which keeps the HMAC message pure ASCII. */
 const CLIENT_SEED_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -85,6 +92,35 @@ export interface Edition {
   slots: SlotOdds[];
 }
 
+/**
+ * One slot's display fact, as pinned by the `0x03` snapshot preimage.
+ *
+ * `displayedValueCents` is `bigint` for the same reason the edition's cents fields are. See
+ * {@link parseSnapshotBody} before parsing a published body by hand.
+ */
+export interface SnapshotSlot {
+  slotIndex: number;
+  /** The item that filled this slot, as a canonical hyphenated UUID. */
+  currentItemId: string;
+  displayedValueCents: bigint;
+  /** The label/media reference shown for the slot. May be empty. Hashed as UTF-8 BYTES. */
+  displayedMedia: string;
+}
+
+/**
+ * A published prize-table snapshot: which item sat in which slot, and at what displayed value.
+ *
+ * `editionFingerprint` is not decoration — the preimage opens with its raw 32 bytes, so a
+ * snapshot is cryptographically bound to one edition's maths. {@link verify} checks that the
+ * fingerprint here is the one it recomputed from the edition, which is what makes the two
+ * preimages one chain rather than two unrelated hashes.
+ */
+export interface Snapshot {
+  /** 64 lowercase hex characters — the edition digest this snapshot was built over. */
+  editionFingerprint: string;
+  slots: SnapshotSlot[];
+}
+
 /** One chunk the derivation loop discarded, located by the HMAC it came from and its offset. */
 export interface RejectedChunk {
   attempt: number;
@@ -116,11 +152,24 @@ export interface VerificationInput {
   clientSeed: string;
   nonce: number;
   edition: Edition;
+  /**
+   * The published prize-table snapshot, if you have it.
+   *
+   * OPTIONAL, and its absence is reported rather than ignored: without it the chain stops at a
+   * slot NUMBER. You would have proved you legitimately won position `i` at its honest odds, and
+   * nothing at all about what was in position `i`. When omitted, {@link VerificationReport.caveats}
+   * says so in as many words.
+   */
+  snapshot?: Snapshot;
   /** What the platform says happened. Every field here is a claim this library tries to refute. */
   expected: {
     editionFingerprint: string;
     drawnPpmValue: number;
     drawnSlotIndex: number;
+    /** The `snapshot_hash` recorded on the win. Required when {@link VerificationInput.snapshot} is given. */
+    snapshotHash?: string;
+    /** The item id the platform says you received. Required when {@link VerificationInput.snapshot} is given. */
+    itemId?: string;
   };
 }
 
@@ -144,13 +193,35 @@ export interface VerificationReport {
     drawnPpmValue: Check;
     /** The cumulative lookup reproduces the recorded slot. */
     drawnSlotIndex: Check;
+    /** The published snapshot body reproduces the `snapshot_hash` on the win. Absent if no snapshot was given. */
+    snapshotHash?: Check;
+    /**
+     * The snapshot is bound to THIS edition — its embedded fingerprint is the one recomputed from
+     * the odds. Without this a valid snapshot of some *other* edition would sail through.
+     */
+    snapshotEditionLink?: Check;
+    /** The item recorded on the win is the item the snapshot places in the drawn slot. */
+    drawnItemId?: Check;
   };
   trace: Derivation & {
     /** The canonical `0x01` edition preimage, lowercase hex — the exact bytes that were hashed. */
     editionPreimageHex: string;
     computedEditionFingerprint: string;
     computedSlotIndex: number;
+    /** The canonical `0x03` snapshot preimage, lowercase hex. Absent if no snapshot was given. */
+    snapshotPreimageHex?: string;
+    computedSnapshotHash?: string;
+    /** The item the snapshot places in the slot the maths selected. */
+    itemIdInDrawnSlot?: string;
   };
+  /**
+   * What this run did NOT prove, in plain language.
+   *
+   * A verifier that only ever prints green is not a verifier, and one that stays silent about the
+   * links it never checked is worse — it converts an unexamined claim into an apparent proof.
+   * Show these next to any PASS.
+   */
+  caveats: string[];
   /** A one-line human summary, safe to show a player verbatim. */
   summary: string;
 }
@@ -426,12 +497,100 @@ function writeI64(out: number[], value: bigint): void {
 }
 
 /** A UUID's 16 raw bytes. The hyphenated text form is just a rendering of exactly these bytes. */
-function writeUuid(out: number[], uuid: string): void {
+function writeUuid(out: number[], uuid: string, field = 'engineId'): void {
   const hex = uuid.replace(/-/g, '');
   if (hex.length !== 32) {
-    throw new Error(`engineId must be a 16-byte UUID, got '${uuid}'`);
+    throw new Error(`${field} must be a 16-byte UUID, got '${uuid}'`);
   }
   out.push(...bytesFromHex(hex));
+}
+
+// ---------------------------------------------------------------------------
+// The snapshot content address — the `0x03` canonical preimage
+// ---------------------------------------------------------------------------
+
+/**
+ * The canonical byte preimage of a prize-table snapshot — what `snapshot_hash` is taken over:
+ *
+ * ```
+ * domain            : 1 byte = 0x03
+ * editionFingerprint: 32 bytes, the hex-DECODED digest (not its 64 ASCII characters)
+ * slotCount         : u32 BE
+ * per slot, ASCENDING slotIndex:
+ *   slotIndex           : u32 BE
+ *   currentItemId       : 16 bytes, raw UUID, most-significant half first
+ *   displayedValueCents : i64 BE, signed
+ *   displayedMedia      : u32 BE byte-length prefix + UTF-8 bytes
+ * ```
+ *
+ * `displayedMedia` is the only variable-width field in either preimage, and it is where a
+ * JavaScript implementation goes wrong: the prefix counts UTF-8 **bytes**, while `String.length`
+ * counts UTF-16 code units. They agree for ASCII and diverge for everything else, so the mistake
+ * passes every ASCII test. {@link https://github.com/prizelayer/verifier} pins a multi-byte vector
+ * for exactly this reason — see the `multi-byte-displayed-media` case in the fixture.
+ *
+ * Slots are sorted by `slotIndex`; caller order is never trusted, as in {@link editionBytes}.
+ */
+export function snapshotBytes(snapshot: Snapshot): Uint8Array {
+  const out: number[] = [SNAPSHOT_DOMAIN_BYTE];
+
+  const fingerprint = snapshot.editionFingerprint.toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(fingerprint)) {
+    throw new Error(`editionFingerprint must be 64 hex characters, was '${snapshot.editionFingerprint}'`);
+  }
+  out.push(...bytesFromHex(fingerprint));
+
+  const slots = sortedSnapshotSlots(snapshot.slots);
+  writeU32(out, slots.length, 'slotCount');
+  for (const slot of slots) {
+    writeU32(out, slot.slotIndex, 'slotIndex');
+    writeUuid(out, slot.currentItemId, 'currentItemId');
+    writeI64(out, slot.displayedValueCents);
+    writeUtf8(out, slot.displayedMedia);
+  }
+  return new Uint8Array(out);
+}
+
+/** SHA-256 of {@link snapshotBytes}, lowercase hex — the `snapshot_hash` recorded on the win. */
+export async function snapshotHash(snapshot: Snapshot): Promise<string> {
+  return hexFromBytes(await sha256(snapshotBytes(snapshot)));
+}
+
+/**
+ * Sort snapshot slots ascending.
+ *
+ * Deliberately looser than {@link sortedSlots}: a snapshot carries no probabilities, so none of
+ * the odds invariants (ppm summing to a million, contiguous indices) apply here. Duplicates ARE
+ * rejected though — two entries for one slot leave the preimage dependent on the order they
+ * happened to arrive in, which is precisely the property sorting exists to remove. No legitimate
+ * snapshot contains one.
+ */
+function sortedSnapshotSlots(slots: readonly SnapshotSlot[]): SnapshotSlot[] {
+  if (slots.length === 0) throw new Error('a snapshot must have at least one slot');
+
+  const sorted = [...slots].sort((a, b) => a.slotIndex - b.slotIndex);
+  sorted.forEach((slot, position) => {
+    if (!Number.isInteger(slot.slotIndex) || slot.slotIndex < 0) {
+      throw new Error(`slotIndex must be a non-negative integer, was ${slot.slotIndex}`);
+    }
+    if (position > 0 && sorted[position - 1].slotIndex === slot.slotIndex) {
+      throw new Error(`duplicate slotIndex ${slot.slotIndex} — the snapshot preimage would be ambiguous`);
+    }
+  });
+  return sorted;
+}
+
+/**
+ * A u32 big-endian BYTE-length prefix followed by the UTF-8 bytes themselves.
+ *
+ * `TextEncoder` is used rather than `str.length` on purpose, and it is the whole subtlety of this
+ * preimage: for `'café'` the byte length is 5 and the code-unit length is 4; for an emoji outside
+ * the BMP the string is two code units and four bytes.
+ */
+function writeUtf8(out: number[], value: string): void {
+  const bytes = new TextEncoder().encode(value);
+  writeU32(out, bytes.length, 'displayedMedia byte length');
+  out.push(...bytes);
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +643,84 @@ function toBigInt(value: unknown, field: string): bigint {
   throw new Error(`${field} must be a decimal string, was ${typeof value}`);
 }
 
+/**
+ * Build a {@link Snapshot} from the `snapshot.body` JSON that `GET /verify/snapshots/{hash}`
+ * serves, accepting either the raw JSON text or an already-parsed object.
+ *
+ * The body uses `snake_case` and is a *rendering* of the same facts the preimage hashes — the
+ * content address is taken over the canonical bytes, never over this JSON. That is deliberate and
+ * worth understanding before you write your own parser: it means whitespace, key order or a
+ * different JSON library cannot move the hash, and it means a verifier must rebuild the preimage
+ * from the parsed fields rather than hashing the bytes it received.
+ *
+ * **One sharp edge.** `displayed_value_cents` is published as a bare JSON number, not the decimal
+ * string the edition's cents fields use. Realistic money is far inside `Number.MAX_SAFE_INTEGER`
+ * so this is exact in practice, but a value beyond it would be rounded by `JSON.parse` before any
+ * code here could intervene. Rather than fingerprint a rounded value, that case throws — pass the
+ * text form and this function re-reads the literal exactly.
+ */
+export function parseSnapshotBody(body: unknown): Snapshot {
+  const exact = typeof body === 'string' ? exactCentsFromText(body) : null;
+  const raw = (typeof body === 'string' ? JSON.parse(body) : body) as Record<string, unknown>;
+
+  const version = raw?.format_version;
+  if (version !== undefined && Number(version) !== SNAPSHOT_DOMAIN_BYTE) {
+    throw new Error(`unsupported snapshot format_version ${version} — this library implements 0x03`);
+  }
+  const slots = raw?.slots;
+  if (!Array.isArray(slots)) throw new Error('snapshot body must carry a slots array');
+
+  return {
+    editionFingerprint: String(raw.edition_fingerprint),
+    slots: slots.map((slot: Record<string, unknown>, i) => ({
+      slotIndex: Number(slot.slot_index),
+      currentItemId: String(slot.current_item_id),
+      displayedValueCents: toBigInt(exact?.[i] ?? slot.displayed_value_cents, 'displayed_value_cents'),
+      displayedMedia: String(slot.displayed_media ?? ''),
+    })),
+  };
+}
+
+/**
+ * Recover every `displayed_value_cents` literal from the body TEXT, in document order, before
+ * `JSON.parse` can round it.
+ *
+ * Whitespace around the colon is tolerated because the body reaches you through **two** renderers
+ * and they do not agree. The platform writes it with compact separators (`"k":v`), but it is stored
+ * as Postgres `jsonb`, which re-renders on the way out with a space after every colon AND its own
+ * key order (by key length, then bytewise — not the writer's alphabetical order). The value itself
+ * survives that round trip exactly, since `jsonb` holds numbers as `numeric`; it is only
+ * `JSON.parse` in the browser that would round it.
+ *
+ * Order is still safe to rely on: this scans and `JSON.parse` reads the same text, so the nth
+ * literal here is the nth slot there whatever order the keys arrived in.
+ */
+function exactCentsFromText(body: string): string[] | null {
+  const matches = [...body.matchAll(/"displayed_value_cents"\s*:\s*(-?\d+)/g)].map((m) => m[1]);
+  return matches.length > 0 ? matches : null;
+}
+
+/**
+ * Build a {@link Snapshot} from the camelCase, decimal-string shape used by the golden-vector
+ * fixture (`slotsAsGiven`). Exact for every i64 by construction — see {@link parseSnapshotBody}
+ * for the published-body path and why the two differ.
+ */
+export function parseSnapshot(json: unknown): Snapshot {
+  const raw = json as Record<string, unknown>;
+  const slots = raw?.slots ?? raw?.slotsAsGiven;
+  if (!Array.isArray(slots)) throw new Error('snapshot.slots must be an array');
+
+  return {
+    editionFingerprint: String(raw.editionFingerprint),
+    slots: slots.map((slot: Record<string, unknown>) => ({
+      slotIndex: Number(slot.slotIndex),
+      currentItemId: String(slot.currentItemId),
+      displayedValueCents: toBigInt(slot.displayedValueCents, 'displayedValueCents'),
+      displayedMedia: String(slot.displayedMedia ?? ''),
+    })),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The whole verification
 // ---------------------------------------------------------------------------
@@ -506,30 +743,68 @@ export async function verify(input: VerificationInput): Promise<VerificationRepo
   const computedFingerprint = hexFromBytes(await sha256(preimage));
   const computedSlotIndex = slotFor(derivation.value, input.edition.slots);
 
-  const checks = {
+  const checks: VerificationReport['checks'] = {
     commitment: check(input.commitmentHex.toLowerCase(), computedCommitment),
     editionFingerprint: check(input.expected.editionFingerprint.toLowerCase(), computedFingerprint),
     drawnPpmValue: check(String(input.expected.drawnPpmValue), String(derivation.value)),
     drawnSlotIndex: check(String(input.expected.drawnSlotIndex), String(computedSlotIndex)),
   };
+  const trace: VerificationReport['trace'] = {
+    ...derivation,
+    editionPreimageHex: hexFromBytes(preimage),
+    computedEditionFingerprint: computedFingerprint,
+    computedSlotIndex,
+  };
+  const caveats: string[] = [];
+
+  if (input.snapshot) {
+    const { snapshotHash: expectedHash, itemId: expectedItemId } = input.expected;
+    if (expectedHash === undefined || expectedItemId === undefined) {
+      throw new Error('expected.snapshotHash and expected.itemId are required when a snapshot is supplied');
+    }
+    const snapshotPreimage = snapshotBytes(input.snapshot);
+    const computedSnapshotHash = hexFromBytes(await sha256(snapshotPreimage));
+    // The slot the MATHS selected, never the one we were told — checking the claimed slot's item
+    // against the claimed item would be circular.
+    const filled = input.snapshot.slots.find((slot) => slot.slotIndex === computedSlotIndex);
+    const itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
+
+    checks.snapshotHash = check(expectedHash.toLowerCase(), computedSnapshotHash);
+    checks.snapshotEditionLink = check(computedFingerprint, input.snapshot.editionFingerprint.toLowerCase());
+    checks.drawnItemId = check(expectedItemId.toLowerCase(), itemIdInDrawnSlot);
+
+    trace.snapshotPreimageHex = hexFromBytes(snapshotPreimage);
+    trace.computedSnapshotHash = computedSnapshotHash;
+    trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+  } else {
+    caveats.push(
+      `NOT VERIFIED: which item filled slot ${computedSlotIndex}. This run proves the draw and the ` +
+        'odds it ran on, so the position you won is genuine — but no prize-table snapshot was ' +
+        'supplied, and nothing here looked at items. A fair draw on fair odds can still be paired ' +
+        'with a misreported prize. Supply the published snapshot to close that gap.',
+    );
+  }
+
   const failed = Object.entries(checks).filter(([, c]) => !c.ok).map(([name]) => name);
 
   return {
     ok: failed.length === 0,
     checks,
-    trace: {
-      ...derivation,
-      editionPreimageHex: hexFromBytes(preimage),
-      computedEditionFingerprint: computedFingerprint,
-      computedSlotIndex,
-    },
+    trace,
+    caveats,
     summary:
       failed.length === 0
         ? `Verified: nonce ${input.nonce} draws ppm ${derivation.value}, which lands on slot ` +
-          `${computedSlotIndex} of an edition whose published odds match its recorded fingerprint.`
+          `${computedSlotIndex} of an edition whose published odds match its recorded fingerprint` +
+          (input.snapshot
+            ? `, and the prize table pinned to that edition puts item ${trace.itemIdInDrawnSlot} in it.`
+            : '. The item in that slot was NOT verified — see caveats.')
         : `FAILED: ${failed.join(', ')} did not match. This open is not verified.`,
   };
 }
+
+/** Stands in for the item id when the drawn slot is absent from the snapshot — a legible FAIL. */
+const NO_SUCH_SLOT = '(no such slot in the published snapshot)';
 
 function check(expected: string, computed: string): Check {
   return { ok: expected === computed, expected, computed };
