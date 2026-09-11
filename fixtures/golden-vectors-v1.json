@@ -4,7 +4,8 @@
   "specification": {
     "draw": "specs/rng-fairness.md §1–§4, §7",
     "slotMapping": "specs/rng-fairness.md §4 (cumulative lookup)",
-    "editionFingerprint": "specs/domain-model.md §B · ADR-KAN-14 (0x01 preimage)"
+    "editionFingerprint": "specs/domain-model.md §B · ADR-KAN-14 (0x01 preimage)",
+    "snapshot": "specs/domain-model.md §B · ADR-TD-16 (0x03 preimage)"
   },
   "notes": [
     "Generated from the certified Kotlin perimeter. Neither implementation may edit this file to make itself pass (KAN-29 S4).",
@@ -853,6 +854,119 @@
         },
         "preimageHex": "01ffffffffffffffffffffffffffffffff7fffffffffffffffffffffff000000020000000000061a80ffffffffffffcfc7ffffffffffffffff00000001000927c080000000000000017fffffffffffffff",
         "editionFingerprint": "e58b220e552235eb7d15a2123ec2432cc291e446f90d4743cfe0417956ec8c50"
+      }
+    ]
+  },
+  "snapshot": {
+    "domainByte": "03",
+    "note": "This is the step that names the PRIZE rather than the position. A draw verified against 0x01 odds proves you legitimately won slot i; only 0x03 proves what was in slot i. The preimage embeds the raw edition_fingerprint bytes, so 0x03 closes over 0x01 — verify this and the odds beneath it are transitively verified.",
+    "hashedBytesNotJson": "snapshot_hash is sha256 of the CANONICAL BYTES below, never of the body JSON. The body is a separate rendering of the same input, so whitespace, key order or a different JSON library can never move the content address. A verifier must parse the body into these fields and rebuild the preimage — hashing the received bytes directly would reject a legitimately re-serialised body.",
+    "utf8Trap": "displayedMedia is the ONLY variable-width field in any of the three preimages: a u32 BE length prefix followed by UTF-8 BYTES. In a language whose strings are UTF-16 (JavaScript), string.length is code units, not bytes, and the two differ for any non-ASCII character. Every ASCII-only case passes either way, so the multi-byte-displayed-media vector below is what makes this family bite.",
+    "numberEncoding": "displayedValueCents is a DECIMAL STRING for the same reason the 0x01 cents fields are (ADR-KAN-36 §7): it is signed 64-bit and a bare JSON numeric literal would be rounded by JSON.parse before any verifier saw it. Parse it into BigInt. slotIndex and slotCount stay JSON numbers — they are u32 and cannot overflow.",
+    "layout": [
+      "domain: 1 byte = 0x03",
+      "editionFingerprint: 32 bytes, the hex-DECODED digest (not its 64 ASCII characters)",
+      "slotCount: u32 BE",
+      "per slot, ASCENDING slotIndex: slotIndex u32 BE, currentItemId 16 bytes raw UUID big-endian (most-significant long first), displayedValueCents i64 BE signed, displayedMedia u32 BE byte-length prefix + UTF-8 bytes"
+    ],
+    "vectors": [
+      {
+        "id": "chains-onto-canonical-edition",
+        "note": "The pinned ADR-KAN-14 golden edition's fingerprint, carrying three filled slots published 2, 0, 1. Caller order is never trusted — the preimage sorts ascending, exactly as 0x01 does. An implementation that walks the published array as-is disagrees on the hash. Recomputing editionFingerprint from the 0x01 family and finding it here is what makes the two links one chain.",
+        "domainValid": true,
+        "editionFingerprint": "290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44",
+        "slotsAsGiven": [
+          {
+            "slotIndex": 2,
+            "currentItemId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "displayedValueCents": "5000",
+            "displayedMedia": "media/ps5.webp"
+          },
+          {
+            "slotIndex": 0,
+            "currentItemId": "00112233-4455-6677-8899-aabbccddeeff",
+            "displayedValueCents": "2000",
+            "displayedMedia": "media/giftcard.webp"
+          },
+          {
+            "slotIndex": 1,
+            "currentItemId": "12345678-9abc-def0-1234-56789abcdef0",
+            "displayedValueCents": "1000",
+            "displayedMedia": "media/voucher.webp"
+          }
+        ],
+        "preimageHex": "03290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44000000030000000000112233445566778899aabbccddeeff00000000000007d0000000136d656469612f67696674636172642e7765627000000001123456789abcdef0123456789abcdef000000000000003e8000000126d656469612f766f75636865722e7765627000000002aaaaaaaabbbbccccddddeeeeeeeeeeee00000000000013880000000e6d656469612f7073352e77656270",
+        "snapshotHash": "19159c52d22eaba0ad100d31b5b8b643ddeb24620d761ca05ddf907c92e40617",
+        "body": "{\"edition_fingerprint\":\"290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44\",\"format_version\":3,\"slots\":[{\"current_item_id\":\"00112233-4455-6677-8899-aabbccddeeff\",\"displayed_media\":\"media/giftcard.webp\",\"displayed_value_cents\":2000,\"slot_index\":0},{\"current_item_id\":\"12345678-9abc-def0-1234-56789abcdef0\",\"displayed_media\":\"media/voucher.webp\",\"displayed_value_cents\":1000,\"slot_index\":1},{\"current_item_id\":\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\",\"displayed_media\":\"media/ps5.webp\",\"displayed_value_cents\":5000,\"slot_index\":2}]}"
+      },
+      {
+        "id": "multi-byte-displayed-media",
+        "note": "THE vector this family exists for. Every displayedMedia here is longer in UTF-8 bytes than in UTF-16 code units: an accented Latin character (2 bytes), a CJK glyph (3 bytes), and an emoji outside the BMP (4 bytes, and a SURROGATE PAIR — so a naive JavaScript implementation both mis-measures the length prefix AND may iterate the string wrongly). An ASCII-only fixture cannot detect either defect.",
+        "domainValid": true,
+        "editionFingerprint": "290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44",
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "currentItemId": "11111111-1111-1111-1111-111111111111",
+            "displayedValueCents": "12345",
+            "displayedMedia": "café"
+          },
+          {
+            "slotIndex": 1,
+            "currentItemId": "22222222-2222-2222-2222-222222222222",
+            "displayedValueCents": "67890",
+            "displayedMedia": "日本語のメディア"
+          },
+          {
+            "slotIndex": 2,
+            "currentItemId": "33333333-3333-3333-3333-333333333333",
+            "displayedValueCents": "100",
+            "displayedMedia": "🎁 prize"
+          }
+        ],
+        "preimageHex": "03290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44000000030000000011111111111111111111111111111111000000000000303900000005636166c3a90000000122222222222222222222222222222222000000000001093200000018e697a5e69cace8aa9ee381aee383a1e38387e382a3e382a2000000023333333333333333333333333333333300000000000000640000000af09f8e81207072697a65",
+        "snapshotHash": "a21f88b0c34d278690dac5ee9f17f609cf8a3f88175a63ba8d6b0e2da98811a4",
+        "body": "{\"edition_fingerprint\":\"290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44\",\"format_version\":3,\"slots\":[{\"current_item_id\":\"11111111-1111-1111-1111-111111111111\",\"displayed_media\":\"café\",\"displayed_value_cents\":12345,\"slot_index\":0},{\"current_item_id\":\"22222222-2222-2222-2222-222222222222\",\"displayed_media\":\"日本語のメディア\",\"displayed_value_cents\":67890,\"slot_index\":1},{\"current_item_id\":\"33333333-3333-3333-3333-333333333333\",\"displayed_media\":\"🎁 prize\",\"displayed_value_cents\":100,\"slot_index\":2}]}"
+      },
+      {
+        "id": "empty-media-single-slot",
+        "note": "Boundary: one slot, an EMPTY displayedMedia (a u32 length prefix of 0 followed by no bytes) and a zero value. Catches an implementation that omits the prefix for an empty string, or that writes a null terminator instead of a length.",
+        "domainValid": true,
+        "editionFingerprint": "290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44",
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "currentItemId": "00000000-0000-0000-0000-000000000000",
+            "displayedValueCents": "0",
+            "displayedMedia": ""
+          }
+        ],
+        "preimageHex": "03290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44000000010000000000000000000000000000000000000000000000000000000000000000",
+        "snapshotHash": "a516c040b7ce7cd0acf2ded241fb282ad83aaf922eba0f7734e5bb5547ae5395",
+        "body": "{\"edition_fingerprint\":\"290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44\",\"format_version\":3,\"slots\":[{\"current_item_id\":\"00000000-0000-0000-0000-000000000000\",\"displayed_media\":\"\",\"displayed_value_cents\":0,\"slot_index\":0}]}"
+      },
+      {
+        "id": "extreme-signed-displayed-value",
+        "note": "SERIALIZER-LEVEL ONLY — not a legal snapshot: no slot displays a negative value. It pins the signed i64 two's-complement encoding of displayedValueCents at both extremes, which is where a JavaScript implementation reaching for a bare Number silently produces the wrong bytes. The UUIDs pin the raw 16-byte encoding against an implementation that hashes the hyphenated string instead: slot 1's has the high bit of BOTH halves set, so a decoder that routes UUID halves through a signed 64-bit path and a decoder that does not must still emit identical bytes.",
+        "domainValid": false,
+        "editionFingerprint": "290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44",
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "currentItemId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+            "displayedValueCents": "-9223372036854775807",
+            "displayedMedia": "min"
+          },
+          {
+            "slotIndex": 1,
+            "currentItemId": "80000000-0000-0000-8000-000000000000",
+            "displayedValueCents": "9223372036854775807",
+            "displayedMedia": "max"
+          }
+        ],
+        "preimageHex": "03290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f440000000200000000ffffffffffffffffffffffffffffffff8000000000000001000000036d696e00000001800000000000000080000000000000007fffffffffffffff000000036d6178",
+        "snapshotHash": "6a8f12a5b7b0e0d28467baeb611c6eb4893f4afed195da0d9f4069bf588c72e8",
+        "body": "{\"edition_fingerprint\":\"290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44\",\"format_version\":3,\"slots\":[{\"current_item_id\":\"ffffffff-ffff-ffff-ffff-ffffffffffff\",\"displayed_media\":\"min\",\"displayed_value_cents\":-9223372036854775807,\"slot_index\":0},{\"current_item_id\":\"80000000-0000-0000-8000-000000000000\",\"displayed_media\":\"max\",\"displayed_value_cents\":9223372036854775807,\"slot_index\":1}]}"
       }
     ]
   }

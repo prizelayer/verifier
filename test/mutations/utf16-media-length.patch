@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index d3a5ee9..d11b549 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -589,7 +589,7 @@ function sortedSnapshotSlots(slots: readonly SnapshotSlot[]): SnapshotSlot[] {
+  */
+ function writeUtf8(out: number[], value: string): void {
+   const bytes = new TextEncoder().encode(value);
+-  writeU32(out, bytes.length, 'displayedMedia byte length');
++  writeU32(out, value.length, 'displayedMedia byte length');
+   out.push(...bytes);
+ }
+ 

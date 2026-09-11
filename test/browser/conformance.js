@@ -20,7 +20,11 @@ import {
   editionFingerprint,
   hexFromBytes,
   parseEdition,
+  parseSnapshot,
+  parseSnapshotBody,
   slotFor,
+  snapshotBytes,
+  snapshotHash,
   verify,
 } from '../../dist/verifier.js';
 
@@ -100,6 +104,20 @@ export async function runConformance(fixture) {
     eq(`edition:${vector.id}.fingerprint`, await editionFingerprint(edition), vector.editionFingerprint);
   }
 
+  // --- the snapshot content address (TextEncoder is the browser's own, not Node's) ---
+  // Worth running here specifically: the UTF-8 length prefix goes through each engine's TextEncoder,
+  // and the multi-byte vector is the one that would expose a divergence.
+  for (const vector of fixture.snapshot.vectors) {
+    asserted.add(`snapshot/${vector.id}`);
+    const snapshot = parseSnapshot({
+      editionFingerprint: vector.editionFingerprint,
+      slots: vector.slotsAsGiven,
+    });
+    eq(`snapshot:${vector.id}.preimage`, hexFromBytes(snapshotBytes(snapshot)), vector.preimageHex);
+    eq(`snapshot:${vector.id}.hash`, await snapshotHash(snapshot), vector.snapshotHash);
+    eq(`snapshot:${vector.id}.fromBody`, await snapshotHash(parseSnapshotBody(vector.body)), vector.snapshotHash);
+  }
+
   // --- one whole verification, the way the UI will call it ---
   const golden = fixture.editionFingerprint.vectors.find((v) => v.id === 'canonical-unsorted-slots');
   const edition = parseEdition({ ...golden.edition, slots: golden.edition.slotsAsGiven });
@@ -117,6 +135,34 @@ export async function runConformance(fixture) {
   });
   eq('verify.ok', report.ok, true);
   eq('verify.trace.hmac', report.trace.hmacHex, fixture.draw.vectors[0].hmacHex);
+  // Without a snapshot the item is unproven, and the report must SAY so rather than print a bare
+  // green — the browser pass is the one a player actually sees the consequences of.
+  eq('verify.caveats', report.caveats.length, 1);
+
+  const snapshotVector = fixture.snapshot.vectors.find((v) => v.id === 'chains-onto-canonical-edition');
+  const drawnSlot = slotFor(186669, edition.slots);
+  const withSnapshot = await verify({
+    serverSeedHex: fixture.draw.serverSeedHex,
+    commitmentHex: fixture.draw.commitmentHex,
+    clientSeed: 'alice-seed',
+    nonce: 1,
+    edition,
+    snapshot: parseSnapshot({
+      editionFingerprint: snapshotVector.editionFingerprint,
+      slots: snapshotVector.slotsAsGiven,
+    }),
+    expected: {
+      editionFingerprint: golden.editionFingerprint,
+      drawnPpmValue: 186669,
+      drawnSlotIndex: drawnSlot,
+      snapshotHash: snapshotVector.snapshotHash,
+      itemId: snapshotVector.slotsAsGiven.find((s) => s.slotIndex === drawnSlot).currentItemId,
+    },
+  });
+  eq('verifyWithSnapshot.ok', withSnapshot.ok, true);
+  eq('verifyWithSnapshot.item', withSnapshot.checks.drawnItemId.ok, true);
+  eq('verifyWithSnapshot.chain', withSnapshot.checks.snapshotEditionLink.ok, true);
+  eq('verifyWithSnapshot.caveats', withSnapshot.caveats.length, 0);
 
   // --- the same fail-closed completeness check the Node suite makes ---
   // Without it the guarantee would hold in Node only: a family added on the platform side would

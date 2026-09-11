@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index d3a5ee9..e6656d2 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -568,7 +568,7 @@ export async function snapshotHash(snapshot: Snapshot): Promise<string> {
+ function sortedSnapshotSlots(slots: readonly SnapshotSlot[]): SnapshotSlot[] {
+   if (slots.length === 0) throw new Error('a snapshot must have at least one slot');
+ 
+-  const sorted = [...slots].sort((a, b) => a.slotIndex - b.slotIndex);
++  const sorted = [...slots];
+   sorted.forEach((slot, position) => {
+     if (!Number.isInteger(slot.slotIndex) || slot.slotIndex < 0) {
+       throw new Error(`slotIndex must be a non-negative integer, was ${slot.slotIndex}`);
