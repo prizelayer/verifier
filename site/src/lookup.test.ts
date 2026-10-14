@@ -86,12 +86,12 @@ describe("lookUp", () => {
 
   it("names an error status as a fault of our server", async () => {
     const result = await lookUp(WIN, null, withAnswer(`/verify/opens/${WIN}`, { status: 500, body: "" }).fetchFn)
-    expect(result).toEqual({ kind: "serverFault", message: `our server answered 500 for /verify/opens/${WIN}` })
+    expect(result).toEqual({ kind: "serverFault", message: "it answered with error 500" })
   })
 
   it("names a 404 for a record the open names as a fault of our server", async () => {
     const result = await lookUp(WIN, null, withAnswer(`/verify/editions/${edition.editionId}`, { status: 404, body: "" }).fetchFn)
-    expect(result).toEqual({ kind: "serverFault", message: "our server has no answer for the box this open names" })
+    expect(result).toEqual({ kind: "serverFault", message: "it has no record of the box this open names" })
   })
 
   it("reads a seed pair whose secret is not revealed yet (null) as a proof", async () => {
@@ -103,7 +103,7 @@ describe("lookUp", () => {
   it("names a seed pair answer with no revealedServerSeed field as a fault of our server", async () => {
     const { revealedServerSeed: _dropped, ...withoutField } = seedPair
     const result = await lookUp(WIN, null, withAnswer(`/verify/seed-pairs/${seedPair.seedPairId}`, { status: 200, body: JSON.stringify(withoutField) }).fetchFn)
-    expect(result).toEqual({ kind: "serverFault", message: "our server's answer for the seed pair has no revealedServerSeed field" })
+    expect(result).toEqual({ kind: "serverFault", message: "the seed pair it sent leaves out its revealed secret" })
   })
 
   it("asks for no prize list when the open names none", async () => {
@@ -128,17 +128,17 @@ describe("lookUp", () => {
   })
 
   it.each([
-    ["the open", `/verify/opens/${WIN}`, "winId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
-    ["the seed pair", `/verify/seed-pairs/${seedPair.seedPairId}`, "seedPairId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
-    ["the box", `/verify/editions/${edition.editionId}`, "editionId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
-    ["the prize list", `/verify/snapshots/${snapshot.snapshotHash}`, "snapshotHash", "0".repeat(64)],
-  ])("names an answer for %s that is another record as a fault of our server", async (what, path, name, other) => {
+    ["the open", `/verify/opens/${WIN}`, "winId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "win id from the one you asked for"],
+    ["the seed pair", `/verify/seed-pairs/${seedPair.seedPairId}`, "seedPairId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "seed pair id from the one the open names"],
+    ["the box", `/verify/editions/${edition.editionId}`, "editionId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "box id from the one the open names"],
+    ["the prize list", `/verify/snapshots/${snapshot.snapshotHash}`, "snapshotHash", "0".repeat(64), "prize list fingerprint from the one the open names"],
+  ])("names an answer for %s that is another record as a fault of our server", async (what, path, name, other, differs) => {
     const answers = exampleAnswers()
     answers.set(path, { status: 200, body: JSON.stringify({ ...JSON.parse(answers.get(path)!.body), [name]: other }) })
     const server = fakeServer(answers)
     expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
       kind: "serverFault",
-      message: `our server's answer for ${what} names another ${name} than the one the page asked for`,
+      message: `${what} it sent has a different ${differs}`,
     })
     // A wrong open is refused before anything else is asked.
     if (what === "the open") expect(server.calls).toHaveLength(1)
@@ -149,7 +149,7 @@ describe("lookUp", () => {
     const upper = JSON.stringify({ ...snapshot, snapshotHash: snapshot.snapshotHash.toUpperCase() })
     expect(await lookUp(WIN, null, withAnswer(path, { status: 200, body: upper }).fetchFn)).toEqual({
       kind: "serverFault",
-      message: "our server's answer for the prize list names another snapshotHash than the one the page asked for",
+      message: "the prize list it sent has a different prize list fingerprint from the one the open names",
     })
   })
 
@@ -158,7 +158,7 @@ describe("lookUp", () => {
     const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body: JSON.stringify(withoutField) })
     expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
       kind: "serverFault",
-      message: "our server's answer for the open has no snapshotHash field",
+      message: "the open it sent leaves out its prize list fingerprint",
     })
     expect(server.calls).toHaveLength(1)
   })
@@ -168,7 +168,7 @@ describe("lookUp", () => {
     const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body })
     expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
       kind: "serverFault",
-      message: `our server's answer for the open has the key "winId" twice`,
+      message: `the open it sent names the field "winId" twice`,
     })
     expect(server.calls).toHaveLength(1)
   })
@@ -181,7 +181,7 @@ describe("lookUp", () => {
       String(url).endsWith(`/verify/opens/${WIN}`) ? new Response(bad, { status: 200 }) : server.fetchFn(url, init)) as typeof fetch
     expect(await lookUp(WIN, null, fetchFn)).toEqual({
       kind: "serverFault",
-      message: `our server's answer for /verify/opens/${WIN} is not valid UTF-8`,
+      message: "one of its answers is not valid UTF-8 text",
     })
   })
 
@@ -191,7 +191,7 @@ describe("lookUp", () => {
 
   it("names an answer that is not JSON", async () => {
     const result = await lookUp(WIN, null, withAnswer(`/verify/editions/${edition.editionId}`, { status: 200, body: "<html>" }).fetchFn)
-    expect(result).toEqual({ kind: "serverFault", message: "our server's answer for the box is not valid JSON" })
+    expect(result).toEqual({ kind: "serverFault", message: "the box it sent is not valid JSON" })
   })
 
   it("refuses an answer larger than the cap, and reads one at the cap", async () => {
@@ -206,7 +206,7 @@ describe("lookUp", () => {
     const result = await lookUp(WIN, null, withAnswer(path, { status: 200, body: over }).fetchFn)
     expect(result.kind).toBe("serverFault")
     expect("message" in result ? result.message : undefined).toBe(
-      `our server's answer for ${path} is larger than ${MAX_ANSWER_BYTES} bytes`,
+      `one of its answers is larger than ${MAX_ANSWER_BYTES.toLocaleString("en")} bytes`,
     )
   })
 
@@ -219,7 +219,7 @@ describe("lookUp", () => {
     }) as typeof fetch
     expect(await lookUp(WIN, null, declared)).toEqual({
       kind: "serverFault",
-      message: `our server's answer for /verify/opens/${WIN} is larger than ${MAX_ANSWER_BYTES} bytes`,
+      message: `one of its answers is larger than ${MAX_ANSWER_BYTES.toLocaleString("en")} bytes`,
     })
   })
 })

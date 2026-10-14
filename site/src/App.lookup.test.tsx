@@ -97,7 +97,7 @@ describe("the lookup", () => {
     const { user } = openWithHash(`#open=${WIN}`, fakeServer(answers))
     await user.click(screen.getByRole("button", { name: "Look up" }))
     expect(
-      await screen.findByText(LOOKUP_WORDS.serverFault("our server's answer for the seed pair has no revealedServerSeed field")),
+      await screen.findByText(LOOKUP_WORDS.serverFault("the seed pair it sent leaves out its revealed secret")),
     ).toBeTruthy()
     expect(verdict()).toBeNull()
     expect(box().value).toBe("")

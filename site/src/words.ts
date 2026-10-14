@@ -126,16 +126,16 @@ export const COULD_NOT_FINISH = "The check could not finish. Nothing was checked
 
 /** The lookup's words, one per result (plan 3.2). */
 export const LOOKUP_WORDS = {
-  busy: "Fetching the public data of this open from our server…",
+  busy: "Fetching the public data of this open from our server (this can take up to 15 seconds)…",
   notAnId: "This is not an open id. An open id looks like 7c9e6679-7425-40de-944b-e07fc1f90ae7.",
   notFound: "We found no open with this id. Check the id, or paste the proof instead.",
   timedOut:
-    "Our server did not answer within 15 seconds. Nothing was checked. Try again, or paste a saved proof instead.",
+    "Our server did not answer within 15 seconds, so nothing was checked. Try again. If you saved this proof before, paste it below.",
   unreachable:
-    "Your browser could not reach our server. That is fine: the check does not need us. Paste a saved proof instead.",
+    "Your browser could not reach our server. Check your connection and try again. If you saved this proof before, paste it below: the check itself does not need our server.",
   serverFault: (message: string) =>
-    `Our server's answer is faulty: ${message}. That is a fault of our server, not of your open. Nothing was checked.`,
-  found: "We fetched the public data of this open and put it in the box below. The check ran in your browser.",
+    `Our server sent a faulty answer, so nothing was checked: ${message}. Try again later. If you saved this proof before, paste it below.`,
+  found: "We fetched the public data of this open and put it in the proof field below. The check ran in your browser.",
   sharing:
     "Anyone you give this proof or this id to can read this open, and can see how many opens were made with the same secret and when it was retired. It does not say who you are.",
 } as const
@@ -148,4 +148,11 @@ export const FIRST_ROWS = 200
 
 /** The words under a cut table: what is not drawn, and that the check still used it. */
 export const moreRows = (count: number) =>
-  `${count.toLocaleString("en")} more rows are not drawn here. Your browser used all of them in the check.`
+  `${count.toLocaleString("en")} rows are not drawn here. Your browser used all of them in the check.`
+
+/** The marker where a cut table skips rows before a row it keeps (row numbers count from 0). */
+export const skippedRows = (from: number, to: number) =>
+  `Rows ${from.toLocaleString("en")} to ${to.toLocaleString("en")} are not drawn here.`
+
+/** Drawing very many rows takes the browser a while; the button says so. */
+export const SLOW_DRAW_ROWS = 20_000

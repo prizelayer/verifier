@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { API_BASE, fromFragment, lookUp, type LookupResult } from "./lookup"
+import { layOut } from "./layOut"
 import { LOOKUP_WORDS } from "./words"
 
 /**
@@ -39,7 +40,10 @@ export function LookupBox({
   })
 
   async function press() {
+    // While busy the button keeps its focus (aria-disabled, not disabled), so a press is ignored here.
+    if (busy || disabled) return
     const asked = winId.trim()
+    if (asked === "") return
     const boxAtPress = shownText
     setBusy(true)
     onBusy?.(true)
@@ -59,8 +63,10 @@ export function LookupBox({
   }
 
   const fetched = result?.result.kind === "found" ? result.result.text : null
+  const resultId = `${fieldId}-result`
+  const invalid = result?.result.kind === "notAnId" || result?.result.kind === "notFound"
   return (
-    <section aria-labelledby={`${fieldId}-label`} className="space-y-3">
+    <section aria-labelledby={`${fieldId}-label`} aria-busy={busy} className="space-y-3">
       <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
         Look up an open by its id
       </label>
@@ -68,51 +74,86 @@ export function LookupBox({
         This is the only time the page contacts our server: when you press "Look up", it fetches the public data of
         that open from {new URL(API_BASE).host}. The check itself still runs in your browser.
       </p>
-      <div className="flex flex-wrap gap-2">
-        <input
+      <form
+        className="flex flex-col gap-2 sm:flex-row"
+        onSubmit={(event) => {
+          // Enter in the field presses "Look up"; nothing is ever submitted to a server.
+          event.preventDefault()
+          void press()
+        }}
+      >
+        {/* A wrapping field: an id is 36 characters and must be readable in full on a phone. */}
+        <textarea
           id={fieldId}
           value={winId}
           onChange={(event) => {
-            setWinId(event.target.value)
+            setWinId(event.target.value.replace(/[\r\n]/g, ""))
             setResult(null)
           }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault()
+              event.currentTarget.form?.requestSubmit()
+            }
+          }}
           readOnly={busy}
+          rows={2}
           spellCheck={false}
-          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs"
+          aria-invalid={invalid || undefined}
+          aria-describedby={result !== null || busy ? resultId : undefined}
+          className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-base break-all sm:h-9 sm:py-1.5 sm:text-sm"
         />
-        <Button onClick={() => void press()} disabled={disabled || busy || winId.trim() === ""}>
+        <Button
+          type="submit"
+          className="self-start"
+          disabled={disabled || winId.trim() === ""}
+          aria-disabled={busy || undefined}
+        >
           Look up
         </Button>
-      </div>
-      <div aria-live="polite" data-lookup={busy ? "busy" : (result?.result.kind ?? "idle")}>
-        {busy ? <p>{LOOKUP_WORDS.busy}</p> : result ? <LookupWords result={result.result} /> : null}
+      </form>
+      <div id={resultId} aria-live="polite" data-lookup={busy ? "busy" : (result?.result.kind ?? "idle")}>
+        {busy ? (
+          <p className="border-l-2 border-muted-foreground pl-3">{LOOKUP_WORDS.busy}</p>
+        ) : result ? (
+          <LookupWords result={result.result} />
+        ) : null}
       </div>
       {result !== null && fetched !== null && fetched === shownText ? (
-        <div className="space-y-1">
+        <div className="space-y-2">
           <Button variant="outline" onClick={() => save(fetched, result.asked)}>
             Save this proof
           </Button>
-          <p className="text-sm">{LOOKUP_WORDS.sharing}</p>
+          <p className="text-sm text-muted-foreground">{LOOKUP_WORDS.sharing}</p>
+          {/* For reading only: the field, the check and the saved file keep the exact text. */}
+          <details className="text-sm">
+            <summary className="cursor-pointer">Show this proof laid out</summary>
+            <pre data-laid-out className="mt-2 max-h-96 overflow-auto rounded-lg border border-border p-3 font-mono text-xs">
+              {layOut(fetched)}
+            </pre>
+          </details>
         </div>
       ) : null}
     </section>
   )
 }
 
+const FAULT = "border-l-2 border-fail pl-3 text-fail"
+
 function LookupWords({ result }: { result: LookupResult }) {
   switch (result.kind) {
     case "found":
       return <p>{LOOKUP_WORDS.found}</p>
     case "notAnId":
-      return <p className="text-fail">{LOOKUP_WORDS.notAnId}</p>
+      return <p className={FAULT}>{LOOKUP_WORDS.notAnId}</p>
     case "notFound":
-      return <p className="text-fail">{LOOKUP_WORDS.notFound}</p>
+      return <p className={FAULT}>{LOOKUP_WORDS.notFound}</p>
     case "unreachable":
-      return <p className="text-fail">{LOOKUP_WORDS.unreachable}</p>
+      return <p className={FAULT}>{LOOKUP_WORDS.unreachable}</p>
     case "timedOut":
-      return <p className="text-fail">{LOOKUP_WORDS.timedOut}</p>
+      return <p className={FAULT}>{LOOKUP_WORDS.timedOut}</p>
     case "serverFault":
-      return <p className="text-fail">{LOOKUP_WORDS.serverFault(result.message)}</p>
+      return <p className={FAULT}>{LOOKUP_WORDS.serverFault(result.message)}</p>
   }
 }
 

@@ -59,7 +59,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           device, with the same numbers, and see if you get the same answer.
         </p>
         <p>
-          Nothing on this page asks our server whether the open was fair. Once the proof is in the box, you
+          Nothing on this page asks our server whether the open was fair. Once the proof is in the field, you
           can turn your internet off and the check still works.
         </p>
         <p>Read "What this does not prove" below. It is short, and it matters.</p>
@@ -76,7 +76,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
         }}
       />
 
-      <section aria-labelledby={`${fieldId}-label`} className="space-y-3">
+      <section aria-labelledby={`${fieldId}-label`} aria-busy={lookingUp} className="space-y-3">
         <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
           Paste a proof
         </label>
@@ -88,7 +88,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           rows={10}
           spellCheck={false}
           aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
-          className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
+          className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
         />
         {checked?.kind === "notAProof" ? (
           <p id={`${fieldId}-problem`} className="text-fail">
