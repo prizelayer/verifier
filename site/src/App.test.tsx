@@ -64,7 +64,8 @@ function expectFailAt(step: number, name: keyof typeof FAIL_WORDS) {
 
 /** A FAIL because an input of `name` cannot be used: the input is named, and no comparison is claimed. */
 function expectCannotUseAt(step: number, name: keyof typeof FAIL_WORDS, field: string) {
-  expect(verdictLine()).toMatch(new RegExp(`^Step ${step} cannot be checked\\. The value ${field.replace(/\./g, "\\.")} cannot be used: `))
+  const opening = `Step ${step} cannot be checked. The value ${field} cannot be used: `
+  expect(verdictLine()?.slice(0, opening.length)).toBe(opening)
   expect(stateOf(name)).toBe("mismatch")
   const row = document.querySelector(`[data-check="${name}"]`)?.textContent
   expect(row).toContain("cannot be checked.")
