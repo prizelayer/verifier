@@ -1,13 +1,13 @@
 diff --git a/site/src/verdict.ts b/site/src/verdict.ts
-index dc3fb1d..1ea15e2 100644
+index af06a0a..5ba4590 100644
 --- a/site/src/verdict.ts
 +++ b/site/src/verdict.ts
-@@ -22,7 +22,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+@@ -23,7 +23,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
      case "failed": {
        const failure = report.firstFailure
        return {
 -        word: "FAIL",
 +        word: "PASS",
-         line: failure ? `Step ${failure.step} does not match: ${CHECK_WORDS[failure.check]} ${failure.message}` : report.summary,
+         line: failure ? `Step ${failure.step} does not match: ${FAIL_WORDS[failure.check]}` : report.summary,
        }
      }

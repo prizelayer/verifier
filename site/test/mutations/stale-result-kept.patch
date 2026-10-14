@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index d00e883..38cfa8f 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -46,7 +46,7 @@ export function App() {
+           onChange={(event) => {
+             // A result is only ever shown for the text it was computed from.
+             setText(event.target.value)
+-            setReport(null)
++            void setReport
+           }}
+           rows={10}
+           spellCheck={false}
