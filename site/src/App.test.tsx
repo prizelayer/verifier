@@ -59,10 +59,9 @@ describe("the page", () => {
   })
 
   it("drops a result whose text was edited while the check ran", async () => {
-    const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByRole("button", { name: "Try the example" }))
-    // The check is running now; the text changes before its result arrives.
+    // Click and edit in the same task, so the edit lands before the check's result arrives.
+    fireEvent.click(screen.getByRole("button", { name: "Try the example" }))
     fireEvent.change(screen.getByRole("textbox", { name: "Paste a proof" }), { target: { value: "edited" } })
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Check" }).hasAttribute("disabled")).toBe(false))
