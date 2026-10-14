@@ -164,7 +164,7 @@ describe("lookUp", () => {
   })
 
   it("refuses an answer with a key written twice, before anything is reported as found", async () => {
-    const body = JSON.stringify(open).replace("{", `{"winId":"0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d",`)
+    const body = `{"winId":"0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d",${JSON.stringify(open).slice(1)}`
     const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body })
     expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
       kind: "serverFault",
