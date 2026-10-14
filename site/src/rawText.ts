@@ -73,51 +73,64 @@ function skipSpace(text: string, at: number): number {
 }
 
 /**
- * The first object key that appears twice in the same object, anywhere in the JSON `text`, or `null`.
- *
- * Two members with one name are read differently by different tools: `JSON.parse` keeps the last,
- * and a cutter like {@link rawObjectText} could keep the first. A proof that two honest tools would
- * read differently is refused rather than resolved, so nobody has to guess which one was checked.
+ * The deepest nesting a proof may have. A real proof is under 10 levels deep (proof, section, slot
+ * list, slot); 64 leaves ample room and still refuses a proof built only to exhaust the reader.
  */
-export function duplicateKey(text: string): string | null {
-  const found = { name: null as string | null }
-  walk(text, skipSpace(text, 0), found)
-  return found.name
+export const MAX_NESTING = 64
+
+/** Why a proof's JSON structure is refused before anything is checked. */
+export type StructureProblem = { duplicateKey: string } | { tooDeep: true }
+
+/**
+ * A structural reason to refuse a proof that `JSON.parse` already accepted, or `null`.
+ *
+ * - A key that appears twice in one object, at any depth: `JSON.parse` keeps the last, a cutter like
+ *   {@link rawObjectText} could keep the first. A proof that two honest tools would read differently
+ *   is refused rather than resolved, so nobody has to guess which one was checked.
+ * - Nesting deeper than {@link MAX_NESTING}.
+ *
+ * One loop with its own stack, never recursion: a deeply nested proof must not exhaust the call
+ * stack of the page that reads it.
+ */
+export function structureProblem(text: string): StructureProblem | null {
+  const stack: { names: Set<string> | null; expectKey: boolean }[] = []
+  let i = 0
+  while (i < text.length) {
+    const c = text[i]
+    if (c === '"') {
+      const end = stringEnd(text, i)
+      if (end < 0) return null
+      const top = stack[stack.length - 1]
+      if (top?.names && top.expectKey) {
+        const name = JSON.parse(text.slice(i, end)) as string
+        if (top.names.has(name)) return { duplicateKey: name }
+        top.names.add(name)
+        top.expectKey = false
+      }
+      i = end
+    } else if (c === "{" || c === "[") {
+      if (stack.length >= MAX_NESTING) return { tooDeep: true }
+      stack.push({ names: c === "{" ? new Set() : null, expectKey: c === "{" })
+      i++
+    } else if (c === "}" || c === "]") {
+      stack.pop()
+      i++
+    } else {
+      if (c === ",") {
+        const top = stack[stack.length - 1]
+        if (top?.names) top.expectKey = true
+      }
+      i++
+    }
+  }
+  return null
 }
 
-/** Walks one value, recording the first duplicate key; returns the index after the value, or -1. */
-function walk(text: string, at: number, found: { name: string | null }): number {
-  if (found.name !== null) return -1
-  if (text[at] === "{") {
-    const names = new Set<string>()
-    let i = skipSpace(text, at + 1)
-    while (i < text.length && text[i] !== "}") {
-      const keyEnd = endOfValue(text, i)
-      if (keyEnd < 0 || text[i] !== '"') return -1
-      const name = JSON.parse(text.slice(i, keyEnd)) as string
-      if (names.has(name)) {
-        found.name = name
-        return -1
-      }
-      names.add(name)
-      const colon = skipSpace(text, keyEnd)
-      if (text[colon] !== ":") return -1
-      const end = walk(text, skipSpace(text, colon + 1), found)
-      if (end < 0) return -1
-      i = skipSpace(text, end)
-      if (text[i] === ",") i = skipSpace(text, i + 1)
-    }
-    return i + 1
+/** The index just after the JSON string that opens at `at`, or -1 if it does not close. */
+function stringEnd(text: string, at: number): number {
+  for (let i = at + 1; i < text.length; i++) {
+    if (text[i] === "\\") i++
+    else if (text[i] === '"') return i + 1
   }
-  if (text[at] === "[") {
-    let i = skipSpace(text, at + 1)
-    while (i < text.length && text[i] !== "]") {
-      const end = walk(text, i, found)
-      if (end < 0) return -1
-      i = skipSpace(text, end)
-      if (text[i] === ",") i = skipSpace(text, i + 1)
-    }
-    return i + 1
-  }
-  return endOfValue(text, at)
+  return -1
 }

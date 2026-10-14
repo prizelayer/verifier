@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { checkProof, type Checked } from "./proof"
 import { StepCards } from "./steps"
-import { STEPS } from "./words"
+import { COULD_NOT_FINISH, STEPS } from "./words"
 import { caveatOf, verdictOf } from "./verdict"
 
 export function App() {
@@ -26,8 +26,16 @@ export function App() {
 
   async function run(proof: string) {
     setRunning(true)
-    const result = await checkProof(proof)
-    setRunning(false)
+    let result: Checked
+    try {
+      result = await checkProof(proof)
+    } catch {
+      // checkProof is built not to throw; if it ever does, the reader gets a sentence, not a page
+      // stuck at "Computing".
+      result = { kind: "notAProof", message: COULD_NOT_FINISH }
+    } finally {
+      setRunning(false)
+    }
     if (proof !== current.current) return
     setChecked(result)
     verdictRef.current?.focus()

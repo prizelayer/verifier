@@ -22,7 +22,8 @@ export function Compare({
   const word = check.ok ? "matches" : unusable ? "cannot be checked" : "does not match"
   return (
     <div className="space-y-1" data-compare={label} data-ok={check.ok ? "yes" : "no"}>
-      <Row name={expectedLabel} value={check.expected} />
+      {/* No recorded value (no item id was given): the empty row is left out, not shown blank. */}
+      {check.expected === "" ? null : <Row name={expectedLabel} value={check.expected} />}
       <Row name={computedLabel} value={check.computed} against={check.ok || unusable ? undefined : check.expected} />
       <p className="text-sm font-semibold" data-word>
         {word}
@@ -96,7 +97,8 @@ const VERDICT_WORDS: Record<ChunkVerdict["verdict"], string> = {
 }
 
 /** The 4-byte numbers the pick read, each with what the pick did with it. */
-export function Chunks({ chunks }: { chunks: readonly ChunkVerdict[] }) {
+/** `value` is the library's `v`, shown after the used number; the page does not reduce it itself. */
+export function Chunks({ chunks, value }: { chunks: readonly ChunkVerdict[]; value: number | undefined }) {
   return (
     <table className="w-full text-xs">
       <caption className="text-left text-sm text-muted-foreground">
@@ -121,7 +123,9 @@ export function Chunks({ chunks }: { chunks: readonly ChunkVerdict[] }) {
             <td>{c.chunk.toLocaleString("en")}</td>
             <td>
               {VERDICT_WORDS[c.verdict]}
-              {c.verdict === "accepted" ? `: ${c.chunk.toLocaleString("en")} mod ${PPM_TOTAL.toLocaleString("en")} = ${(c.chunk % PPM_TOTAL).toLocaleString("en")}` : ""}
+              {c.verdict === "accepted" && value !== undefined
+                ? `: ${c.chunk.toLocaleString("en")} mod ${PPM_TOTAL.toLocaleString("en")} = ${value.toLocaleString("en")}`
+                : ""}
             </td>
           </tr>
         ))}

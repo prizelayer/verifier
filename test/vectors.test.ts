@@ -845,6 +845,19 @@ describe('verify() end to end', () => {
     assert.equal(report.firstFailure?.field, 'expected.snapshotHash');
   });
 
+  it('answers, and never throws, for input nested 20,000 levels deep', async () => {
+    const base = await inputWithSnapshot();
+    const deep = '['.repeat(20_000) + ']'.repeat(20_000);
+    const reports = [
+      // The deep value where the slots should be.
+      await verifyFrom(() => ({ ...base, snapshot: parseSnapshotBody(`{"slots":${deep}}`) })),
+      // A deep object handed to verify() directly.
+      await verify({ ...base, expected: { ...base.expected, itemId: JSON.parse(deep) } }),
+    ];
+    // Both inputs are broken, so neither may pass; what matters is that each one gets an answer.
+    for (const report of reports) assert.ok(['failed', 'invalid'].includes(report.status), report.status);
+  });
+
   it('refuses a missing seed as invalid, by name: only null means "not revealed yet"', async () => {
     const base = await input();
     const report = await verify({ ...base, serverSeedHex: undefined as unknown as string });

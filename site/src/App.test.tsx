@@ -459,6 +459,15 @@ describe("a proof the page cannot read", () => {
     expect(screen.getByText('This is not a valid proof: the key "body" appears twice.')).toBeTruthy()
   })
 
+  it.each([10_000, 20_000])("a proof nested %i levels deep is refused, and the page works again", async (depth) => {
+    const deep = "[".repeat(depth) + "]".repeat(depth)
+    expect(await check(JSON.stringify(EXAMPLE_PROOF).replace(/}$/, `,"deep":${deep}}`))).toBeNull()
+    expect(screen.getByText("This is not a valid proof: it is nested too deeply.")).toBeTruthy()
+    expect(screen.queryByText("Computing in your browser…")).toBeNull()
+    expect(screen.getByRole("button", { name: "Check" }).hasAttribute("disabled")).toBe(false)
+    expect((screen.getByRole("textbox", { name: "Paste a proof" }) as HTMLTextAreaElement).readOnly).toBe(false)
+  })
+
   it("a second top-level prize list is refused too", async () => {
     const text = JSON.stringify(EXAMPLE_PROOF).replace(/}$/, `,"snapshot":${JSON.stringify(EXAMPLE_PROOF.snapshot)}}`)
     expect(await check(text)).toBeNull()

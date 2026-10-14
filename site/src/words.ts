@@ -120,3 +120,6 @@ export function unusableWords(field: string | undefined, error: string): string 
 export const NOT_TOLD_ITEM = "not checked: this page was not told which item you received"
 export const NO_PRIZE_LIST = "not checked: this proof has no prize list"
 export const SEED_LOCKED = "not run: the secret is still locked"
+
+/** Shown if a check stops on an error nobody planned for, instead of a page stuck at "Computing". */
+export const COULD_NOT_FINISH = "The check could not finish. Nothing was checked; reload the page and try again."

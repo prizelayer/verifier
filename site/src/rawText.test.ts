@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { duplicateKey, rawObjectText } from "./rawText"
+import { MAX_NESTING, rawObjectText, structureProblem } from "./rawText"
 
 describe("rawObjectText", () => {
   it("cuts the object out with its own characters", () => {
@@ -23,15 +23,29 @@ describe("rawObjectText", () => {
   })
 })
 
-describe("duplicateKey", () => {
+describe("structureProblem", () => {
+  const dup = (text: string) => structureProblem(text)
+
   it("finds a key that appears twice in one object, at any depth", () => {
-    expect(duplicateKey('{"a":1,"a":2}')).toBe("a")
-    expect(duplicateKey('{"s":{"body":{"v":1},"body":{"v":2}}}')).toBe("body")
-    expect(duplicateKey('{"list":[{"x":1},{"y":2,"y":3}]}')).toBe("y")
+    expect(dup('{"a":1,"a":2}')).toEqual({ duplicateKey: "a" })
+    expect(dup('{"s":{"body":{"v":1},"body":{"v":2}}}')).toEqual({ duplicateKey: "body" })
+    expect(dup('{"list":[{"x":1},{"y":2,"y":3}]}')).toEqual({ duplicateKey: "y" })
+    expect(dup('{"a\\u0062":1,"ab":2}')).toEqual({ duplicateKey: "ab" })
   })
 
-  it("allows the same key in different objects, and a key name inside a string", () => {
-    expect(duplicateKey('{"a":{"v":1},"b":{"v":2},"note":"\\"a\\":1"}')).toBeNull()
-    expect(duplicateKey('[{"v":1},{"v":2}]')).toBeNull()
+  it("allows the same key in different objects, a key name inside a string, and a value equal to a key", () => {
+    expect(dup('{"a":{"v":1},"b":{"v":2},"note":"\\"a\\":1"}')).toBeNull()
+    expect(dup('[{"v":1},{"v":2}]')).toBeNull()
+    expect(dup('{"a":"a","b":["a","a"]}')).toBeNull()
+  })
+
+  it(`refuses nesting deeper than ${MAX_NESTING}, and reads ${MAX_NESTING} levels`, () => {
+    const nested = (depth: number) => "[".repeat(depth) + "]".repeat(depth)
+    expect(dup(nested(MAX_NESTING))).toBeNull()
+    expect(dup(nested(MAX_NESTING + 1))).toEqual({ tooDeep: true })
+  })
+
+  it("reads 100,000 levels without exhausting the stack", () => {
+    expect(dup(`{"a":${'{"a":'.repeat(100_000)}1${"}".repeat(100_001)}`)).toEqual({ tooDeep: true })
   })
 })

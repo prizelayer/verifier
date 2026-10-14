@@ -196,7 +196,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             The 32 bytes:{" "}
             <code className="break-all font-mono text-xs">{(trace.hmacHex ?? "").match(/.{8}/g)?.join(" ")}</code>
           </p>
-          <Chunks chunks={trace.chunks} />
+          <Chunks chunks={trace.chunks} value={trace.value} />
           {checks.drawnPpmValue ? (
             <Compare label="drawnPpmValue" expectedLabel="v we recorded" computedLabel="v your browser computed" check={checks.drawnPpmValue} />
           ) : null}
