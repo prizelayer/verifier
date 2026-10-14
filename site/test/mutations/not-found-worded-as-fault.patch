@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 894c93e..c00bd5f 100644
+index d60486a..7756bbb 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -89,7 +89,7 @@ async function answer(fetchFn: typeof fetch, path: string): Promise<string | nul
+@@ -94,7 +94,7 @@ async function answer(fetchFn: typeof fetch, path: string): Promise<string | nul
    } catch {
      throw new Unreachable()
    }

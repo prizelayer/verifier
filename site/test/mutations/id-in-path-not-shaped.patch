@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 894c93e..58d1451 100644
+index d60486a..87a2b12 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -142,7 +142,7 @@ function objectOf(text: string, what: string): Record<string, unknown> {
+@@ -147,7 +147,7 @@ function objectOf(text: string, what: string): Record<string, unknown> {
  
  function field(json: Record<string, unknown>, name: string, what: string): string {
    const value = json[name]

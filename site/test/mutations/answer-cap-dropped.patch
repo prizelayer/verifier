@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 894c93e..96ec0b0 100644
+index d60486a..a0ec77b 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -112,7 +112,7 @@ async function readCapped(response: Response, path: string): Promise<string> {
+@@ -117,7 +117,7 @@ async function readCapped(response: Response, path: string): Promise<string> {
      const { done, value } = await reader.read()
      if (done) break
      size += value.byteLength

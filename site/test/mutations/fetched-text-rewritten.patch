@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 894c93e..50edf72 100644
+index d60486a..5e28eca 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -70,7 +70,7 @@ export async function lookUp(
+@@ -75,7 +75,7 @@ export async function lookUp(
        `"open":${open}`,
        `"seedPair":${seedPair}`,
        `"edition":${edition}`,
