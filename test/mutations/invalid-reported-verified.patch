@@ -1,10 +1,10 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 9fc7248..aea55a2 100644
+index 1c16c53..e2bdcf8 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1077,8 +1077,8 @@ function failureOf(name: CheckName, failed: Check): Failure {
+@@ -1078,8 +1078,8 @@ function failureOf(name: CheckName, failed: Check): Failure {
  function invalidReport(error: unknown): VerificationReport {
-   const message = error instanceof Error ? error.message : String(error);
+   const message = messageOf(error);
    return {
 -    ok: false,
 -    status: 'invalid',
