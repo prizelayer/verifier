@@ -35,6 +35,7 @@ describe("the page", () => {
     expect(screen.getByRole("heading", { name: "What this does not prove" })).toSatisfy(shown)
     expect(screen.getByText(/^You were not shown the fingerprint or the client seed before you played/)).toSatisfy(shown)
     expect(screen.getByText("So this page cannot prove, on its own, that we did not choose the secret after your open.")).toSatisfy(shown)
+    expect(screen.getByText(/When our server creates a fingerprint for a player, it writes a record in its audit log\. This page does not check that record\.$/)).toSatisfy(shown)
   })
 
   it("clears the result as soon as the pasted proof changes: no PASS for data it was not computed from", async () => {

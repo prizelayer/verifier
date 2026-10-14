@@ -87,8 +87,8 @@ export function App() {
         </p>
         <p>
           You were not shown the fingerprint or the client seed before you played. Our server created both,
-          and this page reads both from our server. The record that the fingerprint existed before your open
-          is in our audit log. This page does not check that log yet.
+          and this page reads both from our server. When our server creates a fingerprint for a player, it
+          writes a record in its audit log. This page does not check that record.
         </p>
         <p>So this page cannot prove, on its own, that we did not choose the secret after your open.</p>
         <p>It also cannot prove that the item was in stock or that it was sent to you.</p>

@@ -43,10 +43,11 @@ done < "$here/storage-apis.txt"
 # The words that must be there, and the two sentences that must not be, until the page can prove them.
 for required in 'Check an open yourself' 'What this does not prove' \
   'You were not shown the fingerprint or the client seed before you played' \
-  'So this page cannot prove, on its own, that we did not choose the secret after your open.'; do
+  'So this page cannot prove, on its own, that we did not choose the secret after your open.' \
+  'This page does not check that record.'; do
   grep -F -q -- "$required" $js || bad "the script does not contain: $required"
 done
-for forbidden in 'published before you played' 'could not have changed it'; do
+for forbidden in 'published before you played' 'could not have changed it' 'existed before your open is in our audit log'; do
   if grep -F -i -q -- "$forbidden" $files; then bad "the bundle contains: $forbidden"; fi
 done
 
