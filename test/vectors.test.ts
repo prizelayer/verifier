@@ -79,8 +79,8 @@ function asJsonb(bodyText: string): string {
  * The loops below iterate the fixture directly, so within a family no vector can be missed. The
  * gap this ledger closes is one level up: the families themselves are named by hand, so a NEW
  * family added on the platform side would be ignored here in silence — and both repositories would
- * stay green while the verifier proved strictly less than the fixture claims. KAN-50 (the 0x03
- * snapshot preimage, which binds a slot to the item in it) is headed for exactly that shape.
+ * stay green while the verifier proved strictly less than the fixture claims. The 0x03 snapshot
+ * preimage, which binds a slot to the item in it, arrived in exactly that shape.
  *
  * Recorded at the top of each test body rather than the bottom, so a vector that fails its
  * assertions still counts as attempted and reports one clear failure instead of two.
@@ -454,7 +454,7 @@ describe('verify() end to end', () => {
   });
 
   it('fails when the item recorded on the win is not the item in the drawn slot', async () => {
-    // THE attack KAN-50 exists to stop: a draw and odds that pass every check, landing on
+    // THE attack the prize-list check exists to stop: a draw and odds that pass every check, landing on
     // a real slot — and then a different, cheaper prize reported for it. Every check that existed
     // before this story still passes.
     const report = await verify(
@@ -778,6 +778,67 @@ describe('verify() end to end', () => {
 
     assert.equal(report.status, 'verified');
     assert.equal(report.checks.drawnItemId?.ok, true);
+  });
+
+  /** The canonical snapshot with the drawn slot left out, and the hash of that shorter list. */
+  async function withoutDrawnSlot(overrides: Record<string, unknown> = {}) {
+    const good = await inputWithSnapshot(overrides);
+    const drawn = good.expected.drawnSlotIndex;
+    const shorter = { ...good.snapshot, slots: good.snapshot.slots.filter((s) => s.slotIndex !== drawn) };
+    return { ...good, snapshot: shorter, expected: { ...good.expected, snapshotHash: await snapshotHash(shorter) } };
+  }
+
+  // A server drops the slot you won from the prize list and records the hash of the shorter list.
+  // Both hashes then agree, so only the slot rules below can see it.
+  for (const [what, itemId] of [
+    ['no item id', undefined],
+    ['the item id of the drawn slot', 'canonical'],
+    ['an item id equal to the old stand-in text', '(no such slot in the published snapshot)'],
+  ] as const) {
+    it(`fails a prize list with no entry for the drawn slot, with ${what}`, async () => {
+      const input = await withoutDrawnSlot();
+      const expected = { ...input.expected } as Record<string, unknown>;
+      if (itemId === undefined) delete expected.itemId;
+      else if (itemId !== 'canonical') expected.itemId = itemId;
+      const report = await verify({ ...input, expected } as typeof input);
+
+      assert.equal(report.checks.snapshotHash?.ok, true);
+      assert.equal(report.status, 'failed');
+      assert.equal(report.checks.snapshotEditionLink?.ok, false);
+      assert.equal(report.checks.snapshotEditionLink?.field, 'snapshot.slots');
+      assert.equal(report.checks.drawnItemId?.ok, false);
+      assert.equal(report.checks.drawnItemId?.error, `the prize list has no entry for slot ${input.expected.drawnSlotIndex}`);
+      assert.equal(report.trace.itemIdInDrawnSlot, undefined);
+    });
+  }
+
+  it('fails a prize list that lists a slot the box does not have', async () => {
+    const good = await inputWithSnapshot();
+    const extra = { ...good.snapshot, slots: [...good.snapshot.slots, { ...good.snapshot.slots[0], slotIndex: 9 }] };
+    const report = await verify({ ...good, snapshot: extra, expected: { ...good.expected, snapshotHash: await snapshotHash(extra) } });
+
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
+    assert.equal(report.firstFailure?.field, 'snapshot.slots');
+    assert.equal(report.checks.drawnItemId?.ok, true);
+  });
+
+  it('reads broken JSON in a snapshot body as "not valid JSON", not as a wrong type', async () => {
+    const base = await input();
+    const report = await verifyFrom(() => ({ ...base, snapshot: parseSnapshotBody('{"slots": [') }));
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.invalid?.message, 'the input could not be read: it is not valid JSON');
+    assert.ok(report.invalid?.detail);
+  });
+
+  it('treats a null snapshot hash like an absent one: the prize-list step fails by name', async () => {
+    const good = await inputWithSnapshot();
+    const report = await verify({ ...good, expected: { ...good.expected, snapshotHash: null as unknown as string } });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.firstFailure?.field, 'expected.snapshotHash');
   });
 
   it('refuses a missing seed as invalid, by name: only null means "not revealed yet"', async () => {

@@ -85,8 +85,8 @@ Up to **seven** independent claims are checked, and every one of them must hold:
 | `drawnPpmValue` | The recorded random value isn't what the seed actually produces. |
 | `drawnSlotIndex` | The value doesn't land on the slot you were given. |
 | `snapshotHash` | The prize table you were shown isn't the one recorded against your win. |
-| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified. |
-| `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew. |
+| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified, or it does not list exactly that edition's slots `0..n-1` (a slot left out, or one added). |
+| `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew, or the table has no entry for that slot. The second case fails even when no item id was given. |
 
 The last three run only when you pass a `snapshot`. Leave it out and they are listed in
 `report.notRun` — and `report.caveats` says, in plain language, that the item was never checked.

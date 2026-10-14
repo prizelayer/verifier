@@ -282,7 +282,6 @@ export interface VerificationReport {
   status: VerificationStatus;
   /** Present when `status` is `failed`: the first failing check in step order. */
   firstFailure?: Failure;
-  /** Present when `status` is `invalid`: why the input could not be read. */
   /**
    * Present when `status` is `invalid`. `message` is plain and names the input; `detail` carries
    * the runtime's own error text when the refusal was not one of this library's named ones.
@@ -997,7 +996,19 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     if (computedFingerprint === undefined) {
       skip('snapshotEditionLink', 'it needs the edition fingerprint, which could not be computed');
     } else {
-      checks.snapshotEditionLink = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
+      // The fingerprint inside the list AND the slots it lists: exactly the box's slots 0..n-1. A
+      // list that leaves a slot out can otherwise hash cleanly and say nothing about that slot.
+      const link = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
+      const boxSlots = input.edition.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+      const listSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+      checks.snapshotEditionLink =
+        link.ok && listSlots !== boxSlots
+          ? unusable(
+              computedFingerprint,
+              'snapshot.slots',
+              `the prize list has slots ${listSlots}, but the box has slots ${boxSlots}`,
+            )
+          : link;
     }
 
     // The slot the MATHS selected, never the one we were told — checking the claimed slot's item
@@ -1005,10 +1016,20 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     let itemIdInDrawnSlot: string | undefined;
     if (computedSlotIndex !== undefined) {
       const filled = snapshot.slots.find((slot) => slot.slotIndex === computedSlotIndex);
-      itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
-      trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+      if (filled) {
+        itemIdInDrawnSlot = filled.currentItemId.toLowerCase();
+        trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+      }
     }
-    if (input.expected.itemId === undefined) {
+    if (computedSlotIndex !== undefined && itemIdInDrawnSlot === undefined) {
+      // A prize list with no entry for the slot you won says nothing about your item: that FAILS,
+      // with or without an item id to compare. No stand-in text, so no input can ever equal it.
+      checks.drawnItemId = unusable(
+        input.expected.itemId?.toLowerCase() ?? '',
+        'snapshot.slots',
+        `the prize list has no entry for slot ${computedSlotIndex}`,
+      );
+    } else if (input.expected.itemId === undefined) {
       skip('drawnItemId', 'no item id was supplied to compare with');
       caveats.push(
         `NOT VERIFIED: the item recorded for this win. The published snapshot puts ` +
@@ -1091,7 +1112,11 @@ function invalidReport(error: unknown): VerificationReport {
   // Only this library's own refusals are worded for a reader. Anything else (a TypeError from a
   // value of the wrong type) keeps its runtime text in `detail`, never in the message.
   const own = error instanceof Error && error.constructor === Error;
-  const message = own ? error.message : 'the input could not be read: a value has the wrong type';
+  const message = own
+    ? error.message
+    : error instanceof SyntaxError
+      ? 'the input could not be read: it is not valid JSON'
+      : 'the input could not be read: a value has the wrong type';
   const invalid: { message: string; detail?: string } = { message };
   if (!own) invalid.detail = messageOf(error);
   return {
@@ -1109,9 +1134,6 @@ function invalidReport(error: unknown): VerificationReport {
 function slotWords(slotIndex: number | undefined): string {
   return slotIndex === undefined ? 'the drawn slot' : `slot ${slotIndex}`;
 }
-
-/** Stands in for the item id when the drawn slot is absent from the snapshot — a legible FAIL. */
-const NO_SUCH_SLOT = '(no such slot in the published snapshot)';
 
 /** Stands in for the computed value of a check whose input was unusable. */
 const NOT_COMPUTED = '(could not be computed)';
@@ -1154,7 +1176,8 @@ function requireShape(input: VerificationInput): void {
   need(typeof input.commitmentHex === 'string', 'commitmentHex');
   need(typeof input.expected === 'object' && input.expected !== null, 'expected');
   need(typeof input.expected.editionFingerprint === 'string', 'expected.editionFingerprint');
-  need(input.expected.snapshotHash === undefined || typeof input.expected.snapshotHash === 'string', 'expected.snapshotHash');
+  // `null` and an absent key both mean "no hash recorded": the snapshot step then fails by name.
+  need(input.expected.snapshotHash == null || typeof input.expected.snapshotHash === 'string', 'expected.snapshotHash');
   need(input.expected.itemId === undefined || typeof input.expected.itemId === 'string', 'expected.itemId');
   if (input.snapshot !== undefined) {
     need(typeof input.snapshot.editionFingerprint === 'string', 'snapshot.editionFingerprint');
