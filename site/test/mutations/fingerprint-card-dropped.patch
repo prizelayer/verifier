@@ -1,5 +1,5 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 117a37d..fea36d8 100644
+index 223d407..544e94d 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
 @@ -28,7 +28,7 @@ export function StepCards({ report, input }: Props) {

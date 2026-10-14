@@ -1,5 +1,5 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 117a37d..2e93448 100644
+index 223d407..664e177 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
 @@ -84,7 +84,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
