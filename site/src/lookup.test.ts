@@ -135,9 +135,16 @@ describe("lookUp", () => {
   })
 
   it("refuses an answer whose declared length is over the cap before reading it", async () => {
-    const declared = (async () =>
-      new Response("{}", { status: 200, headers: { "content-length": String(MAX_ANSWER_BYTES + 1) } })) as typeof fetch
-    expect((await lookUp(WIN, null, declared)).kind).toBe("serverFault")
+    // An answer that is otherwise good, so only the cap can refuse it.
+    const server = fakeServer(exampleAnswers())
+    const declared = (async (url: string | URL | Request, init?: RequestInit) => {
+      const response = await server.fetchFn(url, init)
+      return new Response(response.body, { status: 200, headers: { "content-length": String(MAX_ANSWER_BYTES + 1) } })
+    }) as typeof fetch
+    expect(await lookUp(WIN, null, declared)).toEqual({
+      kind: "serverFault",
+      message: `our server's answer for /verify/opens/${WIN} is larger than ${MAX_ANSWER_BYTES} bytes`,
+    })
   })
 })
 
