@@ -200,6 +200,8 @@ describe("the byte views of the example", () => {
     const words = [...card(3).querySelectorAll("[data-chunk]")].map((tr) => tr.lastElementChild?.textContent?.split(":")[0])
     expect(words).toEqual(["thrown away", "used", ...Array(6).fill("not needed")])
     expect(card(3).querySelector('[data-chunk="rejected"]')?.textContent).toContain("4,294,392,069")
+    const rows = [...card(4).querySelectorAll("[data-contains-v]")].map((tr) => tr.getAttribute("data-contains-v"))
+    expect(rows).toEqual(["no", "yes", "no"])
   })
 
   it("step 3 shows the mixed message and marks the used 4-byte number", async () => {
@@ -309,6 +311,9 @@ describe("tampering", () => {
   it("the recorded slot: FAIL at step 4", async () => {
     expect(await tampered((p) => (p.open.drawnSlotIndex = 1))).toBe("FAIL")
     expectFailAt(4, "drawnSlotIndex")
+    // The range is the one the library found for v, not the slot that was claimed.
+    const rows = [...card(4).querySelectorAll("[data-contains-v]")].map((tr) => tr.getAttribute("data-contains-v"))
+    expect(rows).toEqual(["yes", "no", "no"])
   })
 
   it("a displayed value in the prize list: FAIL at step 4 (the prize list)", async () => {
