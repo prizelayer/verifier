@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 8d204a7..25a3c35 100644
+index e67e97d..396ae3b 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -104,7 +104,7 @@ async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal):
+@@ -112,7 +112,7 @@ async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal):
    } catch {
      throw signal.aborted ? new TimedOut() : new Unreachable()
    }
 -  if (response.status === 404) return null
 +  if (response.status === 410) return null
-   if (!response.ok) throw new ServerFault(`our server answered ${response.status} for ${path}`)
+   if (!response.ok) throw new ServerFault(`it answered with error ${response.status}`)
    try {
-     return await readCapped(response, path)
+     return await readCapped(response)

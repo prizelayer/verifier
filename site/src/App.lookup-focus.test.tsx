@@ -126,14 +126,22 @@ describe("the id field", () => {
 
 describe("Show this proof laid out", () => {
   it("lays the fetched proof out for reading, and the field keeps the exact text", async () => {
+    // A prize list whose displayed value is above 2^53: a view built from parsed JSON would round it.
+    const answers = exampleAnswers()
+    const path = `/verify/snapshots/${EXAMPLE_PROOF.snapshot.snapshotHash}`
+    const big = JSON.stringify(EXAMPLE_PROOF.snapshot).replace('"displayed_value_cents":2000', '"displayed_value_cents":12345678901234567891')
+    expect(big).toContain("12345678901234567891")
+    answers.set(path, { status: 200, body: big })
     window.location.hash = `#open=${WIN}`
     const user = userEvent.setup()
-    render(<App fetchFn={fakeServer(exampleAnswers()).fetchFn} />)
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
     await user.click(lookUpButton())
-    await waitFor(() => expect(document.querySelector("[data-status] p")?.textContent).toBe("PASS"))
+    // The changed value fails the check; the lookup still found the open and shows the view.
+    await screen.findByText("Show this proof laid out")
     const shown = document.querySelector("[data-laid-out]")?.textContent ?? ""
     expect(shown).toBe(layOut(box().value))
     expect(shown.split("\n").length).toBeGreaterThan(20)
+    expect(shown).toContain("12345678901234567891")
     expect(box().value).not.toContain("\n")
     // Without the added whitespace the laid-out text is the field's text, character for character.
     expect(withoutSpaceOutsideStrings(shown)).toBe(box().value)

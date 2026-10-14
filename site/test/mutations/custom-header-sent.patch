@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index 8d204a7..eeaf43c 100644
+index e67e97d..7ceb8ac 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -100,7 +100,7 @@ export async function lookUp(
+@@ -108,7 +108,7 @@ export async function lookUp(
  async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal): Promise<string | null> {
    let response: Response
    try {

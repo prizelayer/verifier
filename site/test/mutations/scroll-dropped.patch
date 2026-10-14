@@ -1,5 +1,5 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 474c014..bf33e43 100644
+index 2ce6d4c..9eb1ab5 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
 @@ -47,7 +47,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
