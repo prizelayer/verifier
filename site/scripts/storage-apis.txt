@@ -1,0 +1,4 @@
+localStorage
+sessionStorage
+indexedDB
+document.cookie
