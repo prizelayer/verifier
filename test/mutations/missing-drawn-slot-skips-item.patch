@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index b9e234d..fb242af 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1021,7 +1021,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+         trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+       }
+     }
+-    if (computedSlotIndex !== undefined && itemIdInDrawnSlot === undefined) {
++    if (false && computedSlotIndex !== undefined && itemIdInDrawnSlot === undefined) {
+       // A prize list with no entry for the slot you won says nothing about your item: that FAILS,
+       // with or without an item id to compare. No stand-in text, so no input can ever equal it.
+       checks.drawnItemId = unusable(

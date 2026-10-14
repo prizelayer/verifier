@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 82ce911..03f7d9c 100644
+index b9e234d..0073d98 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1090,7 +1090,7 @@ function failureOf(name: CheckName, failed: Check): Failure {
+@@ -1111,7 +1111,7 @@ function failureOf(name: CheckName, failed: Check): Failure {
  function invalidReport(error: unknown): VerificationReport {
    // Only this library's own refusals are worded for a reader. Anything else (a TypeError from a
    // value of the wrong type) keeps its runtime text in `detail`, never in the message.
 -  const own = error instanceof Error && error.constructor === Error;
 +  const own = error instanceof Error;
-   const message = own ? error.message : 'the input could not be read: a value has the wrong type';
-   const invalid: { message: string; detail?: string } = { message };
-   if (!own) invalid.detail = messageOf(error);
+   const message = own
+     ? error.message
+     : error instanceof SyntaxError

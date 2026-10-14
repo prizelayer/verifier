@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 82ce911..1413862 100644
+index b9e234d..70d838f 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -997,7 +997,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
-     if (computedFingerprint === undefined) {
-       skip('snapshotEditionLink', 'it needs the edition fingerprint, which could not be computed');
+@@ -998,7 +998,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
      } else {
--      checks.snapshotEditionLink = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
-+      checks.snapshotEditionLink = check(computedFingerprint, seedRevealed ? snapshot.editionFingerprint.toLowerCase() : computedFingerprint);
-     }
- 
-     // The slot the MATHS selected, never the one we were told — checking the claimed slot's item
+       // The fingerprint inside the list AND the slots it lists: exactly the box's slots 0..n-1. A
+       // list that leaves a slot out can otherwise hash cleanly and say nothing about that slot.
+-      const link = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
++      const link = check(computedFingerprint, seedRevealed ? snapshot.editionFingerprint.toLowerCase() : computedFingerprint);
+       const boxSlots = input.edition.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+       const listSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+       checks.snapshotEditionLink =
