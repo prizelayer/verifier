@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e244966..b50970f 100644
+index 8d204a7..df5007b 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -49,7 +49,7 @@ export async function lookUp(
-     const editionId = field(openJson, "editionId", "the open")
+@@ -69,7 +69,7 @@ export async function lookUp(
+     }
      const snapshotHash = openJson.snapshotHash
      // Every value put into a path is checked for its shape first, so no answer can steer a request.
--    if (snapshotHash != null && (typeof snapshotHash !== "string" || !/^[0-9a-f]{64}$/.test(snapshotHash))) {
-+    if (snapshotHash != null && (typeof snapshotHash !== "string" || false)) {
+-    if (snapshotHash !== null && (typeof snapshotHash !== "string" || !HASH.test(snapshotHash))) {
++    if (snapshotHash !== null && (typeof snapshotHash !== "string" || !HASH.test(snapshotHash) && false)) {
        throw new ServerFault("our server's answer for the open has a snapshotHash that is not 64 hex characters")
      }
      const [seedPair, edition, snapshot] = await Promise.all([

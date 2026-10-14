@@ -1,9 +1,9 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index be5ec26..063db40 100644
+index e55b1b4..6620c0b 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -76,7 +76,7 @@ export function LookupBox({
-           <Button variant="outline" onClick={() => save(fetched, winId.trim())}>
+@@ -92,7 +92,7 @@ export function LookupBox({
+           <Button variant="outline" onClick={() => save(fetched, result.asked)}>
              Save this proof
            </Button>
 -          <p className="text-sm">{LOOKUP_WORDS.sharing}</p>

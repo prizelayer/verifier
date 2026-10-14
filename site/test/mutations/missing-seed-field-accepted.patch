@@ -1,10 +1,10 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e244966..9802194 100644
+index 8d204a7..b8fe591 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -65,7 +65,7 @@ export async function lookUp(
+@@ -82,7 +82,7 @@ export async function lookUp(
      sameRecord(objectOf(edition, "the box"), "editionId", editionId, "the box")
-     if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list")
+     if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list", true)
      // `null` means "not revealed yet"; a missing key means our server left the field out.
 -    if (!("revealedServerSeed" in seedPairJson)) {
 +    if (false && !("revealedServerSeed" in seedPairJson)) {

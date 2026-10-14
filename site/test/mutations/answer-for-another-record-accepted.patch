@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e244966..aa33921 100644
+index 8d204a7..31ed6e6 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -139,7 +139,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
- 
- function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string) {
+@@ -184,7 +184,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
+ /** Ids are compared without letter case, as UUIDs are; a hash is compared exactly. */
+ function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string, exact = false) {
    const value = json[name]
--  if (typeof value !== "string" || value.toLowerCase() !== asked.toLowerCase()) {
-+  if (typeof value !== "string" || (value.toLowerCase() !== asked.toLowerCase() && false)) {
+-  const same = typeof value === "string" && (exact ? value === asked : value.toLowerCase() === asked.toLowerCase())
++  const same = typeof value === "string" && (exact ? value === asked : true)
+   if (!same) {
      throw new ServerFault(`our server's answer for ${what} names another ${name} than the one the page asked for`)
    }
- }

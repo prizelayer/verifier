@@ -1,8 +1,8 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index f67c4a7..632a3b1 100644
+index 474c014..90efa39 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -115,7 +115,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
+@@ -118,7 +118,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
  
        {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
  

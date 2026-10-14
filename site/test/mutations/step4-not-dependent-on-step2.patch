@@ -1,5 +1,5 @@
 diff --git a/site/src/words.ts b/site/src/words.ts
-index 83c05b8..5b758b2 100644
+index 012b5e7..6a3908b 100644
 --- a/site/src/words.ts
 +++ b/site/src/words.ts
 @@ -86,7 +86,7 @@ export const FAIL_WORDS: Record<CheckName, string> = {

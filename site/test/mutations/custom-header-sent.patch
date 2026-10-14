@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e244966..8d75b00 100644
+index 8d204a7..eeaf43c 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -80,7 +80,7 @@ export async function lookUp(
- async function answer(fetchFn: typeof fetch, path: string): Promise<string | null> {
+@@ -100,7 +100,7 @@ export async function lookUp(
+ async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal): Promise<string | null> {
    let response: Response
    try {
--    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store" })
-+    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store", headers: { "x-proof": "1" } })
+-    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store", signal })
++    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store", signal, headers: { "x-proof": "1" } })
    } catch {
-     throw new Unreachable()
+     throw signal.aborted ? new TimedOut() : new Unreachable()
    }

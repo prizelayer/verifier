@@ -1,13 +1,13 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index be5ec26..53726cf 100644
+index e55b1b4..801d4d6 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -71,7 +71,7 @@ export function LookupBox({
-       <div aria-live="polite" data-lookup={busy ? "busy" : (result?.kind ?? "idle")}>
-         {busy ? <p>{LOOKUP_WORDS.busy}</p> : result ? <LookupWords result={result} /> : null}
+@@ -87,7 +87,7 @@ export function LookupBox({
+       <div aria-live="polite" data-lookup={busy ? "busy" : (result?.result.kind ?? "idle")}>
+         {busy ? <p>{LOOKUP_WORDS.busy}</p> : result ? <LookupWords result={result.result} /> : null}
        </div>
--      {fetched !== null && fetched === shownText ? (
-+      {fetched !== null && (fetched === shownText || true) ? (
+-      {result !== null && fetched !== null && fetched === shownText ? (
++      {result !== null && fetched !== null && (fetched === shownText || true) ? (
          <div className="space-y-1">
-           <Button variant="outline" onClick={() => save(fetched, winId.trim())}>
+           <Button variant="outline" onClick={() => save(fetched, result.asked)}>
              Save this proof
