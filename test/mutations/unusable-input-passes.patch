@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..9b20a34 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1103,7 +1103,7 @@ function check(expected: string, computed: string): Check {
+ }
+ 
+ function unusable(expected: string, field: string, error: string): Check {
+-  return { ok: false, expected, computed: NOT_COMPUTED, error, field };
++  return { ok: true, expected, computed: NOT_COMPUTED, error, field };
+ }
+ 
+ type Attempt<T> = { ok: true; value: T } | { ok: false; error: string };

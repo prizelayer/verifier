@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..f25b55f 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -476,7 +476,7 @@ export async function derive(
+         };
+       }
+       rejected.push({ attempt, offset, chunk });
+-      chunks.push({ attempt, offset, chunk, verdict: 'rejected' });
++      chunks.push({ attempt, offset, chunk, verdict: 'accepted' });
+     }
+   }
+ }

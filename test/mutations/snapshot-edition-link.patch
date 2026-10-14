@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index d3a5ee9..a179fde 100644
+index 9fc7248..2a62e30 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -762,7 +762,7 @@ export async function verify(input: VerificationInput): Promise<VerificationRepo
-     const itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
+@@ -981,7 +981,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     if (computedFingerprint === undefined) {
+       skip('snapshotEditionLink', 'it needs the edition fingerprint, which could not be computed');
+     } else {
+-      checks.snapshotEditionLink = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
++      checks.snapshotEditionLink = check(computedFingerprint, computedFingerprint);
+     }
  
-     checks.snapshotHash = check(expectedHash.toLowerCase(), computedSnapshotHash);
--    checks.snapshotEditionLink = check(computedFingerprint, input.snapshot.editionFingerprint.toLowerCase());
-+    checks.snapshotEditionLink = check(computedFingerprint, computedFingerprint);
-     checks.drawnItemId = check(expectedItemId.toLowerCase(), itemIdInDrawnSlot);
- 
-     trace.snapshotPreimageHex = hexFromBytes(snapshotPreimage);
+     // The slot the MATHS selected, never the one we were told — checking the claimed slot's item

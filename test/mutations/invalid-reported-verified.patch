@@ -1,0 +1,15 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..aea55a2 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1077,8 +1077,8 @@ function failureOf(name: CheckName, failed: Check): Failure {
+ function invalidReport(error: unknown): VerificationReport {
+   const message = error instanceof Error ? error.message : String(error);
+   return {
+-    ok: false,
+-    status: 'invalid',
++    ok: true,
++    status: 'verified',
+     invalid: { message },
+     notRun: CHECK_NAMES.map((check) => ({ check, reason: 'the input could not be read' })),
+     checks: {},

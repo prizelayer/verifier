@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..d37b3f9 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -461,7 +461,7 @@ export async function derive(
+       const chunk = bigEndianUint32(hmac, offset);
+       if (chunk < ACCEPTANCE_THRESHOLD) {
+         chunks.push({ attempt, offset, chunk, verdict: 'accepted' });
+-        for (const later of CHUNK_OFFSETS.filter((o) => o > offset)) {
++        for (const later of CHUNK_OFFSETS.filter((o) => o > offset && false)) {
+           chunks.push({ attempt, offset: later, chunk: bigEndianUint32(hmac, later), verdict: 'not-reached' });
+         }
+         return {

@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..4aa4d35 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -902,7 +902,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     trace.editionPreimageHex = hexFromBytes(preimage.value);
+     trace.computedEditionFingerprint = computedFingerprint;
+     trace.cumulative = cumulativeTable(input.edition.slots);
+-    checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
++    checks.editionFingerprint = check(expectedFingerprint, seedRevealed ? computedFingerprint : expectedFingerprint);
+   } else {
+     checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);
+   }

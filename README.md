@@ -4,8 +4,12 @@
 in your own browser, with no network access and no dependencies. It does not ask PrizeLayer whether
 a draw was fair — it works the answer out from the same bytes the engine used.
 
+The package is not published to npm. Build it from this repository; the result is one file,
+`dist/verifier.js`, with no imports:
+
 ```
-npm install @prizelayer/verifier
+git clone https://github.com/prizelayer/verifier.git && cd verifier
+npm ci && npm run build
 ```
 
 - **Zero runtime dependencies.** Not "few". None. The only thing it uses is Web Crypto, which your
@@ -42,11 +46,30 @@ const report = await verify({
   snapshot: parseSnapshotBody(publishedSnapshotBody),
 });
 
-report.ok;      // true only if every check below passed
-report.summary; // one line, safe to show a player
-report.caveats; // what this run did NOT prove — show these next to any pass
-report.trace;   // every intermediate value, so you can check the workings by hand
+report.ok;          // true only if status is 'verified'
+report.status;      // 'verified' | 'failed' | 'pending' | 'invalid'
+report.firstFailure; // the first failing check, its step (1 to 4) and the input it names
+report.notRun;      // every check that did not run, and why
+report.summary;     // one line, safe to show a player
+report.caveats;     // what this run did NOT prove — show these next to any pass
+report.trace;       // every intermediate value, so you can check the workings by hand
 ```
+
+`verify()` never throws. What it returns, with an example of each:
+
+- **`verified`** — every check that ran passed, and the commitment, the odds, the draw and the
+  slot all ran. Checks that did not run (no snapshot, no item id) are listed in `notRun`, and
+  `caveats` says what that leaves unproven.
+- **`failed`** — a check did not match, or an input it needed is unusable. Change one chance in the
+  odds table from `250000` to `250001` and the table sums to 1,000,001: `editionFingerprint` fails
+  with `error` explaining the sum and `field: 'edition'`, `firstFailure.step` is `2`, and the
+  commitment and the draw are still recomputed and shown.
+- **`pending`** — `serverSeedHex` is `null` because the seed pair has not retired yet. The odds and
+  the snapshot are checked; the commitment, the draw and the slot are in `notRun`. A pending report
+  can still carry a failed check, and then `firstFailure` names it.
+- **`invalid`** — the input could not be read at all, so nothing was checked. `invalid.message`
+  says why. Use `verifyFrom(() => ({ ...parsed input... }))` to have refusals from `parseEdition`
+  and `parseSnapshotBody` reported the same way.
 
 Up to **seven** independent claims are checked, and every one of them must hold:
 
@@ -60,8 +83,10 @@ Up to **seven** independent claims are checked, and every one of them must hold:
 | `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified. |
 | `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew. |
 
-The last three appear only when you pass a `snapshot`. Leave it out and they are absent — and
-`report.caveats` says, in plain language, that the item was never checked. A verifier that prints
+The last three run only when you pass a `snapshot`. Leave it out and they are listed in
+`report.notRun` — and `report.caveats` says, in plain language, that the item was never checked.
+Pass a snapshot without `expected.itemId` and the snapshot is checked but the item is not compared;
+that is reported the same way, never as a pass. A verifier that prints
 green about a link it never looked at is worse than one that stays silent.
 
 ### The second check is the one that matters
@@ -179,9 +204,12 @@ implementations; "it passed in Node" says nothing about the engine your players 
 
 | Export | |
 |---|---|
-| `verify(input)` | The whole check. Returns `{ ok, checks, trace, summary }`. |
-| `derive(seed, clientSeed, nonce)` | The derivation loop, with the full rejection trace. |
+| `verify(input)` | The whole check. Returns `{ ok, status, firstFailure, notRun, checks, trace, caveats, summary }`. Never throws. |
+| `verifyFrom(build)` | `verify()`, with the parsing done inside `build` and its refusals reported as `invalid`. |
+| `derive(seed, clientSeed, nonce)` | The derivation loop, with the full trace: every chunk of every attempt, and what the loop did with it. |
 | `slotFor(v, slots)` | The cumulative lookup. Sorts by `slotIndex` itself. |
+| `cumulativeTable(slots)` | The same lookup as a table: slot `i` owns every `v` with `from <= v < to`. |
+| `CHECK_NAMES` / `STEP_OF` | The checks in reading order, and the step (1 to 4) each belongs to. |
 | `editionBytes(edition)` | The canonical `0x01` preimage, for inspection. |
 | `editionFingerprint(edition)` | `SHA-256` of the above, lowercase hex. |
 | `commitment(seedBytes)` | `SHA-256` of the raw seed. |
