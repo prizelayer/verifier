@@ -1,13 +1,13 @@
-diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index d60486a..5e28eca 100644
---- a/site/src/lookup.ts
-+++ b/site/src/lookup.ts
-@@ -75,7 +75,7 @@ export async function lookUp(
-       `"open":${open}`,
-       `"seedPair":${seedPair}`,
-       `"edition":${edition}`,
--      ...(snapshot === null ? [] : [`"snapshot":${snapshot}`]),
-+      ...(snapshot === null ? [] : [`"snapshot":${JSON.stringify(JSON.parse(snapshot))}`]),
-       ...(itemId === null ? [] : [`"received":${JSON.stringify({ itemId })}`]),
-     ]
-     return { kind: "found", text: `{${parts.join(",")}}` }
+diff --git a/site/src/proof.ts b/site/src/proof.ts
+index 9d101f4..4cb5336 100644
+--- a/site/src/proof.ts
++++ b/site/src/proof.ts
+@@ -81,7 +81,7 @@ export function joinProof(answers: {
+     `"open":${answers.open}`,
+     `"seedPair":${answers.seedPair}`,
+     `"edition":${answers.edition}`,
+-    ...(answers.snapshot === null ? [] : [`"snapshot":${answers.snapshot}`]),
++    ...(answers.snapshot === null ? [] : [`"snapshot":${JSON.stringify(JSON.parse(answers.snapshot))}`]),
+     ...(answers.itemId === null ? [] : [`"received":${JSON.stringify({ itemId: answers.itemId })}`]),
+   ]
+   return `{${parts.join(",")}}`

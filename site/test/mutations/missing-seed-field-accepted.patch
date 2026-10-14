@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index d60486a..1a1c9fc 100644
+index e244966..9802194 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -67,7 +67,7 @@ export async function lookUp(
+@@ -65,7 +65,7 @@ export async function lookUp(
      sameRecord(objectOf(edition, "the box"), "editionId", editionId, "the box")
      if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list")
      // `null` means "not revealed yet"; a missing key means our server left the field out.
@@ -10,4 +10,4 @@ index d60486a..1a1c9fc 100644
 +    if (false && !("revealedServerSeed" in seedPairJson)) {
        throw new ServerFault("our server's answer for the seed pair has no revealedServerSeed field")
      }
-     const parts = [
+     return { kind: "found", text: joinProof({ open, seedPair, edition, snapshot, itemId }) }

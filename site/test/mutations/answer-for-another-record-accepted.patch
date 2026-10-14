@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index d60486a..376360b 100644
+index e244966..aa33921 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -155,7 +155,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
+@@ -139,7 +139,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
  
  function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string) {
    const value = json[name]

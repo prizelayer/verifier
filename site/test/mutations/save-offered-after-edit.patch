@@ -1,5 +1,5 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index e0fd3cb..e1ae3b6 100644
+index be5ec26..53726cf 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
 @@ -71,7 +71,7 @@ export function LookupBox({

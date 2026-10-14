@@ -1,8 +1,8 @@
 diff --git a/site/src/proof.ts b/site/src/proof.ts
-index 0180fb8..bb9f8d5 100644
+index 9d101f4..b4dc4c2 100644
 --- a/site/src/proof.ts
 +++ b/site/src/proof.ts
-@@ -66,7 +66,7 @@ export type Checked =
+@@ -89,7 +89,7 @@ export function joinProof(answers: {
  
  /** Check a pasted proof. Never throws: an unreadable proof is an `invalid` report with the reason. */
  export async function checkProof(text: string): Promise<Checked> {

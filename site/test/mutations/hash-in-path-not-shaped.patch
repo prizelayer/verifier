@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index d60486a..ae229c4 100644
+index e244966..b50970f 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -51,7 +51,7 @@ export async function lookUp(
+@@ -49,7 +49,7 @@ export async function lookUp(
      const editionId = field(openJson, "editionId", "the open")
      const snapshotHash = openJson.snapshotHash
      // Every value put into a path is checked for its shape first, so no answer can steer a request.
