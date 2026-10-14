@@ -59,12 +59,17 @@ export async function lookUp(
       required(fetchFn, `/verify/editions/${editionId}`, "the box"),
       typeof snapshotHash === "string" ? required(fetchFn, `/verify/snapshots/${snapshotHash}`, "the prize list") : null,
     ])
+    // Each answer must be the record that was asked for: the block is joined from their text, so an
+    // answer for another record would be checked as if it were this open's.
+    sameRecord(openJson, "winId", id, "the open")
+    const seedPairJson = objectOf(seedPair, "the seed pair")
+    sameRecord(seedPairJson, "seedPairId", seedPairId, "the seed pair")
+    sameRecord(objectOf(edition, "the box"), "editionId", editionId, "the box")
+    if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list")
     // `null` means "not revealed yet"; a missing key means our server left the field out.
-    if (!("revealedServerSeed" in objectOf(seedPair, "the seed pair"))) {
+    if (!("revealedServerSeed" in seedPairJson)) {
       throw new ServerFault("our server's answer for the seed pair has no revealedServerSeed field")
     }
-    objectOf(edition, "the box")
-    if (snapshot !== null) objectOf(snapshot, "the prize list")
     const parts = [
       `"format":${JSON.stringify(PROOF_FORMAT)}`,
       `"open":${open}`,
@@ -146,6 +151,13 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
     throw new ServerFault(`our server's answer for ${what} has no usable ${name}`)
   }
   return value
+}
+
+function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string) {
+  const value = json[name]
+  if (typeof value !== "string" || value.toLowerCase() !== asked.toLowerCase()) {
+    throw new ServerFault(`our server's answer for ${what} names another ${name} than the one the page asked for`)
+  }
 }
 
 /** The win id and item id in the page's address: `#open=<winId>&item=<itemId>`. Never sent anywhere. */

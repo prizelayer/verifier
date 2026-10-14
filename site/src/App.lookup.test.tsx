@@ -56,7 +56,7 @@ describe("the lookup", () => {
   it("drops the address's item id when another open id is typed", async () => {
     const other = "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"
     const answers = exampleAnswers()
-    answers.set(`/verify/opens/${other}`, answers.get(`/verify/opens/${WIN}`)!)
+    answers.set(`/verify/opens/${other}`, { status: 200, body: JSON.stringify({ ...EXAMPLE_PROOF.open, winId: other }) })
     const { user, server } = await lookUpFromAddress(`#open=${WIN}&item=${ITEM}`, fakeServer(answers))
     await user.clear(idField())
     await user.type(idField(), other)
@@ -101,4 +101,27 @@ describe("the lookup", () => {
     expect(verdict()).toBeNull()
     expect(box().value).toBe("")
   })
+
+  it.each([
+    ["the client seed", `/verify/seed-pairs/${EXAMPLE_PROOF.seedPair.seedPairId}`, (body: Record<string, unknown>) => ({ ...body, clientSeed: MARKUP })],
+    [
+      "a value of the box",
+      `/verify/editions/${EXAMPLE_PROOF.edition.editionId}`,
+      (body: Record<string, unknown>) => ({
+        ...body,
+        slots: EXAMPLE_PROOF.edition.slots.map((slot, i) => (i === 0 ? { ...slot, requiredBuyBackValueCents: MARKUP } : slot)),
+      }),
+    ],
+  ])("shows markup in %s of a fetched answer as text, never as markup", async (_what, path, change) => {
+    const answers = exampleAnswers()
+    answers.set(path, { status: 200, body: JSON.stringify(change(JSON.parse(answers.get(path)!.body))) })
+    const { user } = await lookUpFromAddress(`#open=${WIN}`, fakeServer(answers))
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdict()).not.toBeNull())
+    expect(document.getElementById("injected")).toBeNull()
+    expect(document.querySelector("main img")).toBeNull()
+    expect(document.querySelector("main")?.textContent).toContain(MARKUP)
+  })
 })
+
+const MARKUP = '<img id="injected" src="x">'

@@ -115,6 +115,24 @@ describe("lookUp", () => {
     expect(server.calls).toHaveLength(1)
   })
 
+  it.each([
+    ["the open", `/verify/opens/${WIN}`, "winId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
+    ["the seed pair", `/verify/seed-pairs/${seedPair.seedPairId}`, "seedPairId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
+    ["the box", `/verify/editions/${edition.editionId}`, "editionId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"],
+    ["the prize list", `/verify/snapshots/${snapshot.snapshotHash}`, "snapshotHash", "0".repeat(64)],
+  ])("names an answer for %s that is another record as a fault of our server", async (what, path, name, other) => {
+    const answers = exampleAnswers()
+    answers.set(path, { status: 200, body: JSON.stringify({ ...JSON.parse(answers.get(path)!.body), [name]: other }) })
+    expect(await lookUp(WIN, null, fakeServer(answers).fetchFn)).toEqual({
+      kind: "serverFault",
+      message: `our server's answer for ${what} names another ${name} than the one the page asked for`,
+    })
+  })
+
+  it("accepts the open's own id in another letter case", async () => {
+    expect((await lookUp(WIN.toUpperCase(), null, withAnswer(`/verify/opens/${WIN.toUpperCase()}`, { status: 200, body: JSON.stringify(open) }).fetchFn)).kind).toBe("found")
+  })
+
   it("names an answer that is not JSON", async () => {
     const result = await lookUp(WIN, null, withAnswer(`/verify/editions/${edition.editionId}`, { status: 200, body: "<html>" }).fetchFn)
     expect(result).toEqual({ kind: "serverFault", message: "our server's answer for the box is not valid JSON" })
