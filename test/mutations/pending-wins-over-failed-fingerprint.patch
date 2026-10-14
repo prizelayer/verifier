@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e496909..828e3a9 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1026,7 +1026,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+   const coreRan = CORE_CHECKS.every((name) => checks[name]?.ok === true);
+   // A check that ran and failed fails the open, whatever is still pending.
+   const status: VerificationStatus =
+-    failed.length > 0 ? 'failed' : !seedRevealed ? 'pending' : coreRan ? 'verified' : 'failed';
++    !seedRevealed ? 'pending' : failed.length > 0 ? 'failed' : coreRan ? 'verified' : 'failed';
+ 
+   const report: VerificationReport = {
+     ok: status === 'verified',

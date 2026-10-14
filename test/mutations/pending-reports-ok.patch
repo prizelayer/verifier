@@ -1,9 +1,9 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 9fc7248..fadd2a9 100644
+index e496909..e86b9cc 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1025,7 +1025,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
-       : 'verified';
+@@ -1029,7 +1029,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     failed.length > 0 ? 'failed' : !seedRevealed ? 'pending' : coreRan ? 'verified' : 'failed';
  
    const report: VerificationReport = {
 -    ok: status === 'verified',
