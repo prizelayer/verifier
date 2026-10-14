@@ -83,8 +83,6 @@ export function LookupBox({
   )
 }
 
-
-
 function LookupWords({ result }: { result: LookupResult }) {
   switch (result.kind) {
     case "found":

@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+import { files } from "./sourceFiles"
 
 // The page stores nothing in the browser: a proof is pasted, checked and forgotten. The scan reads
 // the source and, in CI after the build (SCAN_DIST=1), the built bundle, because a dependency that
@@ -11,14 +12,6 @@ const ROOT = join(import.meta.dirname, "..")
 const SRC = join(ROOT, "src")
 const DIST = join(ROOT, "dist")
 const APIS = readFileSync(join(import.meta.dirname, "storage-apis.txt"), "utf8").split("\n").filter(Boolean)
-
-function files(dir: string, pattern: RegExp): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name)
-    if (statSync(path).isDirectory()) return files(path, pattern)
-    return pattern.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : []
-  })
-}
 
 function hits(paths: string[], base: string) {
   return paths.flatMap((file) => {

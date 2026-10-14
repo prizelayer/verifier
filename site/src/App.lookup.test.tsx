@@ -8,6 +8,7 @@ import { LOOKUP_WORDS, NOT_TOLD_ITEM } from "./words"
 
 const WIN = EXAMPLE_PROOF.open.winId
 const ITEM = EXAMPLE_PROOF.received.itemId
+const MARKUP = '<img id="injected" src="x">'
 
 afterEach(() => {
   cleanup()
@@ -18,7 +19,7 @@ const verdict = () => document.querySelector("[data-status] p")?.textContent ?? 
 const box = () => screen.getByRole("textbox", { name: "Paste a proof" }) as HTMLTextAreaElement
 const idField = () => screen.getByRole("textbox", { name: "Look up an open by its id" }) as HTMLInputElement
 
-async function lookUpFromAddress(hash: string, server = fakeServer(exampleAnswers())) {
+function openWithHash(hash: string, server = fakeServer(exampleAnswers())) {
   window.location.hash = hash
   const user = userEvent.setup()
   render(<App fetchFn={server.fetchFn} />)
@@ -27,7 +28,7 @@ async function lookUpFromAddress(hash: string, server = fakeServer(exampleAnswer
 
 describe("the lookup", () => {
   it("fetches nothing before the button is pressed, also when the id came in the address", async () => {
-    const { user, server } = await lookUpFromAddress(`#open=${WIN}&item=${ITEM}`)
+    const { user, server } = openWithHash(`#open=${WIN}&item=${ITEM}`)
     expect(idField().value).toBe(WIN)
     await user.click(screen.getByRole("button", { name: "Try the example" }))
     await waitFor(() => expect(verdict()).toBe("PASS"))
@@ -35,7 +36,7 @@ describe("the lookup", () => {
   })
 
   it("puts the fetched proof in the box, checks it, and offers to save it", async () => {
-    const { user, server } = await lookUpFromAddress(`#open=${WIN}&item=${ITEM}`)
+    const { user, server } = openWithHash(`#open=${WIN}&item=${ITEM}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdict()).toBe("PASS"))
     expect(server.calls).toHaveLength(4)
@@ -46,7 +47,7 @@ describe("the lookup", () => {
   })
 
   it("checks a lookup without an item id, and says the item was not checked", async () => {
-    const { user } = await lookUpFromAddress(`#open=${WIN}`)
+    const { user } = openWithHash(`#open=${WIN}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdict()).toBe("PASS"))
     expect(JSON.parse(box().value)).not.toHaveProperty("received")
@@ -57,7 +58,7 @@ describe("the lookup", () => {
     const other = "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d"
     const answers = exampleAnswers()
     answers.set(`/verify/opens/${other}`, { status: 200, body: JSON.stringify({ ...EXAMPLE_PROOF.open, winId: other }) })
-    const { user, server } = await lookUpFromAddress(`#open=${WIN}&item=${ITEM}`, fakeServer(answers))
+    const { user, server } = openWithHash(`#open=${WIN}&item=${ITEM}`, fakeServer(answers))
     await user.clear(idField())
     await user.type(idField(), other)
     await user.click(screen.getByRole("button", { name: "Look up" }))
@@ -67,7 +68,7 @@ describe("the lookup", () => {
   })
 
   it("hides 'Save this proof' once the box no longer holds the fetched proof", async () => {
-    const { user } = await lookUpFromAddress(`#open=${WIN}&item=${ITEM}`)
+    const { user } = openWithHash(`#open=${WIN}&item=${ITEM}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdict()).toBe("PASS"))
     await user.type(box(), " ")
@@ -82,7 +83,7 @@ describe("the lookup", () => {
       LOOKUP_WORDS.unreachable,
     ],
   ])("says so for %s, and checks nothing", async (_name, server, words) => {
-    const { user } = await lookUpFromAddress(`#open=${WIN}`, server)
+    const { user } = openWithHash(`#open=${WIN}`, server)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     expect(await screen.findByText(words)).toBeTruthy()
     expect(verdict()).toBeNull()
@@ -93,7 +94,7 @@ describe("the lookup", () => {
     const answers = exampleAnswers()
     const { revealedServerSeed: _dropped, ...withoutField } = EXAMPLE_PROOF.seedPair
     answers.set(`/verify/seed-pairs/${EXAMPLE_PROOF.seedPair.seedPairId}`, { status: 200, body: JSON.stringify(withoutField) })
-    const { user } = await lookUpFromAddress(`#open=${WIN}`, fakeServer(answers))
+    const { user } = openWithHash(`#open=${WIN}`, fakeServer(answers))
     await user.click(screen.getByRole("button", { name: "Look up" }))
     expect(
       await screen.findByText(LOOKUP_WORDS.serverFault("our server's answer for the seed pair has no revealedServerSeed field")),
@@ -115,7 +116,7 @@ describe("the lookup", () => {
   ])("shows markup in %s of a fetched answer as text, never as markup", async (_what, path, change) => {
     const answers = exampleAnswers()
     answers.set(path, { status: 200, body: JSON.stringify(change(JSON.parse(answers.get(path)!.body))) })
-    const { user } = await lookUpFromAddress(`#open=${WIN}`, fakeServer(answers))
+    const { user } = openWithHash(`#open=${WIN}`, fakeServer(answers))
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdict()).not.toBeNull())
     expect(document.getElementById("injected")).toBeNull()
@@ -123,5 +124,3 @@ describe("the lookup", () => {
     expect(document.querySelector("main")?.textContent).toContain(MARKUP)
   })
 })
-
-const MARKUP = '<img id="injected" src="x">'

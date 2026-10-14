@@ -1,4 +1,4 @@
-import { PROOF_FORMAT } from "./proof"
+import { joinProof } from "./proof"
 
 /**
  * The one server this page may ask anything, and only when the reader presses "Look up". The
@@ -31,8 +31,6 @@ class Unreachable extends Error {}
 /**
  * Fetches the four public answers for one open and joins them, unchanged, into one proof.
  *
- * The answers are joined as their own TEXT, never parsed and written again: the prize list carries
- * displayed values as bare JSON numbers, and rewriting them would round any value above 2^53.
  * Every request is a plain GET with no credentials and no custom header, so the browser sends no
  * cookie and no preflight request.
  */
@@ -70,15 +68,7 @@ export async function lookUp(
     if (!("revealedServerSeed" in seedPairJson)) {
       throw new ServerFault("our server's answer for the seed pair has no revealedServerSeed field")
     }
-    const parts = [
-      `"format":${JSON.stringify(PROOF_FORMAT)}`,
-      `"open":${open}`,
-      `"seedPair":${seedPair}`,
-      `"edition":${edition}`,
-      ...(snapshot === null ? [] : [`"snapshot":${snapshot}`]),
-      ...(itemId === null ? [] : [`"received":${JSON.stringify({ itemId })}`]),
-    ]
-    return { kind: "found", text: `{${parts.join(",")}}` }
+    return { kind: "found", text: joinProof({ open, seedPair, edition, snapshot, itemId }) }
   } catch (error) {
     if (error instanceof Unreachable) return { kind: "unreachable" }
     if (error instanceof ServerFault) return { kind: "serverFault", message: error.message }
@@ -111,25 +101,19 @@ async function readCapped(response: Response, path: string): Promise<string> {
   if (Number(response.headers.get("content-length") ?? 0) > MAX_ANSWER_BYTES) throw tooLarge()
   if (response.body === null) return ""
   const reader = response.body.getReader()
-  const pieces: Uint8Array[] = []
+  const decoder = new TextDecoder()
+  let text = ""
   let size = 0
   for (;;) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) return text + decoder.decode()
     size += value.byteLength
     if (size > MAX_ANSWER_BYTES) {
       await reader.cancel()
       throw tooLarge()
     }
-    pieces.push(value)
+    text += decoder.decode(value, { stream: true })
   }
-  const all = new Uint8Array(size)
-  let at = 0
-  for (const piece of pieces) {
-    all.set(piece, at)
-    at += piece.byteLength
-  }
-  return new TextDecoder().decode(all)
 }
 
 function objectOf(text: string, what: string): Record<string, unknown> {

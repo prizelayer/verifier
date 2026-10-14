@@ -64,6 +64,29 @@ export type Checked =
   | { kind: "notAProof"; message: string }
   | { kind: "report"; report: VerificationReport; input: VerificationInput | null }
 
+/**
+ * The proof of a lookup, joined from the answers' own TEXT, never parsed and written again: the
+ * prize list carries displayed values as bare JSON numbers, and rewriting them would round any
+ * value above 2^53. The layout is the one {@link proofInput} reads.
+ */
+export function joinProof(answers: {
+  open: string
+  seedPair: string
+  edition: string
+  snapshot: string | null
+  itemId: string | null
+}): string {
+  const parts = [
+    `"format":${JSON.stringify(PROOF_FORMAT)}`,
+    `"open":${answers.open}`,
+    `"seedPair":${answers.seedPair}`,
+    `"edition":${answers.edition}`,
+    ...(answers.snapshot === null ? [] : [`"snapshot":${answers.snapshot}`]),
+    ...(answers.itemId === null ? [] : [`"received":${JSON.stringify({ itemId: answers.itemId })}`]),
+  ]
+  return `{${parts.join(",")}}`
+}
+
 /** Check a pasted proof. Never throws: an unreadable proof is an `invalid` report with the reason. */
 export async function checkProof(text: string): Promise<Checked> {
   if (readProof(text) === null) return { kind: "notAProof", message: NOT_A_PROOF }
