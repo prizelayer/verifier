@@ -85,7 +85,7 @@ Up to **seven** independent claims are checked, and every one of them must hold:
 | `drawnPpmValue` | The recorded random value isn't what the seed actually produces. |
 | `drawnSlotIndex` | The value doesn't land on the slot you were given. |
 | `snapshotHash` | The prize table you were shown isn't the one recorded against your win. |
-| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified, or it does not list exactly that edition's slots `0..n-1` (a slot left out, or one added). |
+| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified, or it does not list exactly that edition's slots `0..n-1` (a slot left out, or one added; `expected` and `computed` are then the two slot lists). |
 | `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew, or the table has no entry for that slot. The second case fails even when no item id was given. |
 
 The last three run only when you pass a `snapshot`. Leave it out and they are listed in
@@ -121,7 +121,9 @@ slot 2 was always a £20 voucher. Four green checks, one substituted prize.
 
 Closing it is what the `0x03` snapshot preimage is for. It pins which item filled which slot at
 which displayed value, and it **opens with the raw bytes of the edition fingerprint** — so a
-snapshot is bound to one specific set of odds and cannot be lifted from another edition. Pass the
+snapshot is bound to one specific set of odds and cannot be lifted from another edition. A prize
+list must list every slot of its box, `0..n-1`, and no other: a list with a slot left out or added
+fails, even when its hash matches. Pass the
 published snapshot to `verify()` and the chain runs all the way from the seed to the item recorded
 for your win.
 

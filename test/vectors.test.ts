@@ -805,7 +805,10 @@ describe('verify() end to end', () => {
       assert.equal(report.checks.snapshotHash?.ok, true);
       assert.equal(report.status, 'failed');
       assert.equal(report.checks.snapshotEditionLink?.ok, false);
-      assert.equal(report.checks.snapshotEditionLink?.field, 'snapshot.slots');
+      // A mismatch of slot lists, compared and shown: not an input that could not be used.
+      assert.equal(report.checks.snapshotEditionLink?.error, undefined);
+      assert.equal(report.checks.snapshotEditionLink?.expected, '0,1,2');
+      assert.equal(report.checks.snapshotEditionLink?.computed, [0, 1, 2].filter((i) => i !== input.expected.drawnSlotIndex).join(','));
       assert.equal(report.checks.drawnItemId?.ok, false);
       assert.equal(report.checks.drawnItemId?.error, `the prize list has no entry for slot ${input.expected.drawnSlotIndex}`);
       assert.equal(report.trace.itemIdInDrawnSlot, undefined);
@@ -819,7 +822,8 @@ describe('verify() end to end', () => {
 
     assert.equal(report.checks.snapshotHash?.ok, true);
     assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
-    assert.equal(report.firstFailure?.field, 'snapshot.slots');
+    assert.equal(report.firstFailure?.field, undefined);
+    assert.equal(report.firstFailure?.message, 'expected 0,1,2, computed 0,1,2,9');
     assert.equal(report.checks.drawnItemId?.ok, true);
   });
 

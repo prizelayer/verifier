@@ -112,6 +112,8 @@ describe("the page", () => {
     render(<App />)
     // Click and edit in the same task, so the edit lands before the check's result arrives.
     fireEvent.click(screen.getByRole("button", { name: "Try the example" }))
+    // Typing is refused while a check runs; the text guard below is what drops a stale result.
+    expect((screen.getByRole("textbox", { name: "Paste a proof" }) as HTMLTextAreaElement).readOnly).toBe(true)
     fireEvent.change(screen.getByRole("textbox", { name: "Paste a proof" }), { target: { value: "edited" } })
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Check" }).hasAttribute("disabled")).toBe(false))
@@ -348,7 +350,9 @@ describe("tampering", () => {
       }),
     ).toBe("FAIL")
     expect(stateOf("snapshotHash")).toBe("match")
-    expectCannotUseAt(4, "snapshotEditionLink", "snapshot.body.slots")
+    expectFailAt(4, "snapshotEditionLink")
+    expect(card(4).querySelector('[data-compare="slotSet"]')?.getAttribute("data-same")).toBe("no")
+    expect(card(4).querySelector('[data-compare="slotSet"]')?.textContent).toContain("0, 1, 2")
     expect(stateOf("drawnItemId")).toBe("mismatch")
     expect(document.querySelector('[data-check="drawnItemId"]')?.textContent).toContain("the prize list has no entry for slot 0")
   })

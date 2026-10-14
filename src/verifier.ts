@@ -1001,14 +1001,10 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
       const link = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
       const boxSlots = input.edition.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
       const listSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+      // A different set of slots is a mismatch, not an unusable input: the comparison was made, and
+      // `expected`/`computed` then hold the two slot lists.
       checks.snapshotEditionLink =
-        link.ok && listSlots !== boxSlots
-          ? unusable(
-              computedFingerprint,
-              'snapshot.slots',
-              `the prize list has slots ${listSlots}, but the box has slots ${boxSlots}`,
-            )
-          : link;
+        link.ok && listSlots !== boxSlots ? { ok: false, expected: boxSlots, computed: listSlots } : link;
     }
 
     // The slot the MATHS selected, never the one we were told — checking the claimed slot's item

@@ -237,6 +237,13 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
                 computed={trace.computedSnapshotHash}
               />
               <Compare
+                label="slotSet"
+                expectedLabel="Slots of this box"
+                computedLabel="Slots in the prize list"
+                expected={slotList(input.edition.slots)}
+                computed={slotList(input.snapshot.slots)}
+              />
+              <Compare
                 label="snapshotEditionLink"
                 expectedLabel="Box fingerprint your browser computed in step 2"
                 computedLabel="Box fingerprint written inside the prize list"
@@ -265,6 +272,13 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
         </div>
       )
   }
+}
+
+function slotList(slots: readonly { slotIndex: number }[]): string {
+  return slots
+    .map((s) => s.slotIndex)
+    .sort((a, b) => a - b)
+    .join(", ")
 }
 
 function percent(ppm: number): string {
