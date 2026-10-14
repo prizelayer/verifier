@@ -1,0 +1,13 @@
+diff --git a/site/src/verdict.ts b/site/src/verdict.ts
+index 70ab10f..3f5c709 100644
+--- a/site/src/verdict.ts
++++ b/site/src/verdict.ts
+@@ -26,7 +26,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+         word: "FAIL",
+         line: !failure
+           ? report.summary
+-          : failure.field !== undefined
++          : failure.field === "never"
+             ? `Step ${failure.step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
+             : `Step ${failure.step} does not match: ${FAIL_WORDS[failure.check]}`,
+       }

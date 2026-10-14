@@ -1,8 +1,8 @@
 diff --git a/site/src/verdict.ts b/site/src/verdict.ts
-index ee465c4..bcea2a0 100644
+index 70ab10f..4ceb8c1 100644
 --- a/site/src/verdict.ts
 +++ b/site/src/verdict.ts
-@@ -29,7 +29,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+@@ -33,7 +33,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
      }
      case "pending":
        return {

@@ -1,13 +1,13 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index cddfc71..fb3c364 100644
+index 8df7040..d9a390c 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -54,7 +54,7 @@ export function App() {
-           onChange={(event) => {
-             // A result is only ever shown for the text it was computed from.
-             setText(event.target.value)
--            setChecked(null)
-+            void setChecked
-           }}
-           rows={10}
-           spellCheck={false}
+@@ -21,7 +21,7 @@ export function App() {
+   function edit(value: string) {
+     current.current = value
+     setText(value)
+-    setChecked(null)
++    void setChecked
+   }
+ 
+   async function run(proof: string) {
