@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..b68b6b1 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1020,7 +1020,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     } else {
+       // Compared as the 16 bytes the hash covers, so a rendering without hyphens is the same item.
+       const expectedItem = input.expected.itemId.toLowerCase();
+-      checks.drawnItemId = { ...check(expectedItem, itemIdInDrawnSlot), ok: uuidKey(expectedItem) === uuidKey(itemIdInDrawnSlot) };
++      checks.drawnItemId = { ...check(expectedItem, itemIdInDrawnSlot), ok: expectedItem === itemIdInDrawnSlot && uuidKey(expectedItem) !== '' };
+     }
+   }
+ 

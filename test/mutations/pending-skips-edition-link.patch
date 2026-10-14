@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..1413862 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -997,7 +997,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     if (computedFingerprint === undefined) {
+       skip('snapshotEditionLink', 'it needs the edition fingerprint, which could not be computed');
+     } else {
+-      checks.snapshotEditionLink = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
++      checks.snapshotEditionLink = check(computedFingerprint, seedRevealed ? snapshot.editionFingerprint.toLowerCase() : computedFingerprint);
+     }
+ 
+     // The slot the MATHS selected, never the one we were told — checking the claimed slot's item

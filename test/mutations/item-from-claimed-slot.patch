@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..6286e2b 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1004,7 +1004,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     // against the claimed item would be circular.
+     let itemIdInDrawnSlot: string | undefined;
+     if (computedSlotIndex !== undefined) {
+-      const filled = snapshot.slots.find((slot) => slot.slotIndex === computedSlotIndex);
++      const filled = snapshot.slots.find((slot) => slot.slotIndex === input.expected.drawnSlotIndex);
+       itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
+       trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+     }

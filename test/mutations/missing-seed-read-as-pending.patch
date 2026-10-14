@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..0959d78 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1150,7 +1150,7 @@ function requireShape(input: VerificationInput): void {
+     if (!ok) throw new Error(`${what} is missing or has the wrong type`);
+   };
+   need(typeof input === 'object' && input !== null, 'the input');
+-  need(input.serverSeedHex !== undefined, 'serverSeedHex (use null while the seed is not revealed)');
++  if (input.serverSeedHex === undefined) input.serverSeedHex = null;
+   need(typeof input.commitmentHex === 'string', 'commitmentHex');
+   need(typeof input.expected === 'object' && input.expected !== null, 'expected');
+   need(typeof input.expected.editionFingerprint === 'string', 'expected.editionFingerprint');
