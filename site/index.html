@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
       This policy travels inside the file, so it holds on every host and on a copy opened from disk.
-      connect-src 'none': the page asks no server anything. Fonts are bundled, never linked.
+      connect-src names one host: the page asks it for the public data of an open, and only when the
+      reader presses "Look up". The check never asks any server. Fonts are bundled, never linked.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src https://public-api.dev.prizelayer.com; base-uri 'none'; object-src 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
     <title>Check an open yourself — PrizeLayer</title>

@@ -1,5 +1,6 @@
 import { ACCEPTANCE_THRESHOLD, PPM_TOTAL, type Check, type ChunkVerdict } from "@verifier"
 import type { ByteGroup } from "./preimage"
+import { Rows } from "./rows"
 
 /**
  * One check's two values side by side, and its result. The values and the word come from the
@@ -78,13 +79,17 @@ export function ByteGroups({ caption, groups }: { caption: string; groups: ByteG
         </tr>
       </thead>
       <tbody>
-        {groups.map((group, i) => (
-          <tr key={i} className="align-top">
-            <td className="pr-2">{group.name}</td>
-            <td className="break-all pr-2 font-mono">{group.hex}</td>
-            <td>{group.meaning}</td>
-          </tr>
-        ))}
+        <Rows
+          rows={groups}
+          columns={3}
+          row={(group, i) => (
+            <tr key={i} className="align-top">
+              <td className="pr-2">{group.name}</td>
+              <td className="break-all pr-2 font-mono">{group.hex}</td>
+              <td>{group.meaning}</td>
+            </tr>
+          )}
+        />
       </tbody>
     </table>
   )

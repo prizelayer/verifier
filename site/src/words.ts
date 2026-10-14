@@ -123,3 +123,27 @@ export const SEED_LOCKED = "not run: the secret is still locked"
 
 /** Shown if a check stops on an error nobody planned for, instead of a page stuck at "Computing". */
 export const COULD_NOT_FINISH = "The check could not finish. Nothing was checked; reload the page and try again."
+
+/** The lookup's words, one per result (plan 3.2). */
+export const LOOKUP_WORDS = {
+  busy: "Fetching the public data of this open from our server…",
+  notAnId: "This is not an open id. An open id looks like 7c9e6679-7425-40de-944b-e07fc1f90ae7.",
+  notFound: "We found no open with this id. Check the id, or paste the proof instead.",
+  unreachable:
+    "Your browser could not reach our server. That is fine: the check does not need us. Paste a saved proof instead.",
+  serverFault: (message: string) =>
+    `Our server's answer is faulty: ${message}. That is a fault of our server, not of your open. Nothing was checked.`,
+  found: "We fetched the public data of this open and put it in the box below. The check ran in your browser.",
+  sharing:
+    "Anyone you give this proof or this id to can read this open, and can see how many opens were made with the same secret and when it was retired. It does not say who you are.",
+} as const
+
+/**
+ * How many rows a table draws before it asks. A box with 100,000 slots took about 12 seconds to
+ * draw in full, and the check itself does not need the rows on screen.
+ */
+export const FIRST_ROWS = 200
+
+/** The words under a cut table: what is not drawn, and that the check still used it. */
+export const moreRows = (count: number) =>
+  `${count.toLocaleString("en")} more rows are not drawn here. Your browser used all of them in the check.`

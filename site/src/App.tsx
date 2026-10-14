@@ -2,12 +2,13 @@ import { useEffect, useId, useRef, useState } from "react"
 import type { VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
+import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { StepCards } from "./steps"
 import { COULD_NOT_FINISH, STEPS } from "./words"
 import { caveatOf, verdictOf } from "./verdict"
 
-export function App() {
+export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const [text, setText] = useState("")
   const [checked, setChecked] = useState<Checked | null>(null)
   const [running, setRunning] = useState(false)
@@ -56,11 +57,21 @@ export function App() {
           device, with the same numbers, and see if you get the same answer.
         </p>
         <p>
-          Nothing on this page asks our server whether the open was fair. You can turn your internet off now
-          and it still works.
+          Nothing on this page asks our server whether the open was fair. Once the proof is in the box, you
+          can turn your internet off and the check still works.
         </p>
         <p>Read "What this does not prove" below. It is short, and it matters.</p>
       </header>
+
+      <LookupBox
+        disabled={running}
+        shownText={text}
+        fetchFn={fetchFn}
+        onFound={(found) => {
+          edit(found)
+          void run(found)
+        }}
+      />
 
       <section aria-labelledby={`${fieldId}-label`} className="space-y-3">
         <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
