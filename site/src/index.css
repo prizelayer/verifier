@@ -1,6 +1,13 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist/wght.css";
-@import "@fontsource-variable/geist-mono/wght.css";
+
+/* The page is English, so only the latin subset ships: a copy kept on disk stays small. */
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2-variations");
+}
 
 /* Light and dark follow the system setting; the page stores nothing, so there is no switch. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
@@ -49,7 +56,7 @@
   --color-fail: var(--fail);
   --color-pending: var(--pending);
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 body {

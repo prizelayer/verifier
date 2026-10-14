@@ -11,20 +11,20 @@ type Json = Record<string, unknown>
  * or a PASS, for a proof it could not read would be worse than no page.
  */
 export function proofInput(text: string): VerificationInput {
-  let proof: Json
+  let proof: unknown
   try {
-    proof = JSON.parse(text) as Json
+    proof = JSON.parse(text)
   } catch {
+    proof = undefined
+  }
+  if (typeof proof !== "object" || proof === null || (proof as Json).format !== PROOF_FORMAT) {
     throw new Error(`This is not a proof we can read. It should start with { "format": "${PROOF_FORMAT}".`)
   }
-  if (proof?.format !== PROOF_FORMAT) {
-    throw new Error(`This is not a proof we can read. It should start with { "format": "${PROOF_FORMAT}".`)
-  }
-  const open = section(proof, "open")
-  const seedPair = section(proof, "seedPair")
-  const edition = section(proof, "edition")
-  const snapshot = proof.snapshot === undefined ? undefined : section(proof, "snapshot")
-  const received = proof.received === undefined ? undefined : section(proof, "received")
+  const open = section(proof as Json, "open")
+  const seedPair = section(proof as Json, "seedPair")
+  const edition = section(proof as Json, "edition")
+  const snapshot = (proof as Json).snapshot === undefined ? undefined : section(proof as Json, "snapshot")
+  const received = (proof as Json).received === undefined ? undefined : section(proof as Json, "received")
 
   const revealed = seedPair.revealedServerSeed
   const input: VerificationInput = {
