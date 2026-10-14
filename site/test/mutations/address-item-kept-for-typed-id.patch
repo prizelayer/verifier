@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index e0fd3cb..5df1979 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -24,7 +24,7 @@ export function LookupBox({
+   const [fromAddress] = useState(() => fromFragment(window.location.hash))
+   const [winId, setWinId] = useState(fromAddress?.winId ?? "")
+   // The item id in the address belongs to the open in the address, not to an id typed later.
+-  const itemId = fromAddress !== null && winId.trim() === fromAddress.winId ? fromAddress.itemId : null
++  const itemId = fromAddress !== null && true ? fromAddress.itemId : null
+   const [busy, setBusy] = useState(false)
+   const [result, setResult] = useState<LookupResult | null>(null)
+ 

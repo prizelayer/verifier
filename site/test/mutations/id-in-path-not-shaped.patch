@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index 894c93e..58d1451 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -142,7 +142,7 @@ function objectOf(text: string, what: string): Record<string, unknown> {
+ 
+ function field(json: Record<string, unknown>, name: string, what: string): string {
+   const value = json[name]
+-  if (typeof value !== "string" || !UUID.test(value)) {
++  if (typeof value !== "string") {
+     throw new ServerFault(`our server's answer for ${what} has no usable ${name}`)
+   }
+   return value

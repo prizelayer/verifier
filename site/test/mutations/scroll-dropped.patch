@@ -1,8 +1,8 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index cd61797..4a03ea1 100644
+index f67c4a7..29de6b0 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -44,7 +44,7 @@ export function App() {
+@@ -45,7 +45,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
    // The failing card is scrolled to; the focus stays on the verdict, which a screen reader reads first.
    const failingStep = report?.firstFailure?.step
    useEffect(() => {

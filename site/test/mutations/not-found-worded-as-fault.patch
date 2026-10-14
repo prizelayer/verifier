@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index 894c93e..c00bd5f 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -89,7 +89,7 @@ async function answer(fetchFn: typeof fetch, path: string): Promise<string | nul
+   } catch {
+     throw new Unreachable()
+   }
+-  if (response.status === 404) return null
++  if (response.status === 410) return null
+   if (!response.ok) throw new ServerFault(`our server answered ${response.status} for ${path}`)
+   return readCapped(response, path)
+ }

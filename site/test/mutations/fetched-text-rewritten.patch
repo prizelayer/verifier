@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index 894c93e..50edf72 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -70,7 +70,7 @@ export async function lookUp(
+       `"open":${open}`,
+       `"seedPair":${seedPair}`,
+       `"edition":${edition}`,
+-      ...(snapshot === null ? [] : [`"snapshot":${snapshot}`]),
++      ...(snapshot === null ? [] : [`"snapshot":${JSON.stringify(JSON.parse(snapshot))}`]),
+       ...(itemId === null ? [] : [`"received":${JSON.stringify({ itemId })}`]),
+     ]
+     return { kind: "found", text: `{${parts.join(",")}}` }

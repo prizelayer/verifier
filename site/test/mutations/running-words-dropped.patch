@@ -1,8 +1,8 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index cd61797..3026e94 100644
+index f67c4a7..eb30d56 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -99,7 +99,7 @@ export function App() {
+@@ -110,7 +110,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
        </section>
  
        <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">

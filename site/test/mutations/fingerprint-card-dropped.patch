@@ -1,8 +1,8 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index b79846f..43f4cdc 100644
+index 2913da3..3fcde2c 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -34,7 +34,7 @@ export function StepCards({ report, input }: Props) {
+@@ -35,7 +35,7 @@ export function StepCards({ report, input }: Props) {
  
    return (
      <div className="space-y-6">
