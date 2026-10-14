@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 9f5f3ce..82270ad 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -117,7 +117,7 @@ function Checks({ report }: { report: VerificationReport }) {
+         const skipped = report.notRun.find((n) => n.check === name)
+         const state = check ? (check.ok ? "matches" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
+         return (
+-          <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
++          <li key={name} data-check={name} data-state={check ? "match" : "not-run"}>
+             <span className="font-medium">Step {STEP_OF[name]}.</span> {CHECK_WORDS[name]}{" "}
+             <span className="font-semibold">{state}</span>
+           </li>
