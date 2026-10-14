@@ -4,8 +4,13 @@ import { afterEach, describe, expect, it } from "vitest"
 import { App } from "./App"
 import { EXAMPLE_PROOF } from "./example"
 import { expectNoAxeViolations } from "./test/axe"
+import { CHECK_WORDS } from "./verdict"
+import { FAIL_WORDS, LOCKED } from "./words"
 
 afterEach(cleanup)
+
+/** On screen: rendered, and not inside anything hidden from sight or from a screen reader. */
+const shown = (el: HTMLElement) => el.closest('[hidden], [aria-hidden="true"]') === null
 
 async function check(proof: unknown) {
   const user = userEvent.setup()
@@ -26,6 +31,37 @@ describe("the page", () => {
     expect(await screen.findByText("PASS")).toBeTruthy()
     const states = [...document.querySelectorAll("[data-check]")].map((li) => li.getAttribute("data-state"))
     expect(states).toEqual(["match", "match", "match", "match", "match", "match", "match"])
+    // M1: the limits are on screen together with the PASS, not only on an empty page.
+    expect(screen.getByRole("heading", { name: "What this does not prove" })).toSatisfy(shown)
+    expect(screen.getByText(/^You were not shown the fingerprint or the client seed before you played/)).toSatisfy(shown)
+    expect(screen.getByText("So this page cannot prove, on its own, that we did not choose the secret after your open.")).toSatisfy(shown)
+  })
+
+  it("clears the result as soon as the pasted proof changes: no PASS for data it was not computed from", async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole("button", { name: "Try the example" }))
+    expect(await screen.findByText("PASS")).toBeTruthy()
+
+    const field = screen.getByRole("textbox", { name: "Paste a proof" }) as HTMLTextAreaElement
+    const tampered = field.value.replace('"nonce": 1,', '"nonce": 2,')
+    expect(tampered).not.toBe(field.value)
+    await user.clear(field)
+    await user.click(field)
+    await user.paste(tampered)
+
+    expect(screen.queryByText("PASS")).toBeNull()
+    expect(document.querySelector("[data-status], [data-check]")).toBeNull()
+    await user.click(screen.getByRole("button", { name: "Check" }))
+    expect(await screen.findByText("FAIL")).toBeTruthy()
+  })
+
+  it("shows CANNOT CHECK YET for a secret not revealed yet, with what can and cannot be checked", async () => {
+    const pending = { ...EXAMPLE_PROOF, seedPair: { ...EXAMPLE_PROOF.seedPair, revealedServerSeed: null } }
+    expect((await check(pending)).textContent).toBe("CANNOT CHECK YET")
+    expect(screen.getByText(LOCKED)).toBeTruthy()
+    expect(document.querySelector('[data-check="editionFingerprint"]')?.getAttribute("data-state")).toBe("match")
+    expect(document.querySelector('[data-check="drawnPpmValue"]')?.getAttribute("data-state")).toBe("not-run")
   })
 
   it("always shows what the page does not prove", () => {
@@ -56,7 +92,8 @@ describe("tampering", () => {
     expect(screen.getByText(/^Step 3 does not match/)).toBeTruthy()
     const row = document.querySelector('[data-check="drawnPpmValue"]')
     expect(row?.getAttribute("data-state")).toBe("mismatch")
-    expect(row?.textContent).toMatch(/does not match$/)
+    expect(row?.textContent).toContain(`does not match. ${FAIL_WORDS.drawnPpmValue}`)
+    expect(row?.textContent).not.toContain(CHECK_WORDS.drawnPpmValue)
   })
 })
 

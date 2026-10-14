@@ -1,6 +1,7 @@
 import type { CheckName, VerificationReport } from "@verifier"
+import { FAIL_WORDS, LOCKED } from "./words"
 
-/** One plain sentence per check: what it means when it matches. */
+/** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
 export const CHECK_WORDS: Record<CheckName, string> = {
   commitment: "The secret we revealed matches the fingerprint our server published for this pair.",
   editionFingerprint: "The chances match the fingerprint recorded on your open.",
@@ -23,15 +24,13 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
       const failure = report.firstFailure
       return {
         word: "FAIL",
-        line: failure ? `Step ${failure.step} does not match: ${CHECK_WORDS[failure.check]} ${failure.message}` : report.summary,
+        line: failure ? `Step ${failure.step} does not match: ${FAIL_WORDS[failure.check]}` : report.summary,
       }
     }
     case "pending":
       return {
         word: "CANNOT CHECK YET",
-        line:
-          "The secret for this open is still locked, because it is still being used for your next opens. " +
-          "Until it is revealed your browser can check step 2 only.",
+        line: LOCKED,
       }
     case "invalid":
       return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }

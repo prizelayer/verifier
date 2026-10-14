@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { checkProof } from "./proof"
 import { CHECK_WORDS, verdictOf } from "./verdict"
+import { CHECK_LABELS, FAIL_WORDS } from "./words"
 
 export function App() {
   const [text, setText] = useState("")
@@ -42,7 +43,11 @@ export function App() {
         <textarea
           id={fieldId}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            // A result is only ever shown for the text it was computed from.
+            setText(event.target.value)
+            setReport(null)
+          }}
           rows={10}
           spellCheck={false}
           className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
@@ -116,10 +121,15 @@ function Checks({ report }: { report: VerificationReport }) {
         const check = report.checks[name]
         const skipped = report.notRun.find((n) => n.check === name)
         const state = check ? (check.ok ? "matches" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
+        // The sentence follows the result: a mismatch never sits next to the words of a match.
+        const sentence = check ? (check.ok ? CHECK_WORDS[name] : FAIL_WORDS[name]) : null
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
-            <span className="font-medium">Step {STEP_OF[name]}.</span> {CHECK_WORDS[name]}{" "}
+            <span className="font-medium">
+              Step {STEP_OF[name]}. {CHECK_LABELS[name]}:
+            </span>{" "}
             <span className="font-semibold">{state}</span>
+            {sentence ? `. ${sentence}` : null}
           </li>
         )
       })}
