@@ -1,4 +1,4 @@
-import { CHECK_NAMES, STEP_OF, type CheckName, type VerificationInput, type VerificationReport } from "@verifier"
+import { CHECK_NAMES, STEP_OF, type Check, type CheckName, type VerificationInput, type VerificationReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups, snapshotGroups } from "./preimage"
 import { CHECK_WORDS } from "./verdict"
@@ -10,6 +10,7 @@ import {
   NO_PRIZE_LIST,
   NOT_TOLD_ITEM,
   SEED_LOCKED,
+  STEP1_PENDING,
   STEPS,
   type StepNumber,
   unusableWords,
@@ -22,14 +23,22 @@ interface Props {
 
 /** The four step cards. Every step is drawn, run or not, so a missing value is named, never hidden. */
 export function StepCards({ report, input }: Props) {
-  const failedSteps = new Set(CHECK_NAMES.filter((n) => report.checks[n]?.ok === false).map((n) => STEP_OF[n]))
+  const failedNames = CHECK_NAMES.filter((n) => report.checks[n]?.ok === false)
+  const failedSteps = new Set(failedNames.map((n) => STEP_OF[n]))
+  // A step whose only failures are inputs that could not be used compared nothing: it says so.
+  const unusableOnly = (step: StepNumber) =>
+    failedNames.filter((n) => STEP_OF[n] === step).every((n) => report.checks[n]?.error !== undefined)
+  const pending = input.serverSeedHex === null
   const dependsOnFailed = (step: StepNumber): boolean =>
     DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
 
   return (
     <div className="space-y-6">
-      {STEPS.map(({ step, title, method, text }) => {
+      {STEPS.map(({ step, title: stepTitle, method, text: stepText }) => {
         const failed = failedSteps.has(step)
+        // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
+        const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
+        const text = pending && step === 1 ? STEP1_PENDING.text : stepText
         // Shown on a failed step too: its own mismatch may only be the echo of the earlier one.
         const dependent = dependsOnFailed(step)
         return (
@@ -42,7 +51,11 @@ export function StepCards({ report, input }: Props) {
           >
             <h2 id={`step-${step}`} className="text-lg font-semibold">
               Step {step} — {title}
-              {failed ? <span className="ml-2 text-fail">(does not match)</span> : null}
+              {failed ? (
+                <span className="ml-2 text-fail" data-header-state>
+                  {unusableOnly(step) ? "(cannot be checked)" : "(does not match)"}
+                </span>
+              ) : null}
             </h2>
             {text.map((p) => (
               <p key={p}>{p}</p>
@@ -117,15 +130,20 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
       return (
         <div className="space-y-2">
           <p className="text-sm">
-            The secret we revealed: <code className="break-all font-mono text-xs">{input.serverSeedHex ?? "(not revealed yet)"}</code>
+            {input.serverSeedHex === null ? (
+              "The secret: not revealed yet."
+            ) : (
+              <>
+                The secret we revealed: <code className="break-all font-mono text-xs">{input.serverSeedHex}</code>
+              </>
+            )}
           </p>
           {checks.commitment ? (
             <Compare
               label="commitment"
               expectedLabel="Fingerprint our server published"
               computedLabel="Fingerprint your browser computed"
-              expected={checks.commitment.expected}
-              computed={checks.commitment.error ? undefined : checks.commitment.computed}
+              check={checks.commitment}
             />
           ) : null}
         </div>
@@ -154,13 +172,14 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
               ))}
             </tbody>
           </table>
-          <Compare
-            label="editionFingerprint"
-            expectedLabel="Fingerprint recorded on your open"
-            computedLabel="Fingerprint your browser computed"
-            expected={input.expected.editionFingerprint.toLowerCase()}
-            computed={trace.computedEditionFingerprint}
-          />
+          {checks.editionFingerprint ? (
+            <Compare
+              label="editionFingerprint"
+              expectedLabel="Fingerprint recorded on your open"
+              computedLabel="Fingerprint your browser computed"
+              check={checks.editionFingerprint}
+            />
+          ) : null}
           {trace.editionPreimageHex ? (
             <ByteGroups caption="The exact bytes the fingerprint is computed from" groups={editionGroups(trace.editionPreimageHex)} />
           ) : null}
@@ -178,13 +197,9 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             <code className="break-all font-mono text-xs">{(trace.hmacHex ?? "").match(/.{8}/g)?.join(" ")}</code>
           </p>
           <Chunks chunks={trace.chunks} />
-          <Compare
-            label="drawnPpmValue"
-            expectedLabel="v we recorded"
-            computedLabel="v your browser computed"
-            expected={String(input.expected.drawnPpmValue)}
-            computed={trace.value === undefined ? undefined : String(trace.value)}
-          />
+          {checks.drawnPpmValue ? (
+            <Compare label="drawnPpmValue" expectedLabel="v we recorded" computedLabel="v your browser computed" check={checks.drawnPpmValue} />
+          ) : null}
         </div>
       )
     case 4:
@@ -204,7 +219,8 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
               </thead>
               <tbody>
                 {trace.cumulative.map((row) => {
-                  const has = trace.value !== undefined && row.from <= trace.value && trace.value < row.to
+                  // The library's own lookup decides the row; the page does not compare v with the bounds.
+                  const has = row.slotIndex === trace.computedSlotIndex
                   return (
                     <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
                       <td>{row.slotIndex}</td>
@@ -218,51 +234,27 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
               </tbody>
             </table>
           ) : null}
-          {trace.computedSlotIndex !== undefined ? (
-            <Compare
-              label="drawnSlotIndex"
-              expectedLabel="Slot we recorded"
-              computedLabel="Slot your browser found"
-              expected={String(input.expected.drawnSlotIndex)}
-              computed={String(trace.computedSlotIndex)}
-            />
+          {checks.drawnSlotIndex ? (
+            <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
           ) : null}
           {input.snapshot ? (
             <>
-              <Compare
-                label="snapshotHash"
-                expectedLabel="Prize list fingerprint recorded on your open"
-                computedLabel="Prize list fingerprint your browser computed"
-                expected={input.expected.snapshotHash?.toLowerCase()}
-                computed={trace.computedSnapshotHash}
-              />
-              <Compare
-                label="slotSet"
-                expectedLabel="Slots of this box"
-                computedLabel="Slots in the prize list"
-                expected={slotList(input.edition.slots)}
-                computed={slotList(input.snapshot.slots)}
-              />
-              <Compare
-                label="snapshotEditionLink"
-                expectedLabel="Box fingerprint your browser computed in step 2"
-                computedLabel="Box fingerprint written inside the prize list"
-                expected={trace.computedEditionFingerprint}
-                computed={input.snapshot.editionFingerprint.toLowerCase()}
-              />
-              {trace.itemIdInDrawnSlot !== undefined && input.expected.itemId === undefined ? (
+              {checks.snapshotHash ? (
+                <Compare
+                  label="snapshotHash"
+                  expectedLabel="Prize list fingerprint recorded on your open"
+                  computedLabel="Prize list fingerprint your browser computed"
+                  check={checks.snapshotHash}
+                />
+              ) : null}
+              {checks.snapshotEditionLink ? <LinkView check={checks.snapshotEditionLink} boxFingerprint={trace.computedEditionFingerprint} /> : null}
+              {checks.drawnItemId ? (
+                <Compare label="drawnItemId" expectedLabel="Item recorded for your win" computedLabel="Item in that slot" check={checks.drawnItemId} />
+              ) : trace.itemIdInDrawnSlot !== undefined ? (
                 <p className="text-sm" data-compare="drawnItemId">
                   Item in that slot: <code className="font-mono text-xs">{trace.itemIdInDrawnSlot}</code>. The item you
                   received was {NOT_TOLD_ITEM}.
                 </p>
-              ) : trace.itemIdInDrawnSlot !== undefined ? (
-                <Compare
-                  label="drawnItemId"
-                  expectedLabel="Item recorded for your win"
-                  computedLabel="Item in that slot"
-                  expected={input.expected.itemId?.toLowerCase()}
-                  computed={trace.itemIdInDrawnSlot}
-                />
               ) : null}
               {trace.snapshotPreimageHex ? (
                 <ByteGroups caption="The exact bytes of the prize list" groups={snapshotGroups(trace.snapshotPreimageHex)} />
@@ -274,11 +266,20 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
   }
 }
 
-function slotList(slots: readonly { slotIndex: number }[]): string {
-  return slots
-    .map((s) => s.slotIndex)
-    .sort((a, b) => a - b)
-    .join(", ")
+/**
+ * The link between the prize list and the box. The library compares the box fingerprint first, and
+ * then the two slot lists; its check holds whichever pair it compared, and the labels follow that.
+ */
+function LinkView({ check, boxFingerprint }: { check: Check; boxFingerprint: string | undefined }) {
+  const fingerprints = check.expected === boxFingerprint
+  return (
+    <Compare
+      label="snapshotEditionLink"
+      expectedLabel={fingerprints ? "Box fingerprint your browser computed in step 2" : "Slots of this box"}
+      computedLabel={fingerprints ? "Box fingerprint written inside the prize list" : "Slots in the prize list"}
+      check={check}
+    />
+  )
 }
 
 function percent(ppm: number): string {

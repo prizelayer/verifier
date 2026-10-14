@@ -250,6 +250,11 @@ either preimage, and `String.length` gives you UTF-16 code units. They're equal 
 different for everything else, so this bug passes every ASCII test you'll write. `'café'` is 5
 bytes and 4 code units; `'🎁'` is 4 bytes and 2 code units. Use `TextEncoder`.
 
+**`displayed_value_cents` must be written as plain digits.** `parseSnapshotBody()` reads each
+value from the body's text, so a value above 2^53 is not rounded. A value written with an exponent,
+such as `9.007199254740993e15`, is not read as that integer, and the prize-list check then fails.
+The platform always writes plain digits.
+
 **`snapshot_hash` is taken over the canonical bytes, never over the body JSON.** So re-serialising
 the body — different whitespace, different key order — does *not* change the hash, and a verifier
 that hashes the bytes it received would wrongly reject an honest snapshot. Parse the body into

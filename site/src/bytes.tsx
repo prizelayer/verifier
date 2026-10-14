@@ -1,41 +1,42 @@
-import { ACCEPTANCE_THRESHOLD, PPM_TOTAL, type ChunkVerdict } from "@verifier"
+import { ACCEPTANCE_THRESHOLD, PPM_TOTAL, type Check, type ChunkVerdict } from "@verifier"
 import type { ByteGroup } from "./preimage"
 
 /**
- * Two values side by side, with every character of the second that differs from the first marked.
- * The mark is a `<mark>` and a word, never a colour alone.
+ * One check's two values side by side, and its result. The values and the word come from the
+ * library's `Check` only, never from a comparison made here: a view that judged for itself could
+ * say "matches" where the library said "does not match". The characters of the second value that
+ * differ from the first are marked only when the check failed; the word below carries the meaning.
  */
 export function Compare({
   label,
   expectedLabel,
   computedLabel,
-  expected,
-  computed,
+  check,
 }: {
   label: string
   expectedLabel: string
   computedLabel: string
-  expected: string | undefined
-  computed: string | undefined
+  check: Check
 }) {
-  const same = expected !== undefined && expected === computed
+  const unusable = check.error !== undefined
+  const word = check.ok ? "matches" : unusable ? "cannot be checked" : "does not match"
   return (
-    <div className="space-y-1" data-compare={label} data-same={same ? "yes" : "no"}>
-      <Row name={expectedLabel} value={expected} />
-      <Row name={computedLabel} value={computed} against={expected} />
-      <p className="text-sm font-semibold">
-        {expected === undefined || computed === undefined ? "could not be compared" : same ? "matches" : "does not match"}
+    <div className="space-y-1" data-compare={label} data-ok={check.ok ? "yes" : "no"}>
+      <Row name={expectedLabel} value={check.expected} />
+      <Row name={computedLabel} value={check.computed} against={check.ok || unusable ? undefined : check.expected} />
+      <p className="text-sm font-semibold" data-word>
+        {word}
       </p>
     </div>
   )
 }
 
-function Row({ name, value, against }: { name: string; value: string | undefined; against?: string }) {
+function Row({ name, value, against }: { name: string; value: string; against?: string }) {
   return (
     <div className="text-sm">
       <div className="text-muted-foreground">{name}</div>
       <code className="block break-all font-mono text-xs">
-        {value === undefined ? "(could not be computed)" : against === undefined ? value : <Marked value={value} against={against} />}
+        {against === undefined ? value : <Marked value={value} against={against} />}
       </code>
     </div>
   )

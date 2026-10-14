@@ -1,5 +1,5 @@
 import { parseEdition, parseSnapshotBody, verifyFrom, type VerificationInput, type VerificationReport } from "@verifier"
-import { rawObjectText } from "./rawText"
+import { duplicateKey, rawObjectText } from "./rawText"
 
 /** The one format both input paths produce: the public `/verify` answers, unchanged, in one block. */
 export const PROOF_FORMAT = "prizelayer-proof/1"
@@ -67,6 +67,8 @@ export type Checked =
 /** Check a pasted proof. Never throws: an unreadable proof is an `invalid` report with the reason. */
 export async function checkProof(text: string): Promise<Checked> {
   if (readProof(text) === null) return { kind: "notAProof", message: NOT_A_PROOF }
+  const twice = duplicateKey(text)
+  if (twice !== null) return { kind: "notAProof", message: `This is not a valid proof: the key "${twice}" appears twice.` }
   const read: { input: VerificationInput | null } = { input: null }
   const report = await verifyFrom(() => (read.input = proofInput(text)))
   return { kind: "report", report, input: read.input }

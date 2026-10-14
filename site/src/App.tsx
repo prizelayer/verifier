@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
-import type { VerificationInput, VerificationReport } from "@verifier"
+import type { VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { checkProof, type Checked } from "./proof"
@@ -91,7 +91,7 @@ export function App() {
       </section>
 
       <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
-        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} input={input} /> : null}
+        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
       </div>
 
       {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
@@ -123,9 +123,9 @@ export function App() {
   )
 }
 
-function Verdict({ report, input }: { report: VerificationReport; input: VerificationInput | null }) {
+function Verdict({ report }: { report: VerificationReport }) {
   const { word, line } = verdictOf(report)
-  const caveat = caveatOf(report, input)
+  const caveat = caveatOf(report)
   const tone =
     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-pending"
   return (

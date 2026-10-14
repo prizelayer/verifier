@@ -45,6 +45,16 @@ export const STEPS = [
   },
 ] as const
 
+/** Step 1 while the secret is locked: no revealed secret, and no comparison claimed. */
+export const STEP1_PENDING = {
+  title: "The secret, when we reveal it, must be the one we registered.",
+  text: [
+    STEPS[0].text[0],
+    "After the secret is retired, our server publishes the secret itself. The secret of this open is not published yet.",
+    "When it is, your browser computes its fingerprint and checks that it is the fingerprint our server published for this pair.",
+  ],
+} as const
+
 export type StepNumber = (typeof STEPS)[number]["step"]
 
 /** A short, neutral name for each check: what it looks at, with no claim about the result. */

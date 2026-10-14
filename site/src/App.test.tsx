@@ -22,7 +22,7 @@ async function check(proof: unknown): Promise<string | null> {
   await user.click(screen.getByRole("textbox", { name: "Paste a proof" }))
   await user.paste(typeof proof === "string" ? proof : JSON.stringify(proof))
   await user.click(screen.getByRole("button", { name: "Check" }))
-  await screen.findByText(/^(PASS|FAIL|CANNOT CHECK|CANNOT CHECK YET)$|^This is not a proof we can read/)
+  await screen.findByText(/^(PASS|FAIL|CANNOT CHECK|CANNOT CHECK YET)$|^This is not a (proof we can read|valid proof)/)
   return document.querySelector("[data-status] p")?.textContent ?? null
 }
 
@@ -43,8 +43,18 @@ const card = (step: number) => document.querySelector(`[data-step="${step}"]`) a
 const verdictLine = () => document.querySelectorAll("[data-status] p")[1]?.textContent
 
 /** A FAIL whose first failure is `name`, in the words of its step, with that step's card marked. */
+/** A byte view's two shown values and its word: what the reader sees, to compare with the library. */
+function view(name: string) {
+  const el = document.querySelector(`[data-compare="${name}"]`)
+  const [recorded, computed] = [...(el?.querySelectorAll("code") ?? [])].map((c) => c.textContent)
+  return { recorded, computed, word: el?.querySelector("[data-word]")?.textContent, ok: el?.getAttribute("data-ok") }
+}
+
 function expectFailAt(step: number, name: keyof typeof FAIL_WORDS) {
   expect(verdictLine()).toBe(`Step ${step} does not match: ${FAIL_WORDS[name]}`)
+  // The byte view of the failed check says so too: it never draws its own "matches".
+  expect(view(name)).toMatchObject({ word: "does not match", ok: "no" })
+  expect(card(step).querySelector("[data-header-state]")?.textContent).toBe("(does not match)")
   expect(stateOf(name)).toBe("mismatch")
   const row = document.querySelector(`[data-check="${name}"]`)?.textContent
   expect(row).toContain(`does not match. ${FAIL_WORDS[name]}`)
@@ -60,6 +70,7 @@ function expectCannotUseAt(step: number, name: keyof typeof FAIL_WORDS, field: s
   expect(row).toContain("cannot be checked.")
   expect(row).not.toContain(FAIL_WORDS[name])
   expect(card(step).getAttribute("data-failed")).toBe("yes")
+  expect(card(step).querySelector("[data-header-state]")?.textContent).toBe("(cannot be checked)")
 }
 
 describe("the page", () => {
@@ -133,6 +144,8 @@ describe("the page", () => {
     const row = document.querySelector('[data-check="commitment"]')?.textContent
     expect(row).toContain("The secret and its fingerprint: cannot be checked.")
     expect(row).not.toContain("does not match")
+    expect(card(1).querySelector("[data-header-state]")?.textContent).toBe("(cannot be checked)")
+    expect(card(1).textContent).not.toContain("The secret we revealed")
   })
 
   it("always shows what the page does not prove", () => {
@@ -158,7 +171,7 @@ describe("the byte views of the example", () => {
   it("step 1 shows the revealed secret and both fingerprints", async () => {
     await check(EXAMPLE_PROOF)
     expect(card(1).textContent).toContain(EXAMPLE_PROOF.seedPair.revealedServerSeed)
-    expect(card(1).querySelector('[data-compare="commitment"]')?.getAttribute("data-same")).toBe("yes")
+    expect(view("commitment")).toMatchObject({ word: "matches", ok: "yes", computed: EXAMPLE_PROOF.seedPair.serverSeedCommitment })
     expect(card(1).textContent).toContain("SHA-256")
   })
 
@@ -166,6 +179,27 @@ describe("the byte views of the example", () => {
     await check(EXAMPLE_PROOF)
     const row = [...card(2).querySelectorAll("tr")].find((tr) => tr.textContent?.startsWith("slot 0: chance (ppm)"))
     expect(row?.textContent).toBe("slot 0: chance (ppm)0003d090250000")
+  })
+
+  it("step 4 cuts the prize list into named fields, with each item written as its id", async () => {
+    await check(EXAMPLE_PROOF)
+    const row = [...card(4).querySelectorAll("tr")].find((tr) => tr.textContent?.startsWith("slot 0: item"))
+    expect(row?.textContent).toBe("slot 0: item00112233445566778899aabbccddeeff00112233-4455-6677-8899-aabbccddeeff")
+  })
+
+  it("step 3 marks a 4-byte number that was thrown away, then the one used, then the ones not needed", async () => {
+    // The specification's rejection vector: at counter 7599 the first number is too large.
+    expect(
+      await tampered((p) => {
+        p.open.nonce = 7599
+        p.open.drawnPpmValue = 369120
+        p.open.drawnSlotIndex = 1
+        p.received.itemId = "12345678-9abc-def0-1234-56789abcdef0"
+      }),
+    ).toBe("PASS")
+    const words = [...card(3).querySelectorAll("[data-chunk]")].map((tr) => tr.lastElementChild?.textContent?.split(":")[0])
+    expect(words).toEqual(["thrown away", "used", ...Array(6).fill("not needed")])
+    expect(card(3).querySelector('[data-chunk="rejected"]')?.textContent).toContain("4,294,392,069")
   })
 
   it("step 3 shows the mixed message and marks the used 4-byte number", async () => {
@@ -176,6 +210,21 @@ describe("the byte views of the example", () => {
     expect(used[0].textContent).toMatch(/used: .* mod 1,000,000 = 186,669$/)
     expect(card(3).querySelectorAll("[data-chunk]").length).toBe(8)
     expect(card(3).textContent).toContain("HMAC-SHA256")
+  })
+
+  it("shows the running words while the check runs, and scrolls to the failing card", async () => {
+    const scrolled: Element[] = []
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this)
+    }
+    render(<App />)
+    fireEvent.click(screen.getByRole("button", { name: "Try the example" }))
+    expect(screen.getByText("Computing in your browser…")).toBeTruthy()
+    await screen.findByText("PASS")
+    expect(scrolled).toEqual([])
+    cleanup()
+    await tampered((p) => (p.open.nonce = 2))
+    expect(scrolled.at(-1)).toBe(card(3))
   })
 
   it("step 4 marks the one range that contains v", async () => {
@@ -219,6 +268,8 @@ describe("tampering", () => {
   it("the counter: FAIL at step 3", async () => {
     expect(await tampered((p) => (p.open.nonce = 2))).toBe("FAIL")
     expectFailAt(3, "drawnPpmValue")
+    // The value shown as computed is the library's, not the recorded one shown twice.
+    expect(view("drawnPpmValue")).toMatchObject({ recorded: "186669", computed: "459796" })
     expect(card(4).querySelector("[data-dependent]")).toBeTruthy()
   })
 
@@ -241,6 +292,8 @@ describe("tampering", () => {
       }),
     ).toBe("FAIL")
     expectFailAt(2, "editionFingerprint")
+    // Step 4 reads its ranges from the chances of step 2, so it proves nothing here.
+    expect(card(4).querySelector("[data-dependent]")).toBeTruthy()
   })
 
   it("a frozen value in cents: FAIL at step 2", async () => {
@@ -275,11 +328,22 @@ describe("tampering", () => {
     ).toBe("FAIL")
     expectFailAt(4, "snapshotEditionLink")
     expect(stateOf("snapshotHash")).toBe("match")
+    expect(view("snapshotEditionLink")).toMatchObject({ recorded: EXAMPLE_PROOF.open.editionFingerprint, computed: "ab".repeat(32) })
   })
 
   it("the received item: FAIL at step 4 (the item)", async () => {
     expect(await tampered((p) => (p.received.itemId = "12345678-9abc-def0-1234-56789abcdef0"))).toBe("FAIL")
     expectFailAt(4, "drawnItemId")
+    expect(view("drawnItemId")).toMatchObject({
+      recorded: "12345678-9abc-def0-1234-56789abcdef0",
+      computed: "00112233-4455-6677-8899-aabbccddeeff",
+    })
+  })
+
+  it("the received item written without hyphens: the same 16 bytes, so PASS, and the item view agrees", async () => {
+    expect(await tampered((p) => (p.received.itemId = "00112233445566778899aabbccddeeff"))).toBe("PASS")
+    expect(view("drawnItemId")).toMatchObject({ word: "matches", ok: "yes" })
+    expect(card(4).querySelectorAll('[data-compare="drawnItemId"] mark').length).toBe(0)
   })
 
   it("no prize list: PASS, with the item-not-checked caveat next to it", async () => {
@@ -318,11 +382,15 @@ describe("tampering", () => {
     expect(verdictLine()).toBe(LOCKED)
     expect(stateOf("editionFingerprint")).toBe("match")
     for (const name of ["commitment", "drawnPpmValue", "drawnSlotIndex"]) expect(stateOf(name)).toBe("not-run")
+    // No secret was revealed, and no comparison was made: step 1 says neither.
+    expect(card(1).textContent).not.toContain("The secret we revealed")
+    expect(card(1).textContent).not.toContain("now computes")
+    expect(card(1).textContent).toContain("The secret: not revealed yet.")
     expect(document.querySelector('[data-check="commitment"]')?.textContent).toContain("not run: the secret is still locked")
   })
 
   // Changed by a later ruling: a check that ran and failed fails the open, whatever is still pending.
-  it("the secret not revealed AND one chance changed: FAIL at step 2, never CANNOT CHECK YET", async () => {
+  it("the secret not revealed AND one frozen value changed: FAIL at step 2, never CANNOT CHECK YET", async () => {
     expect(
       await tampered((p) => {
         ;(p.seedPair as Record<string, unknown>).revealedServerSeed = null
@@ -333,7 +401,19 @@ describe("tampering", () => {
     expect(stateOf("commitment")).toBe("not-run")
   })
 
-  it("a fallback win (the open marked as one) compares the item of the drawn slot: PASS", async () => {
+  it("the secret not revealed AND one chance changed (the sum now wrong): FAIL at step 2, cannot be checked", async () => {
+    expect(
+      await tampered((p) => {
+        ;(p.seedPair as Record<string, unknown>).revealedServerSeed = null
+        p.edition.slots[0].probabilityPpm = 250001
+      }),
+    ).toBe("FAIL")
+    expectCannotUseAt(2, "editionFingerprint", "edition")
+  })
+
+  // A fallback win records the drawn slot's item; the public open does not mark it. A field the
+  // page does not read changes nothing: this is the example again, with one unknown field.
+  it("an unknown field on the open (isFallback) is ignored: PASS", async () => {
     expect(await tampered((p) => ((p.open as Record<string, unknown>).isFallback = true))).toBe("PASS")
     expect(stateOf("drawnItemId")).toBe("match")
   })
@@ -351,14 +431,35 @@ describe("tampering", () => {
     ).toBe("FAIL")
     expect(stateOf("snapshotHash")).toBe("match")
     expectFailAt(4, "snapshotEditionLink")
-    expect(card(4).querySelector('[data-compare="slotSet"]')?.getAttribute("data-same")).toBe("no")
-    expect(card(4).querySelector('[data-compare="slotSet"]')?.textContent).toContain("0, 1, 2")
+    // The library compared the two slot lists; the view shows its two values under their own names.
+    expect(view("snapshotEditionLink")).toMatchObject({ recorded: "0,1,2", computed: "1,2", word: "does not match" })
+    expect(card(4).querySelector('[data-compare="snapshotEditionLink"]')?.textContent).toContain("Slots in the prize list")
     expect(stateOf("drawnItemId")).toBe("mismatch")
     expect(document.querySelector('[data-check="drawnItemId"]')?.textContent).toContain("the prize list has no entry for slot 0")
   })
 })
 
 describe("a proof the page cannot read", () => {
+  // Two tools that keep a different one of two same-named keys would check different proofs.
+  it.each([
+    ["the honest prize list first", true],
+    ["the honest prize list last", false],
+  ])("a key that appears twice (%s) is refused, never resolved", async (_, honestFirst) => {
+    const honest = JSON.stringify(EXAMPLE_PROOF.snapshot.body)
+    const changed = honest.replace('"displayed_value_cents":5000', '"displayed_value_cents":500000')
+    const [first, second] = honestFirst ? [honest, changed] : [changed, honest]
+    const text = JSON.stringify(EXAMPLE_PROOF).replace(`"body":${honest}`, `"body":${first},"body":${second}`)
+    expect(text).toContain(changed)
+    expect(await check(text)).toBeNull()
+    expect(screen.getByText('This is not a valid proof: the key "body" appears twice.')).toBeTruthy()
+  })
+
+  it("a second top-level prize list is refused too", async () => {
+    const text = JSON.stringify(EXAMPLE_PROOF).replace(/}$/, `,"snapshot":${JSON.stringify(EXAMPLE_PROOF.snapshot)}}`)
+    expect(await check(text)).toBeNull()
+    expect(screen.getByText('This is not a valid proof: the key "snapshot" appears twice.')).toBeTruthy()
+  })
+
   it("text that is not JSON: the reason under the box, and no verdict", async () => {
     expect(await check("not a proof")).toBeNull()
     expect(screen.getByText(/^This is not a proof we can read\. It should start with/)).toBeTruthy()

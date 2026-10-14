@@ -1,4 +1,4 @@
-import type { CheckName, VerificationInput, VerificationReport } from "@verifier"
+import type { CheckName, VerificationReport } from "@verifier"
 import { FAIL_WORDS, LOCKED, unusableWords } from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
@@ -42,9 +42,11 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
 }
 
 /** The caveat a PASS carries when the item was not compared. A PASS never hides what it left out. */
-export function caveatOf(report: VerificationReport, input: VerificationInput | null): string | null {
-  if (report.status !== "verified" || input === null) return null
-  if (!input.snapshot) return "The item was not checked: this proof has no prize list, so the page cannot tell which item was in your slot."
-  if (input.expected.itemId === undefined) return "The item was not checked: this page was not told which item you received."
-  return null
+export function caveatOf(report: VerificationReport): string | null {
+  if (report.status !== "verified" || report.notRun.length === 0) return null
+  // Read from what the library did not run, so a check it skips in a later version is not missed.
+  const skipped = new Set(report.notRun.map((n) => n.check))
+  if (skipped.has("snapshotHash")) return "The item was not checked: this proof has no prize list, so the page cannot tell which item was in your slot."
+  if (skipped.has("drawnItemId") && skipped.size === 1) return "The item was not checked: this page was not told which item you received."
+  return `Not checked: ${report.notRun.map((n) => `${n.check} (${n.reason})`).join("; ")}.`
 }
