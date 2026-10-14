@@ -51,7 +51,7 @@ describe("the lookup", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdict()).toBe("PASS"))
     expect(JSON.parse(box().value)).not.toHaveProperty("received")
-    expect(screen.getAllByText(new RegExp(NOT_TOLD_ITEM)).length).toBeGreaterThan(0)
+    expect(document.querySelector("main")?.textContent).toContain(NOT_TOLD_ITEM)
   })
 
   it("drops the address's item id when another open id is typed", async () => {
