@@ -454,7 +454,7 @@ describe('verify() end to end', () => {
   });
 
   it('fails when the item recorded on the win is not the item in the drawn slot', async () => {
-    // THE attack KAN-50 exists to stop: a genuinely fair draw, on genuinely fair odds, landing on
+    // THE attack KAN-50 exists to stop: a draw and odds that pass every check, landing on
     // a real slot — and then a different, cheaper prize reported for it. Every check that existed
     // before this story still passes.
     const report = await verify(
@@ -717,6 +717,99 @@ describe('verify() end to end', () => {
       report.notRun.filter((n) => /not been revealed/.test(n.reason)).map((n) => n.check),
       ['commitment', 'drawnPpmValue', 'drawnSlotIndex'],
     );
+  });
+
+  it('fails, rather than stays pending, when the prize list does not match its hash', async () => {
+    const good = await inputWithSnapshot({ serverSeedHex: null });
+    const snapshot = { ...good.snapshot, slots: good.snapshot.slots.map((s, i) => (i === 0 ? { ...s, displayedValueCents: s.displayedValueCents + 1n } : s)) };
+    const report = await verify({ ...good, snapshot });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'commitment' && /not been revealed/.test(n.reason)));
+  });
+
+  it('fails, rather than stays pending, when the prize list belongs to another edition', async () => {
+    const good = await inputWithSnapshot({ serverSeedHex: null });
+    const foreign = { ...good.snapshot, editionFingerprint: 'ab'.repeat(32) };
+    const report = await verify({ ...good, snapshot: foreign, expected: { ...good.expected, snapshotHash: await snapshotHash(foreign) } });
+
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
+  });
+
+  it('fails a pending open whose commitment can never match: not 64 hex characters', async () => {
+    const report = await verify(await input({ serverSeedHex: null, commitmentHex: 'not hex' }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'commitment');
+    assert.equal(report.firstFailure?.field, 'commitmentHex');
+  });
+
+  it('names the earliest step when several checks fail', async () => {
+    // A different seed breaks the commitment (step 1) and, through it, the drawn value (step 3).
+    const report = await verify(await input({ serverSeedHex: 'ab'.repeat(32) }));
+
+    assert.equal(report.checks.commitment?.ok, false);
+    assert.equal(report.checks.drawnPpmValue?.ok, false);
+    assert.equal(report.firstFailure?.check, 'commitment');
+    assert.equal(report.firstFailure?.step, 1);
+  });
+
+  it('looks the item up in the slot the maths chose, not the slot that was claimed', async () => {
+    const good = await inputWithSnapshot();
+    const report = await verify({ ...good, expected: { ...good.expected, drawnSlotIndex: 2 } });
+    const computedSlot = report.trace.computedSlotIndex;
+
+    assert.notEqual(computedSlot, 2);
+    assert.equal(
+      report.trace.itemIdInDrawnSlot,
+      good.snapshot.slots.find((s) => s.slotIndex === computedSlot)?.currentItemId.toLowerCase(),
+    );
+  });
+
+  it('compares items as the bytes the hash covers: an id without hyphens is the same item', async () => {
+    const good = await inputWithSnapshot();
+    const bare = { ...good.snapshot, slots: good.snapshot.slots.map((s) => ({ ...s, currentItemId: s.currentItemId.replace(/-/g, '') })) };
+    assert.equal(await snapshotHash(bare), good.expected.snapshotHash);
+    const report = await verify({ ...good, snapshot: bare });
+
+    assert.equal(report.status, 'verified');
+    assert.equal(report.checks.drawnItemId?.ok, true);
+  });
+
+  it('refuses a missing seed as invalid, by name: only null means "not revealed yet"', async () => {
+    const base = await input();
+    const report = await verify({ ...base, serverSeedHex: undefined as unknown as string });
+
+    assert.equal(report.status, 'invalid');
+    assert.match(report.invalid?.message ?? '', /^serverSeedHex /);
+  });
+
+  for (const [what, broken] of [
+    ['commitmentHex', { commitmentHex: undefined }],
+    ['expected.itemId', { expected: { itemId: null } }],
+    ['snapshot.slots', { snapshot: { editionFingerprint: 'ab'.repeat(32), slots: {} } }],
+  ] as const) {
+    it(`names ${what} when it is missing or of the wrong type, in plain words`, async () => {
+      const report = await verify((await inputWithSnapshot(broken as Record<string, unknown>)) as never);
+
+      assert.equal(report.status, 'invalid');
+      assert.equal(report.invalid?.message, `${what} is missing or has the wrong type`);
+      assert.equal(report.invalid?.detail, undefined);
+    });
+  }
+
+  it('keeps a runtime error out of the message, in invalid.detail only', async () => {
+    const report = await verifyFrom(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'x')");
+    });
+
+    assert.equal(report.status, 'invalid');
+    assert.doesNotMatch(report.invalid?.message ?? '', /Cannot read properties/);
+    assert.match(report.invalid?.detail ?? '', /Cannot read properties/);
   });
 
   it('reports an input it cannot read as invalid instead of throwing', async () => {

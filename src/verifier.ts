@@ -181,8 +181,8 @@ export interface VerificationInput {
    * The published prize-table snapshot, if you have it.
    *
    * OPTIONAL, and its absence is reported rather than ignored: without it the chain stops at a
-   * slot NUMBER. You would have proved you legitimately won position `i` at its honest odds, and
-   * nothing at all about what was in position `i`. When omitted, {@link VerificationReport.caveats}
+   * slot NUMBER. You would have checked that the revealed seed lands on position `i`, under odds
+   * that match their fingerprint, and nothing at all about what was in position `i`. When omitted, {@link VerificationReport.caveats}
    * says so in as many words.
    */
   snapshot?: Snapshot;
@@ -283,7 +283,11 @@ export interface VerificationReport {
   /** Present when `status` is `failed`: the first failing check in step order. */
   firstFailure?: Failure;
   /** Present when `status` is `invalid`: why the input could not be read. */
-  invalid?: { message: string };
+  /**
+   * Present when `status` is `invalid`. `message` is plain and names the input; `detail` carries
+   * the runtime's own error text when the refusal was not one of this library's named ones.
+   */
+  invalid?: { message: string; detail?: string };
   /** Every check that did not run, with the reason. */
   notRun: NotRun[];
   /** The checks that ran. A check that did not run is absent here and listed in {@link notRun}. */
@@ -894,6 +898,7 @@ const SEED_NOT_REVEALED = 'the server seed has not been revealed yet; it is publ
 const NO_SNAPSHOT = 'no prize-table snapshot was supplied';
 
 async function verifyChecked(input: VerificationInput): Promise<VerificationReport> {
+  requireShape(input);
   const checks: VerificationReport['checks'] = {};
   const notRun: NotRun[] = [];
   const trace: VerificationReport['trace'] = {};
@@ -918,7 +923,9 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
   // Steps 1 and 3 — the commitment and the draw. Both need the revealed seed.
   let derivation: Derivation | undefined;
   if (input.serverSeedHex === null) {
-    skip('commitment', SEED_NOT_REVEALED);
+    // Its shape needs no seed: a commitment that is not 64 hex characters can never be matched.
+    if (/^[0-9a-f]{64}$/i.test(input.commitmentHex)) skip('commitment', SEED_NOT_REVEALED);
+    else checks.commitment = unusable(input.commitmentHex, 'commitmentHex', 'the commitment must be 64 hex characters');
     skip('drawnPpmValue', SEED_NOT_REVEALED);
   } else {
     const seedHex = input.serverSeedHex;
@@ -965,10 +972,11 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     skip('snapshotEditionLink', NO_SNAPSHOT);
     skip('drawnItemId', NO_SNAPSHOT);
     caveats.push(
-      `NOT VERIFIED: which item filled ${slotWords(computedSlotIndex)}. This run checks the draw and the ` +
-        'odds it ran on, so the position you won is genuine — but no prize-table snapshot was ' +
-        'supplied, and nothing here looked at items. A fair draw on fair odds can still be paired ' +
-        'with a misreported prize. Supply the published snapshot to close that gap.',
+      `NOT VERIFIED: which item filled ${slotWords(computedSlotIndex)}. This run checks that the revealed ` +
+        'seed reproduces the drawn value and that the value lands on this slot, under odds that match ' +
+        'their fingerprint — but no prize-table snapshot was supplied, and nothing here looked at items. ' +
+        'A draw and odds that pass these checks can still be paired with a misreported prize. Supply ' +
+        'the published snapshot to close that gap.',
     );
   } else {
     const snapshot = input.snapshot;
@@ -1010,7 +1018,9 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     } else if (itemIdInDrawnSlot === undefined) {
       skip('drawnItemId', seedRevealed ? 'it needs the drawn slot, which could not be computed' : SEED_NOT_REVEALED);
     } else {
-      checks.drawnItemId = check(input.expected.itemId.toLowerCase(), itemIdInDrawnSlot);
+      // Compared as the 16 bytes the hash covers, so a rendering without hyphens is the same item.
+      const expectedItem = input.expected.itemId.toLowerCase();
+      checks.drawnItemId = { ...check(expectedItem, itemIdInDrawnSlot), ok: uuidKey(expectedItem) === uuidKey(itemIdInDrawnSlot) };
     }
   }
 
@@ -1023,6 +1033,8 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
   }
 
   const failed = CHECK_NAMES.filter((name) => checks[name]?.ok === false);
+  // Defence in depth: with the seed revealed and nothing failed, the four core checks have always
+  // run today. This keeps a later skip from turning into a `verified` that checked less.
   const coreRan = CORE_CHECKS.every((name) => checks[name]?.ok === true);
   // A check that ran and failed fails the open, whatever is still pending.
   const status: VerificationStatus =
@@ -1076,11 +1088,16 @@ function failureOf(name: CheckName, failed: Check): Failure {
 }
 
 function invalidReport(error: unknown): VerificationReport {
-  const message = messageOf(error);
+  // Only this library's own refusals are worded for a reader. Anything else (a TypeError from a
+  // value of the wrong type) keeps its runtime text in `detail`, never in the message.
+  const own = error instanceof Error && error.constructor === Error;
+  const message = own ? error.message : 'the input could not be read: a value has the wrong type';
+  const invalid: { message: string; detail?: string } = { message };
+  if (!own) invalid.detail = messageOf(error);
   return {
     ok: false,
     status: 'invalid',
-    invalid: { message },
+    invalid,
     notRun: CHECK_NAMES.map((check) => ({ check, reason: 'the input could not be read' })),
     checks: {},
     trace: {},
@@ -1115,6 +1132,33 @@ function attempt<T>(fn: () => T): Attempt<T> {
     return { ok: true, value: fn() };
   } catch (error) {
     return { ok: false, error: messageOf(error) };
+  }
+}
+
+/** A UUID as the 16 bytes it encodes: hyphens and case do not change which item it names. */
+function uuidKey(uuid: string): string {
+  return uuid.replace(/-/g, '').toLowerCase();
+}
+
+/**
+ * The fields every check reads, refused by name when missing or of the wrong type, so a reader
+ * sees which input is wrong instead of a runtime error. `serverSeedHex` must be present: `null`
+ * means "not revealed yet", while a missing key is a broken input, never a pending one.
+ */
+function requireShape(input: VerificationInput): void {
+  const need = (ok: boolean, what: string) => {
+    if (!ok) throw new Error(`${what} is missing or has the wrong type`);
+  };
+  need(typeof input === 'object' && input !== null, 'the input');
+  need(input.serverSeedHex !== undefined, 'serverSeedHex (use null while the seed is not revealed)');
+  need(typeof input.commitmentHex === 'string', 'commitmentHex');
+  need(typeof input.expected === 'object' && input.expected !== null, 'expected');
+  need(typeof input.expected.editionFingerprint === 'string', 'expected.editionFingerprint');
+  need(input.expected.snapshotHash === undefined || typeof input.expected.snapshotHash === 'string', 'expected.snapshotHash');
+  need(input.expected.itemId === undefined || typeof input.expected.itemId === 'string', 'expected.itemId');
+  if (input.snapshot !== undefined) {
+    need(typeof input.snapshot.editionFingerprint === 'string', 'snapshot.editionFingerprint');
+    need(Array.isArray(input.snapshot.slots), 'snapshot.slots');
   }
 }
 

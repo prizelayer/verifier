@@ -21,11 +21,12 @@ npm ci && npm run build
 ## Why this is a separate repository
 
 A `/verify` endpoint on PrizeLayer's own servers would be PrizeLayer marking its own homework. The
-verification has to run somewhere they don't control, from code that isn't theirs to change at the
-moment you're looking at it. So this ships from its own public repository, on its own build, with a
-permissive licence — and you can read all of it, in one file, without access to anything else.
+verification has to run somewhere they don't control. So this ships from its own public repository,
+on its own build, with a permissive licence — and you can read all of it, in one file, without access
+to anything else. That narrows what you have to trust; it does not remove PrizeLayer from it.
+PrizeLayer wrote this code, so you still have to read it, or trust someone who did.
 
-## What it proves
+## What it checks
 
 ```ts
 import { verify, parseEdition } from '@prizelayer/verifier';
@@ -66,10 +67,13 @@ report.trace;       // every intermediate value, so you can check the workings b
   commitment and the draw are still recomputed and shown.
 - **`pending`** — `serverSeedHex` is `null` because the seed pair has not retired yet, and every
   check that could run passed. The odds and the snapshot are checked; the commitment, the draw and
-  the slot are in `notRun`. If one of the checks that ran fails — odds that do not match their
+  the slot are in `notRun`; a commitment that is not 64 hex characters already fails here. If one
+  of the checks that ran fails — odds that do not match their
   fingerprint, say — the status is `failed`, not `pending`.
 - **`invalid`** — the input could not be read at all, so nothing was checked. `invalid.message`
-  says why. Use `verifyFrom(() => ({ ...parsed input... }))` to have refusals from `parseEdition`
+  says why in plain words and names the input (`commitmentHex is missing or has the wrong type`);
+  a missing `serverSeedHex` is `invalid`, because only `null` means "not revealed yet". When the
+  refusal came from the runtime rather than from this library, its text is in `invalid.detail`. Use `verifyFrom(() => ({ ...parsed input... }))` to have refusals from `parseEdition`
   and `parseSnapshotBody` reported the same way.
 
 Up to **seven** independent claims are checked, and every one of them must hold:
@@ -108,18 +112,18 @@ fingerprint recorded on the win. If someone swapped the odds, the fingerprint wo
 
 ### And the slot is a position, not a prize
 
-Verifying the draw and the odds proves you legitimately won *slot 2* at its honest 5%. It says
-nothing about what was in slot 2.
+Checking the draw and the odds shows that the revealed seed lands on *slot 2*, under odds that
+match the fingerprint recorded on the win (5% for that slot). It says nothing about what was in slot 2.
 
-That gap is real and it survives every check above. An operator can run a genuinely fair draw, on
-genuinely fair odds, land you on a real slot — and then hand you a £20 voucher while reporting that
+That gap is real and it survives every check above. An operator can serve a draw and odds that pass
+every check above, land you on a real slot — and then hand you a £20 voucher while reporting that
 slot 2 was always a £20 voucher. Four green checks, one substituted prize.
 
 Closing it is what the `0x03` snapshot preimage is for. It pins which item filled which slot at
 which displayed value, and it **opens with the raw bytes of the edition fingerprint** — so a
 snapshot is bound to one specific set of odds and cannot be lifted from another edition. Pass the
-published snapshot to `verify()` and the chain runs all the way from the seed to the thing in your
-hands.
+published snapshot to `verify()` and the chain runs all the way from the seed to the item recorded
+for your win.
 
 ## The algorithms, in full
 
