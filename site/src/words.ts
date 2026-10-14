@@ -129,6 +129,8 @@ export const LOOKUP_WORDS = {
   busy: "Fetching the public data of this open from our server…",
   notAnId: "This is not an open id. An open id looks like 7c9e6679-7425-40de-944b-e07fc1f90ae7.",
   notFound: "We found no open with this id. Check the id, or paste the proof instead.",
+  timedOut:
+    "Our server did not answer within 15 seconds. Nothing was checked. Try again, or paste a saved proof instead.",
   unreachable:
     "Your browser could not reach our server. That is fine: the check does not need us. Paste a saved proof instead.",
   serverFault: (message: string) =>

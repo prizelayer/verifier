@@ -213,7 +213,7 @@ jobs:
             echo "::group::$patch"
             git apply "$patch" || { echo "::error::$patch no longer applies — rebase it onto site/src"; exit 1; }
             set +e
-            (cd site && timeout 300 npx tsc -b)
+            (cd site && timeout -k 10 300 npx tsc -b)
             status=$?
             set -e
             if [ $status -eq 124 ]; then
@@ -227,7 +227,7 @@ jobs:
             fi
             started=$(date +%s)
             set +e
-            (cd site && timeout 300 npx vitest run)
+            (cd site && timeout -k 10 300 npx vitest run)
             status=$?
             set -e
             seconds=$(( $(date +%s) - started ))

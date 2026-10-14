@@ -12,6 +12,8 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const [text, setText] = useState("")
   const [checked, setChecked] = useState<Checked | null>(null)
   const [running, setRunning] = useState(false)
+  // A lookup in flight: the box and its buttons wait, so the answer cannot land over a pasted proof.
+  const [lookingUp, setLookingUp] = useState(false)
   const verdictRef = useRef<HTMLDivElement>(null)
   // The text on screen now, read when a check finishes: a result is kept only for the text it checked.
   const current = useRef("")
@@ -66,6 +68,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
       <LookupBox
         disabled={running}
         shownText={text}
+        onBusy={setLookingUp}
         fetchFn={fetchFn}
         onFound={(found) => {
           edit(found)
@@ -81,7 +84,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           id={fieldId}
           value={text}
           onChange={(event) => edit(event.target.value)}
-          readOnly={running}
+          readOnly={running || lookingUp}
           rows={10}
           spellCheck={false}
           aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
@@ -93,7 +96,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => run(text)} disabled={running || text.trim() === ""}>
+          <Button onClick={() => run(text)} disabled={running || lookingUp || text.trim() === ""}>
             Check
           </Button>
           <Button
@@ -102,7 +105,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
               edit(EXAMPLE_TEXT)
               void run(EXAMPLE_TEXT)
             }}
-            disabled={running}
+            disabled={running || lookingUp}
           >
             Try the example
           </Button>

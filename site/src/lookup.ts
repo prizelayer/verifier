@@ -1,4 +1,5 @@
 import { joinProof } from "./proof"
+import { structureProblem } from "./rawText"
 
 /**
  * The one server this page may ask anything, and only when the reader presses "Look up". The
@@ -12,12 +13,16 @@ export const API_BASE = "https://public-api.dev.prizelayer.com"
  */
 export const MAX_ANSWER_BYTES = 1_000_000
 
+/** How long a whole lookup may take. A server that never answers must not leave the page waiting. */
+export const LOOKUP_TIMEOUT_MS = 15_000
+
 /** What a lookup gives the page: the proof as text, or a named reason why there is none. */
 export type LookupResult =
   | { kind: "found"; text: string }
   | { kind: "notAnId" }
   | { kind: "notFound" }
   | { kind: "unreachable" }
+  | { kind: "timedOut" }
   | { kind: "serverFault"; message: string }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -27,6 +32,11 @@ class ServerFault extends Error {}
 
 /** The network did not answer: offline, blocked, or refused by the browser. */
 class Unreachable extends Error {}
+
+/** Our server took longer than {@link LOOKUP_TIMEOUT_MS}. */
+class TimedOut extends Error {}
+
+const HASH = /^[0-9a-f]{64}$/
 
 /**
  * Fetches the four public answers for one open and joins them, unchanged, into one proof.
@@ -41,56 +51,71 @@ export async function lookUp(
 ): Promise<LookupResult> {
   const id = winId.trim()
   if (!UUID.test(id)) return { kind: "notAnId" }
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), LOOKUP_TIMEOUT_MS)
+  const get = (path: string) => answer(fetchFn, path, abort.signal)
   try {
-    const open = await answer(fetchFn, `/verify/opens/${id}`)
+    const open = await get(`/verify/opens/${id}`)
     if (open === null) return { kind: "notFound" }
     const openJson = objectOf(open, "the open")
-    const seedPairId = field(openJson, "seedPairId", "the open")
-    const editionId = field(openJson, "editionId", "the open")
-    const snapshotHash = openJson.snapshotHash
-    // Every value put into a path is checked for its shape first, so no answer can steer a request.
-    if (snapshotHash != null && (typeof snapshotHash !== "string" || !/^[0-9a-f]{64}$/.test(snapshotHash))) {
-      throw new ServerFault("our server's answer for the open has a snapshotHash that is not 64 hex characters")
-    }
-    const [seedPair, edition, snapshot] = await Promise.all([
-      required(fetchFn, `/verify/seed-pairs/${seedPairId}`, "the seed pair"),
-      required(fetchFn, `/verify/editions/${editionId}`, "the box"),
-      typeof snapshotHash === "string" ? required(fetchFn, `/verify/snapshots/${snapshotHash}`, "the prize list") : null,
-    ])
     // Each answer must be the record that was asked for: the block is joined from their text, so an
     // answer for another record would be checked as if it were this open's.
     sameRecord(openJson, "winId", id, "the open")
+    const seedPairId = field(openJson, "seedPairId", "the open")
+    const editionId = field(openJson, "editionId", "the open")
+    // `null` means "this open has no prize list"; a missing key means our server left the field out.
+    if (!("snapshotHash" in openJson)) {
+      throw new ServerFault("our server's answer for the open has no snapshotHash field")
+    }
+    const snapshotHash = openJson.snapshotHash
+    // Every value put into a path is checked for its shape first, so no answer can steer a request.
+    if (snapshotHash !== null && (typeof snapshotHash !== "string" || !HASH.test(snapshotHash))) {
+      throw new ServerFault("our server's answer for the open has a snapshotHash that is not 64 hex characters")
+    }
+    const [seedPair, edition, snapshot] = await Promise.all([
+      required(get, `/verify/seed-pairs/${seedPairId}`, "the seed pair"),
+      required(get, `/verify/editions/${editionId}`, "the box"),
+      snapshotHash === null ? null : required(get, `/verify/snapshots/${snapshotHash}`, "the prize list"),
+    ])
     const seedPairJson = objectOf(seedPair, "the seed pair")
     sameRecord(seedPairJson, "seedPairId", seedPairId, "the seed pair")
     sameRecord(objectOf(edition, "the box"), "editionId", editionId, "the box")
-    if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list")
+    if (snapshot !== null) sameRecord(objectOf(snapshot, "the prize list"), "snapshotHash", snapshotHash as string, "the prize list", true)
     // `null` means "not revealed yet"; a missing key means our server left the field out.
     if (!("revealedServerSeed" in seedPairJson)) {
       throw new ServerFault("our server's answer for the seed pair has no revealedServerSeed field")
     }
     return { kind: "found", text: joinProof({ open, seedPair, edition, snapshot, itemId }) }
   } catch (error) {
+    if (error instanceof TimedOut) return { kind: "timedOut" }
     if (error instanceof Unreachable) return { kind: "unreachable" }
     if (error instanceof ServerFault) return { kind: "serverFault", message: error.message }
     throw error
+  } finally {
+    clearTimeout(timer)
   }
 }
 
 /** One GET; its body as text, or `null` for a 404. */
-async function answer(fetchFn: typeof fetch, path: string): Promise<string | null> {
+async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal): Promise<string | null> {
   let response: Response
   try {
-    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store" })
+    response = await fetchFn(`${API_BASE}${path}`, { method: "GET", credentials: "omit", cache: "no-store", signal })
   } catch {
-    throw new Unreachable()
+    throw signal.aborted ? new TimedOut() : new Unreachable()
   }
   if (response.status === 404) return null
   if (!response.ok) throw new ServerFault(`our server answered ${response.status} for ${path}`)
-  return readCapped(response, path)
+  try {
+    return await readCapped(response, path)
+  } catch (error) {
+    if (error instanceof ServerFault) throw error
+    throw signal.aborted ? new TimedOut() : new Unreachable()
+  }
 }
 
-async function required(fetchFn: typeof fetch, path: string, what: string): Promise<string> {
-  const text = await answer(fetchFn, path)
+async function required(get: (path: string) => Promise<string | null>, path: string, what: string): Promise<string> {
+  const text = await get(path)
   if (text === null) throw new ServerFault(`our server has no answer for ${what} this open names`)
   return text
 }
@@ -101,22 +126,41 @@ async function readCapped(response: Response, path: string): Promise<string> {
   if (Number(response.headers.get("content-length") ?? 0) > MAX_ANSWER_BYTES) throw tooLarge()
   if (response.body === null) return ""
   const reader = response.body.getReader()
-  const decoder = new TextDecoder()
+  // Fatal: a byte that is not UTF-8 is refused, so the box only ever holds what the server sent.
+  const decoder = new TextDecoder("utf-8", { fatal: true })
   let text = ""
   let size = 0
   for (;;) {
     const { done, value } = await reader.read()
-    if (done) return text + decoder.decode()
+    if (done) return text + decode(decoder, undefined, path)
     size += value.byteLength
     if (size > MAX_ANSWER_BYTES) {
       await reader.cancel()
       throw tooLarge()
     }
-    text += decoder.decode(value, { stream: true })
+    text += decode(decoder, value, path)
+  }
+}
+
+function decode(decoder: TextDecoder, bytes: Uint8Array | undefined, path: string): string {
+  try {
+    return bytes === undefined ? decoder.decode() : decoder.decode(bytes, { stream: true })
+  } catch {
+    throw new ServerFault(`our server's answer for ${path} is not valid UTF-8`)
   }
 }
 
 function objectOf(text: string, what: string): Record<string, unknown> {
+  // A key written twice would be read as its last copy here, and refused later by the check: refuse
+  // it now, so the lookup never reports a proof the check will not read.
+  const problem = structureProblem(text)
+  if (problem !== null) {
+    throw new ServerFault(
+      "tooDeep" in problem
+        ? `our server's answer for ${what} is nested too deeply`
+        : `our server's answer for ${what} has the key "${problem.duplicateKey}" twice`,
+    )
+  }
   let value: unknown
   try {
     value = JSON.parse(text)
@@ -137,9 +181,11 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
   return value
 }
 
-function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string) {
+/** Ids are compared without letter case, as UUIDs are; a hash is compared exactly. */
+function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string, exact = false) {
   const value = json[name]
-  if (typeof value !== "string" || value.toLowerCase() !== asked.toLowerCase()) {
+  const same = typeof value === "string" && (exact ? value === asked : value.toLowerCase() === asked.toLowerCase())
+  if (!same) {
     throw new ServerFault(`our server's answer for ${what} names another ${name} than the one the page asked for`)
   }
 }

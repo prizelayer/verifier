@@ -6,6 +6,6 @@ export function files(dir: string, pattern: RegExp): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) return files(path, pattern)
-    return pattern.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : []
+    return pattern.test(name) && !/\.test\.[cm]?[jt]sx?$/.test(name) ? [path] : []
   })
 }

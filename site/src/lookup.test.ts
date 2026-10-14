@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { EXAMPLE_PROOF } from "./example"
-import { API_BASE, fromFragment, lookUp, MAX_ANSWER_BYTES } from "./lookup"
+import { API_BASE, fromFragment, LOOKUP_TIMEOUT_MS, lookUp, MAX_ANSWER_BYTES } from "./lookup"
 import { exampleAnswers, fakeServer, type Answer } from "./test/fakeServer"
 
 const { open, seedPair, edition, snapshot, received } = EXAMPLE_PROOF
@@ -62,6 +62,15 @@ describe("lookUp", () => {
     expect(server.calls).toEqual([])
   })
 
+  it.each([`${WIN}/../x`, `x${WIN}`, `${WIN}%2F`, `${WIN}/../../seed-pairs/x`])(
+    "asks nothing for %s, which only contains an open id",
+    async (typed) => {
+      const server = fakeServer(exampleAnswers())
+      expect(await lookUp(typed, null, server.fetchFn)).toEqual({ kind: "notAnId" })
+      expect(server.calls).toEqual([])
+    },
+  )
+
   it("says no open was found on a 404 for the open", async () => {
     const server = fakeServer(new Map())
     expect(await lookUp(WIN, null, server.fetchFn)).toEqual({ kind: "notFound" })
@@ -106,8 +115,11 @@ describe("lookUp", () => {
 
   it.each([
     ["seedPairId", "../editions/x"],
+    ["seedPairId", `${seedPair.seedPairId}/../x`],
+    ["seedPairId", `x${seedPair.seedPairId}`],
     ["editionId", null],
     ["snapshotHash", "19159c52/../x"],
+    ["snapshotHash", `${snapshot.snapshotHash}/../x`],
   ])("refuses an open whose %s cannot be put in a path, and asks nothing more", async (name, value) => {
     const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body: JSON.stringify({ ...open, [name]: value }) })
     const result = await lookUp(WIN, null, server.fetchFn)
@@ -123,9 +135,53 @@ describe("lookUp", () => {
   ])("names an answer for %s that is another record as a fault of our server", async (what, path, name, other) => {
     const answers = exampleAnswers()
     answers.set(path, { status: 200, body: JSON.stringify({ ...JSON.parse(answers.get(path)!.body), [name]: other }) })
-    expect(await lookUp(WIN, null, fakeServer(answers).fetchFn)).toEqual({
+    const server = fakeServer(answers)
+    expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
       kind: "serverFault",
       message: `our server's answer for ${what} names another ${name} than the one the page asked for`,
+    })
+    // A wrong open is refused before anything else is asked.
+    if (what === "the open") expect(server.calls).toHaveLength(1)
+  })
+
+  it("compares a hash exactly: a prize list naming the hash in upper case is another record", async () => {
+    const path = `/verify/snapshots/${snapshot.snapshotHash}`
+    const upper = JSON.stringify({ ...snapshot, snapshotHash: snapshot.snapshotHash.toUpperCase() })
+    expect(await lookUp(WIN, null, withAnswer(path, { status: 200, body: upper }).fetchFn)).toEqual({
+      kind: "serverFault",
+      message: "our server's answer for the prize list names another snapshotHash than the one the page asked for",
+    })
+  })
+
+  it("names an open answer with no snapshotHash field as a fault of our server, and asks nothing more", async () => {
+    const { snapshotHash: _dropped, ...withoutField } = open
+    const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body: JSON.stringify(withoutField) })
+    expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
+      kind: "serverFault",
+      message: "our server's answer for the open has no snapshotHash field",
+    })
+    expect(server.calls).toHaveLength(1)
+  })
+
+  it("refuses an answer with a key written twice, before anything is reported as found", async () => {
+    const body = JSON.stringify(open).replace("{", `{"winId":"0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d",`)
+    const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body })
+    expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
+      kind: "serverFault",
+      message: `our server's answer for the open has the key "winId" twice`,
+    })
+    expect(server.calls).toHaveLength(1)
+  })
+
+  it("refuses an answer that is not UTF-8", async () => {
+    const text = new TextEncoder().encode(JSON.stringify(open))
+    const bad = new Uint8Array([...text.slice(0, 20), 0xff, ...text.slice(20)])
+    const server = fakeServer(exampleAnswers())
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) =>
+      String(url).endsWith(`/verify/opens/${WIN}`) ? new Response(bad, { status: 200 }) : server.fetchFn(url, init)) as typeof fetch
+    expect(await lookUp(WIN, null, fetchFn)).toEqual({
+      kind: "serverFault",
+      message: `our server's answer for /verify/opens/${WIN} is not valid UTF-8`,
     })
   })
 
@@ -165,6 +221,46 @@ describe("lookUp", () => {
       kind: "serverFault",
       message: `our server's answer for /verify/opens/${WIN} is larger than ${MAX_ANSWER_BYTES} bytes`,
     })
+  })
+})
+
+describe("a lookup that takes too long", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** A fetch that never answers, and fails as a fetch does once its signal is aborted. */
+  const silent = (async (_url: string | URL | Request, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))
+    })) as typeof fetch
+
+  it("stops after the time limit when our server never answers, and every request carried the signal", async () => {
+    vi.useFakeTimers()
+    const result = lookUp(WIN, null, silent)
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS - 1)
+    let settled = false
+    void result.then(() => (settled = true))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await result).toEqual({ kind: "timedOut" })
+  })
+
+  it("stops after the time limit when an answer starts and then stalls", async () => {
+    vi.useFakeTimers()
+    const stalling = (async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"winId":'))
+          init?.signal?.addEventListener("abort", () => controller.error(new DOMException("aborted", "AbortError")))
+        },
+      })
+      return new Response(body, { status: 200 })
+    }) as typeof fetch
+    const result = lookUp(WIN, null, stalling)
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS)
+    expect(await result).toEqual({ kind: "timedOut" })
   })
 })
 
