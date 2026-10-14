@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 9ee3a8c..e0382d8 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -91,7 +91,7 @@ export function App() {
+       </section>
+ 
+       <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
+-        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
++        {running ? null : report ? <Verdict report={report} /> : null}
+       </div>
+ 
+       {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}

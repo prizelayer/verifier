@@ -1,8 +1,8 @@
 diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
-index 5c09e71..3b02bbc 100644
+index 8be747f..01ce963 100644
 --- a/site/src/bytes.tsx
 +++ b/site/src/bytes.tsx
-@@ -44,7 +44,7 @@ function Row({ name, value, against }: { name: string; value: string | undefined
+@@ -45,7 +45,7 @@ function Row({ name, value, against }: { name: string; value: string; against?:
  function Marked({ value, against }: { value: string; against: string }) {
    const parts: { text: string; differs: boolean }[] = []
    for (let i = 0; i < value.length; i++) {

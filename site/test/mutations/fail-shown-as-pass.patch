@@ -1,5 +1,5 @@
 diff --git a/site/src/verdict.ts b/site/src/verdict.ts
-index 70ab10f..87e440f 100644
+index 3b57f83..27b8b9d 100644
 --- a/site/src/verdict.ts
 +++ b/site/src/verdict.ts
 @@ -23,7 +23,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str

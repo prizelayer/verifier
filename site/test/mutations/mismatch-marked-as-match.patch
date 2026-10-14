@@ -1,8 +1,8 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 223d407..664e177 100644
+index bfa3d54..fb344de 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -84,7 +84,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
+@@ -97,7 +97,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
                ? inputWords(check.field, check.error, input)
                : FAIL_WORDS[name]
          return (

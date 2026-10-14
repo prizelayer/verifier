@@ -1,8 +1,8 @@
 diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
-index 5c09e71..371bdd9 100644
+index 8be747f..865b371 100644
 --- a/site/src/bytes.tsx
 +++ b/site/src/bytes.tsx
-@@ -111,7 +111,7 @@ export function Chunks({ chunks }: { chunks: readonly ChunkVerdict[] }) {
+@@ -112,7 +112,7 @@ export function Chunks({ chunks }: { chunks: readonly ChunkVerdict[] }) {
        </thead>
        <tbody>
          {chunks.map((c) => (

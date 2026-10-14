@@ -1,5 +1,5 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 8df7040..5aa56ea 100644
+index 9ee3a8c..6059946 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
 @@ -28,7 +28,7 @@ export function App() {

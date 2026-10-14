@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 43d4375..3e98704 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -86,7 +86,7 @@ export const FAIL_WORDS: Record<CheckName, string> = {
+  * The steps a step's own values come from. A later step that only re-uses values of a step that
+  * failed proves nothing, and says so; a step that does not use them (step 2 after step 1) does not.
+  */
+-export const DEPENDS_ON: Record<StepNumber, readonly StepNumber[]> = { 1: [], 2: [], 3: [1], 4: [2, 3] }
++export const DEPENDS_ON: Record<StepNumber, readonly StepNumber[]> = { 1: [], 2: [], 3: [1], 4: [3] }
+ 
+ export const DEPENDENT_NOTE = "This step depends on a step that failed, so it proves nothing."
+ 

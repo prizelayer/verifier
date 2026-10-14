@@ -1,13 +1,13 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 223d407..544e94d 100644
+index bfa3d54..2390904 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -28,7 +28,7 @@ export function StepCards({ report, input }: Props) {
+@@ -34,7 +34,7 @@ export function StepCards({ report, input }: Props) {
  
    return (
      <div className="space-y-6">
--      {STEPS.map(({ step, title, method, text }) => {
-+      {STEPS.filter((s) => s.step !== 2).map(({ step, title, method, text }) => {
+-      {STEPS.map(({ step, title: stepTitle, method, text: stepText }) => {
++      {STEPS.filter((s) => s.step !== 2).map(({ step, title: stepTitle, method, text: stepText }) => {
          const failed = failedSteps.has(step)
-         // Shown on a failed step too: its own mismatch may only be the echo of the earlier one.
-         const dependent = dependsOnFailed(step)
+         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
+         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
