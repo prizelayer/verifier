@@ -1,0 +1,13 @@
+diff --git a/site/src/verdict.ts b/site/src/verdict.ts
+index c0e28c8..5b313c0 100644
+--- a/site/src/verdict.ts
++++ b/site/src/verdict.ts
+@@ -23,7 +23,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+     case "failed": {
+       const failure = report.firstFailure
+       return {
+-        word: "FAIL",
++        word: "PASS",
+         line: !failure
+           ? report.summary
+           : failure.field !== undefined

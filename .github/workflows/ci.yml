@@ -129,3 +129,99 @@ jobs:
           name: playwright-report
           path: playwright-report/
           if-no-files-found: ignore
+
+  site:
+    name: Verification page (site/)
+    # The page a player opens. Its own package, so the library above keeps zero dependencies. Every
+    # step reads the page as built, and the offline test opens it from a file with the network
+    # refused, in the same three engines as the library.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint -- --deny-warnings
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit, tamper, accessibility and no-storage tests
+        run: npm test
+
+      - name: Build (one classic script, relative paths)
+        run: npm run build
+
+      - name: No browser storage in the built bundle
+        run: SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts
+
+      - name: Bundle check
+        run: npm run check-bundle
+
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Open the built page from file:// with the network refused, in three engines
+        run: npm run test:offline
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: site-playwright-report
+          path: site/playwright-report/
+          if-no-files-found: ignore
+
+  site-mutation-sentinel:
+    name: A broken page must fail the page's tests
+    # The library's sentinel above reads src/ only, so it cannot see the page. This one breaks the
+    # page in ways a reader would be misled by (a FAIL shown as PASS, a mismatch drawn as a match,
+    # the "what this does not prove" paragraph gone), and the build fails if the page's tests still
+    # pass. Same rules: the mutant must type-check, and nothing may stay applied.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+        working-directory: site
+
+      - name: Every page mutation must redden the page's tests
+        run: |
+          shopt -s nullglob
+          patches=(site/test/mutations/*.patch)
+          if [ ${#patches[@]} -eq 0 ]; then
+            echo "no page mutation patches found — the sentinel would pass vacuously"; exit 1
+          fi
+          for patch in "${patches[@]}"; do
+            echo "::group::$patch"
+            git apply "$patch" || { echo "::error::$patch no longer applies — rebase it onto site/src"; exit 1; }
+            if ! (cd site && npx tsc -b); then
+              echo "::error::$patch breaks the type-check rather than the page. A mutation must"
+              echo "::error::compile, or it proves nothing about what the tests catch."
+              exit 1
+            fi
+            if (cd site && npx vitest run); then
+              echo "::error::$patch did NOT redden the page's tests. A reader would be misled and"
+              echo "::error::the suite would not notice."
+              exit 1
+            fi
+            git apply -R "$patch"
+            echo "caught: $patch"
+            echo "::endgroup::"
+          done
+          git diff --exit-code site/src/

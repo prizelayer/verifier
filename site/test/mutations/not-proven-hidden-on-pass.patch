@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 333cc8a..1be90c3 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -81,7 +81,7 @@ export function App() {
+ 
+       {report ? <Checks report={report} /> : null}
+ 
+-      <section aria-labelledby="not-proven" className="space-y-3">
++      <section aria-labelledby="not-proven" className="space-y-3" hidden={report?.status === "verified"}>
+         <h2 id="not-proven" className="text-lg font-semibold">
+           What this does not prove
+         </h2>

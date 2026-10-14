@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 333cc8a..175e50d 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -134,7 +134,7 @@ function Checks({ report }: { report: VerificationReport }) {
+             ? CHECK_WORDS[name]
+             : check.error !== undefined
+               ? unusableWords(check.field, check.error)
+-              : FAIL_WORDS[name]
++              : CHECK_WORDS[name] ?? FAIL_WORDS[name]
+         return (
+           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
+             <span className="font-medium">
