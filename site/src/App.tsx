@@ -126,7 +126,7 @@ function Checks({ report }: { report: VerificationReport }) {
       {CHECK_NAMES.map((name) => {
         const check = report.checks[name]
         const skipped = report.notRun.find((n) => n.check === name)
-        const state = check ? (check.ok ? "matches" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
+        const state = check ? (check.ok ? "matches" : check.error !== undefined ? "cannot be checked" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
         // The sentence follows the result: a mismatch never sits next to the words of a match.
         const sentence = !check
           ? null

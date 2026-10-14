@@ -78,6 +78,9 @@ describe("the page", () => {
     const line = "Step 1 cannot be checked. The value seedPair.serverSeedCommitment cannot be used: the commitment must be 64 hex characters."
     expect(screen.getByText(line)).toBeTruthy()
     expect(document.body.textContent).not.toContain(FAIL_WORDS.commitment)
+    const row = document.querySelector('[data-check="commitment"]')?.textContent
+    expect(row).toContain("The secret and its fingerprint: cannot be checked.")
+    expect(row).not.toContain("does not match")
   })
 
   it("shows CANNOT CHECK YET for a secret not revealed yet, with what can and cannot be checked", async () => {
