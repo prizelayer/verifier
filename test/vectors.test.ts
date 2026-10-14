@@ -16,6 +16,7 @@ import {
   CHUNK_OFFSETS,
   PPM_TOTAL,
   SERVER_SEED_BYTES,
+  bigEndianUint32,
   bytesFromHex,
   commitment,
   derive,
@@ -29,6 +30,7 @@ import {
   snapshotBytes,
   snapshotHash,
   verify,
+  verifyFrom,
 } from '../src/verifier.js';
 
 const FIXTURE = JSON.parse(
@@ -391,15 +393,15 @@ describe('verify() end to end', () => {
     const report = await verify(await input());
 
     assert.equal(report.ok, true);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.editionFingerprint.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
-    assert.equal(report.checks.drawnSlotIndex.ok, true);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.equal(report.checks.drawnSlotIndex?.ok, true);
 
     assert.equal(report.trace.message, 'alice-seed:1:0');
     assert.equal(report.trace.hmacHex, FIXTURE.draw.vectors[0].hmacHex);
     assert.equal(report.trace.value, 186_669);
-    assert.equal(report.trace.computedEditionFingerprint, report.checks.editionFingerprint.expected);
+    assert.equal(report.trace.computedEditionFingerprint, report.checks.editionFingerprint?.expected);
     assert.match(report.summary, /^Verified:/);
   });
 
@@ -407,7 +409,7 @@ describe('verify() end to end', () => {
     const report = await verify(await input({ commitmentHex: 'ab'.repeat(32) }));
 
     assert.equal(report.ok, false);
-    assert.equal(report.checks.commitment.ok, false);
+    assert.equal(report.checks.commitment?.ok, false);
     assert.match(report.summary, /^FAILED: commitment/);
   });
 
@@ -417,9 +419,9 @@ describe('verify() end to end', () => {
     const report = await verify(await input({ expected: { editionFingerprint: 'cd'.repeat(32) } }));
 
     assert.equal(report.ok, false);
-    assert.equal(report.checks.editionFingerprint.ok, false);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
   });
 
   it('says plainly which item it did NOT verify when no snapshot is supplied', async () => {
@@ -456,10 +458,10 @@ describe('verify() end to end', () => {
 
     assert.equal(report.ok, false);
     assert.equal(report.checks.drawnItemId?.ok, false);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.editionFingerprint.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
-    assert.equal(report.checks.drawnSlotIndex.ok, true);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.equal(report.checks.drawnSlotIndex?.ok, true);
     assert.equal(report.checks.snapshotHash?.ok, true);
     assert.match(report.summary, /^FAILED: drawnItemId/);
   });
@@ -498,15 +500,235 @@ describe('verify() end to end', () => {
     assert.equal(report.checks.snapshotHash?.ok, true, 'the foreign snapshot hashes correctly — that is the point');
   });
 
-  it('refuses to pretend when a snapshot arrives without the claims to check it against', async () => {
-    // The key is REMOVED, not set to undefined: `exactOptionalPropertyTypes` makes those two
-    // different types, and it is the absent-key case a real caller produces.
+  it('checks the snapshot but does not pretend about the item when no item id is supplied', async () => {
+    // A lookup by win id alone fetches the published snapshot but has no item to compare. That is an
+    // honest input, so it must not fail — and it must not pass the item either. The key is REMOVED,
+    // not set to undefined: `exactOptionalPropertyTypes` makes those two different types, and it is
+    // the absent-key case a real caller produces.
     const base = await inputWithSnapshot();
     const { itemId: _omitted, ...expectedWithoutItem } = base.expected;
-    await assert.rejects(
-      () => verify({ ...base, expected: expectedWithoutItem }),
-      /expected.snapshotHash and expected.itemId are required/,
+    const report = await verify({ ...base, expected: expectedWithoutItem });
+
+    assert.equal(report.status, 'verified');
+    assert.equal(report.ok, true);
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.equal(report.checks.drawnItemId, undefined);
+    assert.deepEqual(report.notRun.map((n) => n.check), ['drawnItemId']);
+    assert.equal(report.trace.itemIdInDrawnSlot, base.expected.itemId);
+    assert.equal(report.caveats.length, 1);
+    assert.match(report.caveats[0], /NOT VERIFIED: the item recorded for this win/);
+    assert.match(report.summary, /NOT compared/);
+  });
+
+  it('still catches a tampered snapshot when no item id is supplied', async () => {
+    // "Not checked" for the item must never hide a broken prize table.
+    const vector = snapshotVector();
+    const tampered = parseSnapshot({
+      editionFingerprint: vector.editionFingerprint,
+      slots: vector.slotsAsGiven.map((s: Record<string, unknown>, i: number) =>
+        i === 0 ? { ...s, displayedValueCents: '1' } : s,
+      ),
+    });
+    const base = await inputWithSnapshot({ snapshot: tampered });
+    const { itemId: _omitted, ...expectedWithoutItem } = base.expected;
+    const report = await verify({ ...base, expected: expectedWithoutItem });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.snapshotHash?.ok, false);
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.firstFailure?.step, 4);
+  });
+
+  it('fails, rather than throws, when a snapshot arrives without the hash recorded on the win', async () => {
+    const base = await inputWithSnapshot();
+    const { snapshotHash: _omitted, ...expectedWithoutHash } = base.expected;
+    const report = await verify({ ...base, expected: expectedWithoutHash });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.snapshotHash?.ok, false);
+    assert.equal(report.checks.snapshotHash?.field, 'expected.snapshotHash');
+  });
+
+  it('lists every check that did not run, with a reason, when no snapshot is supplied', async () => {
+    const report = await verify(await input());
+
+    assert.equal(report.status, 'verified');
+    assert.deepEqual(
+      report.notRun.map((n) => n.check),
+      ['snapshotHash', 'snapshotEditionLink', 'drawnItemId'],
     );
+    assert.ok(report.notRun.every((n) => n.reason.length > 0));
+  });
+
+  it('traces the cumulative table a reader can check by hand', async () => {
+    // The golden edition: slots 0 and 1 hold 25% each, slot 2 holds 50%.
+    const report = await verify(await input());
+
+    assert.deepEqual(report.trace.cumulative, [
+      { slotIndex: 0, probabilityPpm: 250_000, from: 0, to: 250_000 },
+      { slotIndex: 1, probabilityPpm: 250_000, from: 250_000, to: 500_000 },
+      { slotIndex: 2, probabilityPpm: 500_000, from: 500_000, to: 1_000_000 },
+    ]);
+    const row = report.trace.cumulative?.find((r) => r.slotIndex === report.trace.computedSlotIndex);
+    assert.ok(row && row.from <= 186_669 && 186_669 < row.to, 'the drawn value lies in the drawn row');
+  });
+
+  it('traces all eight chunks of an accepted first chunk', async () => {
+    const report = await verify(await input());
+    const hmac = bytesFromHex(FIXTURE.draw.vectors[0].hmacHex);
+
+    assert.deepEqual(
+      report.trace.chunks,
+      CHUNK_OFFSETS.map((offset, i) => ({
+        attempt: 0,
+        offset,
+        chunk: bigEndianUint32(hmac, offset),
+        verdict: i === 0 ? 'accepted' : 'not-reached',
+      })),
+    );
+  });
+
+  for (const vector of FIXTURE.draw.vectors.filter((v: { rejected: unknown[] }) => v.rejected.length > 0)) {
+    it(`traces rejected, accepted and unread chunks for ${vector.id}`, async () => {
+      const derivation = await derive(SERVER_SEED, vector.clientSeed, vector.nonce);
+      const hmac = bytesFromHex(vector.hmacHex);
+      const expected = CHUNK_OFFSETS.map((offset) => ({
+        attempt: vector.attempt,
+        offset,
+        chunk: bigEndianUint32(hmac, offset),
+        verdict: offset < vector.offset ? 'rejected' : offset === vector.offset ? 'accepted' : 'not-reached',
+      }));
+
+      assert.deepEqual(derivation.chunks, expected);
+      // The rejected entries are the fixture's own rejected list, verdict for verdict.
+      assert.deepEqual(
+        derivation.chunks.filter((c) => c.verdict === 'rejected').map(({ verdict: _v, ...c }) => c),
+        vector.rejected,
+      );
+    });
+  }
+
+  it('fails at step 2, and keeps steps 1 and 3, when the chances do not add up', async () => {
+    // One ppm value changed from 250000 to 250001: the table now sums to 1,000,001. That used to
+    // throw before any check existed; it is a broken claim about the odds, so it fails step 2.
+    const vector = FIXTURE.editionFingerprint.vectors.find(
+      (v: { id: string }) => v.id === 'canonical-unsorted-slots',
+    );
+    const broken = parseEdition({
+      ...vector.edition,
+      slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
+        s.slotIndex === 0 ? { ...s, probabilityPpm: 250_001 } : s,
+      ),
+    });
+    const report = await verify(await input({ edition: broken }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.checks.editionFingerprint?.field, 'edition');
+    assert.match(report.checks.editionFingerprint?.error ?? '', /must sum to 1000000, was 1000001/);
+    assert.deepEqual(
+      { check: report.firstFailure?.check, step: report.firstFailure?.step, field: report.firstFailure?.field },
+      { check: 'editionFingerprint', step: 2, field: 'edition' },
+    );
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnSlotIndex'));
+    assert.equal(report.trace.cumulative, undefined);
+  });
+
+  it('fails at step 1 when the revealed seed is not 32 bytes', async () => {
+    const report = await verify(await input({ serverSeedHex: FIXTURE.draw.serverSeedHex.slice(0, 62) }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.commitment?.ok, false);
+    assert.equal(report.checks.commitment?.field, 'serverSeedHex');
+    assert.equal(report.firstFailure?.step, 1);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnPpmValue'));
+  });
+
+  for (const [field, overrides] of [
+    ['clientSeed', { clientSeed: 'alice seed' }],
+    ['nonce', { nonce: 0 }],
+  ] as const) {
+    it(`fails at step 3, naming ${field}, when ${field} is not a value the engine accepts`, async () => {
+      const report = await verify(await input(overrides));
+
+      assert.equal(report.status, 'failed');
+      assert.equal(report.checks.commitment?.ok, true);
+      assert.equal(report.checks.drawnPpmValue?.ok, false);
+      assert.equal(report.checks.drawnPpmValue?.field, field);
+      assert.equal(report.firstFailure?.step, 3);
+    });
+  }
+
+  it('is pending, not failed and not passed, while the seed is not revealed', async () => {
+    const report = await verify(await input({ serverSeedHex: null }));
+
+    assert.equal(report.status, 'pending');
+    assert.equal(report.ok, false);
+    assert.equal(report.firstFailure, undefined);
+    assert.equal(report.checks.editionFingerprint?.ok, true, 'the odds are checked before the reveal');
+    assert.equal(report.checks.commitment, undefined);
+    assert.deepEqual(
+      report.notRun.filter((n) => /not been revealed/.test(n.reason)).map((n) => n.check),
+      ['commitment', 'drawnPpmValue', 'drawnSlotIndex'],
+    );
+    assert.ok(report.caveats.some((c) => /NOT VERIFIED: the draw/.test(c)));
+    assert.match(report.summary, /^PENDING:/);
+  });
+
+  it('checks the snapshot of a pending open, and leaves its item for later', async () => {
+    const report = await verify(await inputWithSnapshot({ serverSeedHex: null }));
+
+    assert.equal(report.status, 'pending');
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.equal(report.checks.drawnItemId, undefined);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnItemId' && /not been revealed/.test(n.reason)));
+  });
+
+  it('does not let a pending open hide odds that do not match', async () => {
+    // Chances moved between two slots: the sum is still 1,000,000, so only the fingerprint can see it.
+    const vector = FIXTURE.editionFingerprint.vectors.find(
+      (v: { id: string }) => v.id === 'canonical-unsorted-slots',
+    );
+    const swapped = parseEdition({
+      ...vector.edition,
+      slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
+        s.slotIndex === 0 ? { ...s, probabilityPpm: 240_000 } : s.slotIndex === 1 ? { ...s, probabilityPpm: 260_000 } : s,
+      ),
+    });
+    const report = await verify(await input({ serverSeedHex: null, edition: swapped }));
+
+    assert.equal(report.status, 'pending');
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.firstFailure?.check, 'editionFingerprint');
+    assert.match(report.summary, /editionFingerprint did not match/);
+  });
+
+  it('reports an input it cannot read as invalid instead of throwing', async () => {
+    const base = await input();
+    // No `expected` block at all: there is nothing to check against, so no step can be named.
+    const report = await verify({ ...base, expected: undefined as unknown as typeof base.expected });
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.ok, false);
+    assert.ok(report.invalid?.message);
+    assert.match(report.summary, /^CANNOT CHECK:/);
+    assert.equal(report.notRun.length, 7);
+  });
+
+  it('turns a refusal while parsing into an invalid report', async () => {
+    const base = await input();
+    const report = await verifyFrom(() => ({ ...base, edition: parseEdition({ slots: {} }) }));
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.ok, false);
+    assert.equal(report.invalid?.message, 'edition.slots must be an array');
   });
 });
 

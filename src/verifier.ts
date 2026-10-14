@@ -128,6 +128,19 @@ export interface RejectedChunk {
   chunk: number;
 }
 
+/**
+ * One 4-byte chunk of an HMAC the derivation loop computed, with what the loop did with it.
+ *
+ * `not-reached` chunks are the ones after the accepted chunk: the loop never looked at them, but they
+ * are part of the HMAC a reader sees, so they are listed rather than silently dropped.
+ */
+export interface ChunkVerdict {
+  attempt: number;
+  offset: number;
+  chunk: number;
+  verdict: 'rejected' | 'accepted' | 'not-reached';
+}
+
 /** The full, replayable story of one derivation — everything §3 did to reach `value`. */
 export interface Derivation {
   /** The accepted ppm value `v`, in [0, 999999]. */
@@ -141,12 +154,20 @@ export interface Derivation {
   /** The HMAC of the accepted attempt, lowercase hex. */
   hmacHex: string;
   acceptedChunk: number;
+  /** Every chunk of every attempt, in loop order: eight per attempt, the last attempt included. */
+  chunks: ChunkVerdict[];
 }
 
 /** Everything needed to verify one open. Assemble it from the published verification data. */
 export interface VerificationInput {
-  /** The revealed server seed, 64 lowercase hex characters. Only exists after the pair retires. */
-  serverSeedHex: string;
+  /**
+   * The revealed server seed, 64 lowercase hex characters, or `null` while the pair is still active.
+   *
+   * `null` is an honest state, not an error: the seed is published only when its pair retires. The
+   * report is then `pending` — the checks that do not need the seed still run, so the odds can be
+   * verified before the draw can.
+   */
+  serverSeedHex: string | null;
   /** The commitment published BEFORE play. This is the promise being checked. */
   commitmentHex: string;
   clientSeed: string;
@@ -168,31 +189,108 @@ export interface VerificationInput {
     drawnSlotIndex: number;
     /** The `snapshot_hash` recorded on the win. Required when {@link VerificationInput.snapshot} is given. */
     snapshotHash?: string;
-    /** The item id the platform says you received. Required when {@link VerificationInput.snapshot} is given. */
+    /**
+     * The item id recorded for the win. Optional even with a snapshot: without it the snapshot is
+     * still checked, and the item comparison is reported as not run, with a caveat — never as a pass.
+     */
     itemId?: string;
   };
 }
 
-/** One claim, checked. `expected` is what we were told; `computed` is what the maths says. */
+/**
+ * One claim, checked. `expected` is what we were told; `computed` is what the maths says.
+ *
+ * When the input a check needs is unusable — a seed of the wrong length, a table whose chances do
+ * not add up — the check FAILS with `error` saying why and `field` naming the input. A broken input
+ * is a failed claim, not a crash: a page that threw here would show a sceptic nothing at all.
+ */
 export interface Check {
   ok: boolean;
   expected: string;
   computed: string;
+  error?: string;
+  field?: string;
+}
+
+/** The names of the checks, in the order a reader should meet them. */
+export const CHECK_NAMES = [
+  'commitment',
+  'editionFingerprint',
+  'drawnPpmValue',
+  'drawnSlotIndex',
+  'snapshotHash',
+  'snapshotEditionLink',
+  'drawnItemId',
+] as const;
+
+export type CheckName = (typeof CHECK_NAMES)[number];
+
+/**
+ * The step of the published walk-through each check belongs to: 1 the commitment, 2 the odds,
+ * 3 the draw, 4 from the drawn value to the item.
+ */
+export const STEP_OF: Readonly<Record<CheckName, 1 | 2 | 3 | 4>> = {
+  commitment: 1,
+  editionFingerprint: 2,
+  drawnPpmValue: 3,
+  drawnSlotIndex: 4,
+  snapshotHash: 4,
+  snapshotEditionLink: 4,
+  drawnItemId: 4,
+};
+
+/** A check that did not run, and why. Absence from `checks` is never left unexplained. */
+export interface NotRun {
+  check: CheckName;
+  reason: string;
+}
+
+/** The first failing check, in step order — what a reader should be shown first. */
+export interface Failure {
+  check: CheckName;
+  step: 1 | 2 | 3 | 4;
+  field?: string;
+  message: string;
+}
+
+/**
+ * - `verified`: every check that ran passed, and the commitment, the odds, the draw and the slot all ran.
+ * - `failed`: at least one check failed, or an input it needed was unusable.
+ * - `pending`: the server seed is not revealed yet. The checks that do not need it ran and are
+ *   reported, a failed one included; the draw itself cannot be checked yet.
+ * - `invalid`: the input could not be read at all. Nothing was checked.
+ */
+export type VerificationStatus = 'verified' | 'failed' | 'pending' | 'invalid';
+
+/** One range of the cumulative lookup: slot `slotIndex` owns every `v` with `from <= v < to`. */
+export interface CumulativeRow {
+  slotIndex: number;
+  probabilityPpm: number;
+  from: number;
+  to: number;
 }
 
 /** The verdict, with enough detail to see exactly where a failing verification diverged. */
 export interface VerificationReport {
-  /** True only when every check passes. A single failure invalidates the whole verification. */
+  /** True only when {@link status} is `verified`. A single failure invalidates the whole verification. */
   ok: boolean;
+  status: VerificationStatus;
+  /** Present when a check failed: the first one in step order. A `pending` report can carry one. */
+  firstFailure?: Failure;
+  /** Present when `status` is `invalid`: why the input could not be read. */
+  invalid?: { message: string };
+  /** Every check that did not run, with the reason. */
+  notRun: NotRun[];
+  /** The checks that ran. A check that did not run is absent here and listed in {@link notRun}. */
   checks: {
-    /** SHA-256(revealed seed) equals the commitment published before play. */
-    commitment: Check;
+    /** SHA-256(revealed seed) equals the published commitment. */
+    commitment?: Check;
     /** The published odds are the odds that were fingerprinted. Without this the rest is theatre. */
-    editionFingerprint: Check;
+    editionFingerprint?: Check;
     /** The derivation reproduces the recorded ppm value. */
-    drawnPpmValue: Check;
+    drawnPpmValue?: Check;
     /** The cumulative lookup reproduces the recorded slot. */
-    drawnSlotIndex: Check;
+    drawnSlotIndex?: Check;
     /** The published snapshot body reproduces the `snapshot_hash` on the win. Absent if no snapshot was given. */
     snapshotHash?: Check;
     /**
@@ -203,11 +301,14 @@ export interface VerificationReport {
     /** The item recorded on the win is the item the snapshot places in the drawn slot. */
     drawnItemId?: Check;
   };
-  trace: Derivation & {
+  /** Every intermediate value that could be computed. A value whose inputs were unusable is absent. */
+  trace: Partial<Derivation> & {
     /** The canonical `0x01` edition preimage, lowercase hex — the exact bytes that were hashed. */
-    editionPreimageHex: string;
-    computedEditionFingerprint: string;
-    computedSlotIndex: number;
+    editionPreimageHex?: string;
+    computedEditionFingerprint?: string;
+    /** The cumulative lookup table, one row per slot in ascending `slotIndex` order. */
+    cumulative?: CumulativeRow[];
+    computedSlotIndex?: number;
     /** The canonical `0x03` snapshot preimage, lowercase hex. Absent if no snapshot was given. */
     snapshotPreimageHex?: string;
     computedSnapshotHash?: string;
@@ -351,6 +452,7 @@ export async function derive(
   requireNonce(nonce);
 
   const rejected: RejectedChunk[] = [];
+  const chunks: ChunkVerdict[] = [];
   for (let attempt = 0; ; attempt++) {
     const message = drawMessage(clientSeed, nonce, attempt);
     const hmac = await hmacSha256(serverSeed, message);
@@ -358,6 +460,10 @@ export async function derive(
     for (const offset of CHUNK_OFFSETS) {
       const chunk = bigEndianUint32(hmac, offset);
       if (chunk < ACCEPTANCE_THRESHOLD) {
+        chunks.push({ attempt, offset, chunk, verdict: 'accepted' });
+        for (const later of CHUNK_OFFSETS.filter((o) => o > offset)) {
+          chunks.push({ attempt, offset: later, chunk: bigEndianUint32(hmac, later), verdict: 'not-reached' });
+        }
         return {
           value: chunk % PPM_TOTAL,
           attempt,
@@ -366,9 +472,11 @@ export async function derive(
           message: new TextDecoder().decode(message),
           hmacHex: hexFromBytes(hmac),
           acceptedChunk: chunk,
+          chunks,
         };
       }
       rejected.push({ attempt, offset, chunk });
+      chunks.push({ attempt, offset, chunk, verdict: 'rejected' });
     }
   }
 }
@@ -400,6 +508,20 @@ export function slotFor(v: number, slots: readonly Pick<SlotOdds, 'slotIndex' | 
   }
   /* Unreachable: the table sums to PPM_TOTAL and v < PPM_TOTAL, both checked above. */
   throw new Error(`ppm value ${v} exceeded the prize table's cumulative total`);
+}
+
+/**
+ * The cumulative lookup {@link slotFor} walks, as a table a reader can check by hand: slot `i` owns
+ * every `v` with `from <= v < to`. A zero-probability slot owns an empty range (`from === to`).
+ * Validates the table exactly as {@link slotFor} does.
+ */
+export function cumulativeTable(slots: readonly Pick<SlotOdds, 'slotIndex' | 'probabilityPpm'>[]): CumulativeRow[] {
+  let from = 0;
+  return sortedSlots(slots).map((slot) => {
+    const row = { slotIndex: slot.slotIndex, probabilityPpm: slot.probabilityPpm, from, to: from + slot.probabilityPpm };
+    from = row.to;
+    return row;
+  });
 }
 
 /**
@@ -726,88 +848,273 @@ export function parseSnapshot(json: unknown): Snapshot {
 // ---------------------------------------------------------------------------
 
 /**
- * Verify one open end to end, offline.
+ * Verify one open end to end, offline. Never throws.
  *
- * Order matters for how a failure reads, not for the result: the commitment is checked first
- * because a broken commitment means the seed was chosen after the fact and nothing downstream is
- * worth reading; the fingerprint next, because a mismatch there means the odds are unverified and
- * a matching slot proves nothing.
+ * Every check is computed on its own, so one unusable input fails the checks that need it and
+ * leaves the others standing. Example: a table whose chances add up to 1,000,001 fails
+ * `editionFingerprint` with an `error`; the commitment and the draw are still recomputed and shown,
+ * and the slot lookup, which needs the table, is listed in `notRun`.
+ *
+ * The commitment is listed first because a broken commitment means the revealed seed is not the
+ * committed one and nothing downstream is worth reading; the fingerprint next, because a mismatch
+ * there means the odds are unverified and a matching slot proves nothing.
  */
 export async function verify(input: VerificationInput): Promise<VerificationReport> {
-  const serverSeed = bytesFromHex(input.serverSeedHex);
-  requireSeed(serverSeed);
+  try {
+    return await verifyChecked(input);
+  } catch (error) {
+    return invalidReport(error);
+  }
+}
 
-  const computedCommitment = await commitment(serverSeed);
-  const derivation = await derive(serverSeed, input.clientSeed, input.nonce);
-  const preimage = editionBytes(input.edition);
-  const computedFingerprint = hexFromBytes(await sha256(preimage));
-  const computedSlotIndex = slotFor(derivation.value, input.edition.slots);
+/**
+ * {@link verify}, with the parsing inside the same guard: `build` is where {@link parseEdition} and
+ * {@link parseSnapshotBody} run, and anything they refuse becomes an `invalid` report rather than
+ * an exception. One call, one result, whatever was pasted.
+ */
+export async function verifyFrom(build: () => VerificationInput): Promise<VerificationReport> {
+  let input: VerificationInput;
+  try {
+    input = build();
+  } catch (error) {
+    return invalidReport(error);
+  }
+  return verify(input);
+}
 
-  const checks: VerificationReport['checks'] = {
-    commitment: check(input.commitmentHex.toLowerCase(), computedCommitment),
-    editionFingerprint: check(input.expected.editionFingerprint.toLowerCase(), computedFingerprint),
-    drawnPpmValue: check(String(input.expected.drawnPpmValue), String(derivation.value)),
-    drawnSlotIndex: check(String(input.expected.drawnSlotIndex), String(computedSlotIndex)),
-  };
-  const trace: VerificationReport['trace'] = {
-    ...derivation,
-    editionPreimageHex: hexFromBytes(preimage),
-    computedEditionFingerprint: computedFingerprint,
-    computedSlotIndex,
-  };
+const SEED_NOT_REVEALED = 'the server seed has not been revealed yet; it is published when its seed pair retires';
+const NO_SNAPSHOT = 'no prize-table snapshot was supplied';
+
+async function verifyChecked(input: VerificationInput): Promise<VerificationReport> {
+  const checks: VerificationReport['checks'] = {};
+  const notRun: NotRun[] = [];
+  const trace: VerificationReport['trace'] = {};
   const caveats: string[] = [];
+  const skip = (check: CheckName, reason: string) => notRun.push({ check, reason });
+  const seedRevealed = input.serverSeedHex !== null;
 
-  if (input.snapshot) {
-    const { snapshotHash: expectedHash, itemId: expectedItemId } = input.expected;
-    if (expectedHash === undefined || expectedItemId === undefined) {
-      throw new Error('expected.snapshotHash and expected.itemId are required when a snapshot is supplied');
-    }
-    const snapshotPreimage = snapshotBytes(input.snapshot);
-    const computedSnapshotHash = hexFromBytes(await sha256(snapshotPreimage));
-    // The slot the MATHS selected, never the one we were told — checking the claimed slot's item
-    // against the claimed item would be circular.
-    const filled = input.snapshot.slots.find((slot) => slot.slotIndex === computedSlotIndex);
-    const itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
-
-    checks.snapshotHash = check(expectedHash.toLowerCase(), computedSnapshotHash);
-    checks.snapshotEditionLink = check(computedFingerprint, input.snapshot.editionFingerprint.toLowerCase());
-    checks.drawnItemId = check(expectedItemId.toLowerCase(), itemIdInDrawnSlot);
-
-    trace.snapshotPreimageHex = hexFromBytes(snapshotPreimage);
-    trace.computedSnapshotHash = computedSnapshotHash;
-    trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+  // Step 2 — the odds. Needs no seed, so it runs for a pending open too.
+  const expectedFingerprint = input.expected.editionFingerprint.toLowerCase();
+  let computedFingerprint: string | undefined;
+  const preimage = attempt(() => editionBytes(input.edition));
+  if (preimage.ok) {
+    computedFingerprint = hexFromBytes(await sha256(preimage.value));
+    trace.editionPreimageHex = hexFromBytes(preimage.value);
+    trace.computedEditionFingerprint = computedFingerprint;
+    trace.cumulative = cumulativeTable(input.edition.slots);
+    checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
   } else {
+    checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);
+  }
+
+  // Steps 1 and 3 — the commitment and the draw. Both need the revealed seed.
+  let derivation: Derivation | undefined;
+  if (input.serverSeedHex === null) {
+    skip('commitment', SEED_NOT_REVEALED);
+    skip('drawnPpmValue', SEED_NOT_REVEALED);
+  } else {
+    const seedHex = input.serverSeedHex;
+    const seed = attempt(() => {
+      const bytes = bytesFromHex(seedHex);
+      requireSeed(bytes);
+      return bytes;
+    });
+    const expectedPpm = String(input.expected.drawnPpmValue);
+    if (!seed.ok) {
+      checks.commitment = unusable(input.commitmentHex.toLowerCase(), 'serverSeedHex', seed.error);
+      skip('drawnPpmValue', 'it needs the revealed server seed, which is unusable');
+    } else {
+      checks.commitment = check(input.commitmentHex.toLowerCase(), await commitment(seed.value));
+      const clientSeed = attempt(() => requireClientSeed(input.clientSeed));
+      const nonce = attempt(() => requireNonce(input.nonce));
+      if (!clientSeed.ok) {
+        checks.drawnPpmValue = unusable(expectedPpm, 'clientSeed', clientSeed.error);
+      } else if (!nonce.ok) {
+        checks.drawnPpmValue = unusable(expectedPpm, 'nonce', nonce.error);
+      } else {
+        derivation = await derive(seed.value, input.clientSeed, input.nonce);
+        Object.assign(trace, derivation);
+        checks.drawnPpmValue = check(expectedPpm, String(derivation.value));
+      }
+    }
+  }
+
+  // Step 4 — the slot. Needs the draw and a usable table.
+  let computedSlotIndex: number | undefined;
+  if (derivation === undefined) {
+    skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+  } else if (!preimage.ok) {
+    skip('drawnSlotIndex', 'it needs the prize table, which is unusable');
+  } else {
+    computedSlotIndex = slotFor(derivation.value, input.edition.slots);
+    trace.computedSlotIndex = computedSlotIndex;
+    checks.drawnSlotIndex = check(String(input.expected.drawnSlotIndex), String(computedSlotIndex));
+  }
+
+  // Step 4 — the item, through the published snapshot.
+  if (!input.snapshot) {
+    skip('snapshotHash', NO_SNAPSHOT);
+    skip('snapshotEditionLink', NO_SNAPSHOT);
+    skip('drawnItemId', NO_SNAPSHOT);
     caveats.push(
-      `NOT VERIFIED: which item filled slot ${computedSlotIndex}. This run proves the draw and the ` +
+      `NOT VERIFIED: which item filled ${slotWords(computedSlotIndex)}. This run checks the draw and the ` +
         'odds it ran on, so the position you won is genuine — but no prize-table snapshot was ' +
         'supplied, and nothing here looked at items. A fair draw on fair odds can still be paired ' +
         'with a misreported prize. Supply the published snapshot to close that gap.',
     );
+  } else {
+    const snapshot = input.snapshot;
+    const expectedHash = input.expected.snapshotHash?.toLowerCase();
+    const snapshotPreimage = attempt(() => snapshotBytes(snapshot));
+    if (!snapshotPreimage.ok) {
+      checks.snapshotHash = unusable(expectedHash ?? '', 'snapshot', snapshotPreimage.error);
+    } else {
+      const computedSnapshotHash = hexFromBytes(await sha256(snapshotPreimage.value));
+      trace.snapshotPreimageHex = hexFromBytes(snapshotPreimage.value);
+      trace.computedSnapshotHash = computedSnapshotHash;
+      checks.snapshotHash =
+        expectedHash === undefined
+          ? unusable('', 'expected.snapshotHash', 'a snapshot was supplied without the snapshot hash recorded on the win')
+          : check(expectedHash, computedSnapshotHash);
+    }
+
+    if (computedFingerprint === undefined) {
+      skip('snapshotEditionLink', 'it needs the edition fingerprint, which could not be computed');
+    } else {
+      checks.snapshotEditionLink = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
+    }
+
+    // The slot the MATHS selected, never the one we were told — checking the claimed slot's item
+    // against the claimed item would be circular.
+    let itemIdInDrawnSlot: string | undefined;
+    if (computedSlotIndex !== undefined) {
+      const filled = snapshot.slots.find((slot) => slot.slotIndex === computedSlotIndex);
+      itemIdInDrawnSlot = filled ? filled.currentItemId.toLowerCase() : NO_SUCH_SLOT;
+      trace.itemIdInDrawnSlot = itemIdInDrawnSlot;
+    }
+    if (input.expected.itemId === undefined) {
+      skip('drawnItemId', 'no item id was supplied to compare with');
+      caveats.push(
+        `NOT VERIFIED: the item recorded for this win. The published snapshot puts ` +
+          `${itemIdInDrawnSlot === undefined ? 'an item' : `item ${itemIdInDrawnSlot}`} in ` +
+          `${slotWords(computedSlotIndex)}, but no item id was supplied, so nothing was compared with it.`,
+      );
+    } else if (itemIdInDrawnSlot === undefined) {
+      skip('drawnItemId', seedRevealed ? 'it needs the drawn slot, which could not be computed' : SEED_NOT_REVEALED);
+    } else {
+      checks.drawnItemId = check(input.expected.itemId.toLowerCase(), itemIdInDrawnSlot);
+    }
   }
 
-  const failed = Object.entries(checks).filter(([, c]) => !c.ok).map(([name]) => name);
+  if (!seedRevealed) {
+    caveats.push(
+      'NOT VERIFIED: the draw. The server seed of this seed pair has not been revealed yet, so the ' +
+        'commitment, the drawn value and the slot cannot be recomputed. Only the checks listed in ' +
+        '`checks` ran.',
+    );
+  }
 
-  return {
-    ok: failed.length === 0,
+  const failed = CHECK_NAMES.filter((name) => checks[name]?.ok === false);
+  const coreRan = (['commitment', 'editionFingerprint', 'drawnPpmValue', 'drawnSlotIndex'] as const).every(
+    (name) => checks[name]?.ok === true,
+  );
+  const status: VerificationStatus = !seedRevealed
+    ? 'pending'
+    : failed.length > 0 || !coreRan
+      ? 'failed'
+      : 'verified';
+
+  const report: VerificationReport = {
+    ok: status === 'verified',
+    status,
+    notRun,
     checks,
     trace,
     caveats,
-    summary:
-      failed.length === 0
-        ? `Verified: nonce ${input.nonce} draws ppm ${derivation.value}, which lands on slot ` +
-          `${computedSlotIndex} of an edition whose published odds match its recorded fingerprint` +
-          (input.snapshot
-            ? `, and the prize table pinned to that edition puts item ${trace.itemIdInDrawnSlot} in it.`
-            : '. The item in that slot was NOT verified — see caveats.')
-        : `FAILED: ${failed.join(', ')} did not match. This open is not verified.`,
+    summary: summaryOf(status, failed, input, trace),
   };
+  const first = failed[0];
+  if (first !== undefined) report.firstFailure = failureOf(first, checks[first] as Check);
+  return report;
+}
+
+function summaryOf(
+  status: VerificationStatus,
+  failed: CheckName[],
+  input: VerificationInput,
+  trace: VerificationReport['trace'],
+): string {
+  if (status === 'pending') {
+    return (
+      'PENDING: the server seed has not been revealed yet, so the draw cannot be checked. ' +
+      (failed.length > 0 ? `${failed.join(', ')} did not match.` : 'Every check that could run matched.')
+    );
+  }
+  if (status === 'failed') return `FAILED: ${failed.join(', ')} did not match. This open is not verified.`;
+
+  const item =
+    input.snapshot === undefined
+      ? '. The item in that slot was NOT verified — see caveats.'
+      : input.expected.itemId === undefined
+        ? '. The item recorded for the win was NOT compared — see caveats.'
+        : `, and the prize table pinned to that edition puts item ${trace.itemIdInDrawnSlot} in it.`;
+  return (
+    `Verified: nonce ${input.nonce} draws ppm ${trace.value}, which lands on slot ` +
+    `${trace.computedSlotIndex} of an edition whose published odds match its recorded fingerprint${item}`
+  );
+}
+
+function failureOf(name: CheckName, failed: Check): Failure {
+  const failure: Failure = {
+    check: name,
+    step: STEP_OF[name],
+    message: failed.error ?? `expected ${failed.expected}, computed ${failed.computed}`,
+  };
+  if (failed.field !== undefined) failure.field = failed.field;
+  return failure;
+}
+
+function invalidReport(error: unknown): VerificationReport {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    ok: false,
+    status: 'invalid',
+    invalid: { message },
+    notRun: CHECK_NAMES.map((check) => ({ check, reason: 'the input could not be read' })),
+    checks: {},
+    trace: {},
+    caveats: [],
+    summary: `CANNOT CHECK: ${message}`,
+  };
+}
+
+function slotWords(slotIndex: number | undefined): string {
+  return slotIndex === undefined ? 'the drawn slot' : `slot ${slotIndex}`;
 }
 
 /** Stands in for the item id when the drawn slot is absent from the snapshot — a legible FAIL. */
 const NO_SUCH_SLOT = '(no such slot in the published snapshot)';
 
+/** Stands in for the computed value of a check whose input was unusable. */
+const NOT_COMPUTED = '(could not be computed)';
+
 function check(expected: string, computed: string): Check {
   return { ok: expected === computed, expected, computed };
+}
+
+function unusable(expected: string, field: string, error: string): Check {
+  return { ok: false, expected, computed: NOT_COMPUTED, error, field };
+}
+
+type Attempt<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/** Runs one input guard or preimage builder, turning its refusal into a value a check can report. */
+function attempt<T>(fn: () => T): Attempt<T> {
+  try {
+    return { ok: true, value: fn() };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 // ---------------------------------------------------------------------------
