@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index e67e97d..f8670ea 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -95,7 +95,7 @@ export async function lookUp(
+     }
+     return { kind: "found", text: joinProof({ open, seedPair, edition, snapshot, itemId }) }
+   } catch (error) {
+-    if (error instanceof TimedOut) return { kind: "timedOut" }
++    if (error instanceof TimedOut) return { kind: "unreachable" }
+     if (error instanceof Unreachable) return { kind: "unreachable" }
+     if (error instanceof ServerFault) return { kind: "serverFault", message: error.message }
+     throw error

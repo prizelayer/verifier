@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 2ce6d4c..98476b0 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -84,7 +84,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
+           id={fieldId}
+           value={text}
+           onChange={(event) => edit(event.target.value)}
+-          readOnly={running || lookingUp}
++          readOnly={running}
+           rows={10}
+           spellCheck={false}
+           aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}

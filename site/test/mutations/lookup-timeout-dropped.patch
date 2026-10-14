@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index e67e97d..3d3acdb 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -60,7 +60,7 @@ export async function lookUp(
+   const id = winId.trim()
+   if (!UUID.test(id)) return { kind: "notAnId" }
+   const abort = new AbortController()
+-  const timer = setTimeout(() => abort.abort(), LOOKUP_TIMEOUT_MS)
++  const timer = setTimeout(() => undefined, LOOKUP_TIMEOUT_MS)
+   const get = (path: string) => answer(fetchFn, path, abort.signal)
+   try {
+     const open = await get(`/verify/opens/${id}`)

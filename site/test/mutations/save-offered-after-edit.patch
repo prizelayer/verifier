@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..ab83302 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -119,7 +119,7 @@ export function LookupBox({
+           <LookupWords result={result.result} />
+         ) : null}
+       </div>
+-      {result !== null && fetched !== null && fetched === shownText ? (
++      {result !== null && fetched !== null && (fetched === shownText || true) ? (
+         <div className="space-y-2">
+           <Button variant="outline" onClick={() => save(fetched, result.asked)}>
+             Save this proof

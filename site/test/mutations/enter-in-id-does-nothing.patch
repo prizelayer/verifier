@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..c8e2d03 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -93,7 +93,7 @@ export function LookupBox({
+           onKeyDown={(event) => {
+             if (event.key === "Enter") {
+               event.preventDefault()
+-              event.currentTarget.form?.requestSubmit()
++              void 0
+             }
+           }}
+           readOnly={busy}

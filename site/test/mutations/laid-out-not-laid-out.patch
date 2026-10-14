@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..79878d1 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -129,7 +129,7 @@ export function LookupBox({
+           <details className="text-sm">
+             <summary className="cursor-pointer">Show this proof laid out</summary>
+             <pre data-laid-out className="mt-2 max-h-96 overflow-auto rounded-lg border border-border p-3 font-mono text-xs">
+-              {layOut(fetched)}
++              {layOut(fetched).replace(/\n */g, "")}
+             </pre>
+           </details>
+         </div>

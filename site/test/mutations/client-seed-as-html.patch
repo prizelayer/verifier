@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 2913da3..f60c1f7 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -196,7 +196,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+       return (
+         <div className="space-y-2">
+           <p className="text-sm">
+-            The message that was mixed: <code className="font-mono text-xs">{trace.message}</code> (client seed : counter : try)
++            The message that was mixed: <code className="font-mono text-xs" dangerouslySetInnerHTML={{ __html: trace.message }} /> (client seed : counter : try)
+           </p>
+           <p className="text-sm">
+             The 32 bytes:{" "}

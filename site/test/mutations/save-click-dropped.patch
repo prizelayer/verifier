@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..e615796 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -163,7 +163,7 @@ function save(text: string, winId: string) {
+   const link = document.createElement("a")
+   link.href = url
+   link.download = `proof-${winId}.json`
+-  link.click()
++
+   // Released on the next turn: some browsers cancel a download whose URL is released at once.
+   setTimeout(() => URL.revokeObjectURL(url), 0)
+ }

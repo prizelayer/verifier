@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..aa0e8e4 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -124,7 +124,7 @@ export function LookupBox({
+           <Button variant="outline" onClick={() => save(fetched, result.asked)}>
+             Save this proof
+           </Button>
+-          <p className="text-sm text-muted-foreground">{LOOKUP_WORDS.sharing}</p>
++          {null}
+           {/* For reading only: the field, the check and the saved file keep the exact text. */}
+           <details className="text-sm">
+             <summary className="cursor-pointer">Show this proof laid out</summary>

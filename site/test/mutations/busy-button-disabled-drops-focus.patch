@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..2da670b 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -106,7 +106,7 @@ export function LookupBox({
+         <Button
+           type="submit"
+           className="self-start"
+-          disabled={disabled || winId.trim() === ""}
++          disabled={disabled || busy || winId.trim() === ""}
+           aria-disabled={busy || undefined}
+         >
+           Look up

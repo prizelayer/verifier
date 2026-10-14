@@ -1,0 +1,13 @@
+diff --git a/site/src/rows.tsx b/site/src/rows.tsx
+index c20fa5a..c1a9c67 100644
+--- a/site/src/rows.tsx
++++ b/site/src/rows.tsx
+@@ -71,7 +71,7 @@ export function Rows<T>({
+ function firstRows<T>(rows: readonly T[], keep: ((item: T) => boolean) | undefined) {
+   const shown: { item: T; index: number }[] = []
+   rows.forEach((item, index) => {
+-    if (index < FIRST_ROWS || keep?.(item)) shown.push({ item, index })
++    if (index < FIRST_ROWS * 1000 || keep?.(item)) shown.push({ item, index })
+   })
+   return shown
+ }

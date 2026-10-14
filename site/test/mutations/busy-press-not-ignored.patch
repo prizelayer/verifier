@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..f9067b2 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -41,7 +41,7 @@ export function LookupBox({
+ 
+   async function press() {
+     // While busy the button keeps its focus (aria-disabled, not disabled), so a press is ignored here.
+-    if (busy || disabled) return
++    if (disabled) return
+     const asked = winId.trim()
+     if (asked === "") return
+     const boxAtPress = shownText
