@@ -1,10 +1,10 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index bfa3d54..8ac02f3 100644
+index b79846f..6e49f4c 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
 @@ -198,7 +198,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
            </p>
-           <Chunks chunks={trace.chunks} />
+           <Chunks chunks={trace.chunks} value={trace.value} />
            {checks.drawnPpmValue ? (
 -            <Compare label="drawnPpmValue" expectedLabel="v we recorded" computedLabel="v your browser computed" check={checks.drawnPpmValue} />
 +            <Compare label="drawnPpmValue" expectedLabel="v we recorded" computedLabel="v your browser computed" check={{ ...checks.drawnPpmValue, computed: checks.drawnPpmValue.expected }} />

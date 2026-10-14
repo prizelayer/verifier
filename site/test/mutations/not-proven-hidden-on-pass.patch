@@ -1,8 +1,8 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 9ee3a8c..6c19922 100644
+index cd61797..9c9b254 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -96,7 +96,7 @@ export function App() {
+@@ -104,7 +104,7 @@ export function App() {
  
        {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
  

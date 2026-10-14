@@ -1,5 +1,5 @@
 diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
-index 8be747f..37225ea 100644
+index 8945aed..a38c3b6 100644
 --- a/site/src/bytes.tsx
 +++ b/site/src/bytes.tsx
 @@ -19,7 +19,7 @@ export function Compare({
@@ -10,4 +10,4 @@ index 8be747f..37225ea 100644
 +  const word = check.ok || true ? "matches" : unusable ? "cannot be checked" : "does not match"
    return (
      <div className="space-y-1" data-compare={label} data-ok={check.ok ? "yes" : "no"}>
-       <Row name={expectedLabel} value={check.expected} />
+       {/* No recorded value (no item id was given): the empty row is left out, not shown blank. */}

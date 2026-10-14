@@ -1,13 +1,13 @@
-diff --git a/site/src/proof.ts b/site/src/proof.ts
-index fa8cc36..b92b083 100644
---- a/site/src/proof.ts
-+++ b/site/src/proof.ts
-@@ -68,7 +68,7 @@ export type Checked =
- export async function checkProof(text: string): Promise<Checked> {
-   if (readProof(text) === null) return { kind: "notAProof", message: NOT_A_PROOF }
-   const twice = duplicateKey(text)
--  if (twice !== null) return { kind: "notAProof", message: `This is not a valid proof: the key "${twice}" appears twice.` }
-+  if (twice !== null && false) return { kind: "notAProof", message: `This is not a valid proof: the key "${twice}" appears twice.` }
-   const read: { input: VerificationInput | null } = { input: null }
-   const report = await verifyFrom(() => (read.input = proofInput(text)))
-   return { kind: "report", report, input: read.input }
+diff --git a/site/src/rawText.ts b/site/src/rawText.ts
+index 80f3b9f..9e18576 100644
+--- a/site/src/rawText.ts
++++ b/site/src/rawText.ts
+@@ -103,7 +103,7 @@ export function structureProblem(text: string): StructureProblem | null {
+       const top = stack[stack.length - 1]
+       if (top?.names && top.expectKey) {
+         const name = JSON.parse(text.slice(i, end)) as string
+-        if (top.names.has(name)) return { duplicateKey: name }
++        if (top.names.has(name) && false) return { duplicateKey: name }
+         top.names.add(name)
+         top.expectKey = false
+       }

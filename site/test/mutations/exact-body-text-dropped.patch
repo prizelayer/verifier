@@ -1,5 +1,5 @@
 diff --git a/site/src/proof.ts b/site/src/proof.ts
-index fa8cc36..c86ca56 100644
+index 0180fb8..029b55c 100644
 --- a/site/src/proof.ts
 +++ b/site/src/proof.ts
 @@ -35,7 +35,7 @@ export function proofInput(text: string): VerificationInput {

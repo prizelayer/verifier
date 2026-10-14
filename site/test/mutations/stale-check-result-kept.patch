@@ -1,11 +1,11 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 9ee3a8c..6059946 100644
+index cd61797..27804e0 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -28,7 +28,7 @@ export function App() {
-     setRunning(true)
-     const result = await checkProof(proof)
-     setRunning(false)
+@@ -36,7 +36,7 @@ export function App() {
+     } finally {
+       setRunning(false)
+     }
 -    if (proof !== current.current) return
 +    if (proof !== current.current && false) return
      setChecked(result)

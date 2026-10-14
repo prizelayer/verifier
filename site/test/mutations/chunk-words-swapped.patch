@@ -1,8 +1,8 @@
 diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
-index 8be747f..c805cdc 100644
+index 8945aed..1430d45 100644
 --- a/site/src/bytes.tsx
 +++ b/site/src/bytes.tsx
-@@ -91,7 +91,7 @@ export function ByteGroups({ caption, groups }: { caption: string; groups: ByteG
+@@ -92,7 +92,7 @@ export function ByteGroups({ caption, groups }: { caption: string; groups: ByteG
  
  const VERDICT_WORDS: Record<ChunkVerdict["verdict"], string> = {
    accepted: "used",
