@@ -4,8 +4,12 @@
 in your own browser, with no network access and no dependencies. It does not ask PrizeLayer whether
 a draw was fair — it works the answer out from the same bytes the engine used.
 
+The package is not published to npm. Build it from this repository; the result is one file,
+`dist/verifier.js`, with no imports:
+
 ```
-npm install @prizelayer/verifier
+git clone https://github.com/prizelayer/verifier.git && cd verifier
+npm ci && npm run build
 ```
 
 - **Zero runtime dependencies.** Not "few". None. The only thing it uses is Web Crypto, which your
@@ -17,11 +21,12 @@ npm install @prizelayer/verifier
 ## Why this is a separate repository
 
 A `/verify` endpoint on PrizeLayer's own servers would be PrizeLayer marking its own homework. The
-verification has to run somewhere they don't control, from code that isn't theirs to change at the
-moment you're looking at it. So this ships from its own public repository, on its own build, with a
-permissive licence — and you can read all of it, in one file, without access to anything else.
+verification has to run somewhere they don't control. So this ships from its own public repository,
+on its own build, with a permissive licence — and you can read all of it, in one file, without access
+to anything else. That narrows what you have to trust; it does not remove PrizeLayer from it.
+PrizeLayer wrote this code, so you still have to read it, or trust someone who did.
 
-## What it proves
+## What it checks
 
 ```ts
 import { verify, parseEdition } from '@prizelayer/verifier';
@@ -42,26 +47,51 @@ const report = await verify({
   snapshot: parseSnapshotBody(publishedSnapshotBody),
 });
 
-report.ok;      // true only if every check below passed
-report.summary; // one line, safe to show a player
-report.caveats; // what this run did NOT prove — show these next to any pass
-report.trace;   // every intermediate value, so you can check the workings by hand
+report.ok;          // true only if status is 'verified'
+report.status;      // 'verified' | 'failed' | 'pending' | 'invalid'
+report.firstFailure; // the first failing check, its step (1 to 4) and the input it names
+report.notRun;      // every check that did not run, and why
+report.summary;     // one line, safe to show a player
+report.caveats;     // what this run did NOT prove — show these next to any pass
+report.trace;       // every intermediate value, so you can check the workings by hand
 ```
+
+`verify()` never throws. What it returns, with an example of each:
+
+- **`verified`** — every check that ran passed, and the commitment, the odds, the draw and the
+  slot all ran. Checks that did not run (no snapshot, no item id) are listed in `notRun`, and
+  `caveats` says what that leaves unproven.
+- **`failed`** — a check did not match, or an input it needed is unusable. Change one chance in the
+  odds table from `250000` to `250001` and the table sums to 1,000,001: `editionFingerprint` fails
+  with `error` explaining the sum and `field: 'edition'`, `firstFailure.step` is `2`, and the
+  commitment and the draw are still recomputed and shown.
+- **`pending`** — `serverSeedHex` is `null` because the seed pair has not retired yet, and every
+  check that could run passed. The odds and the snapshot are checked; the commitment, the draw and
+  the slot are in `notRun`; a commitment that is not 64 hex characters already fails here. If one
+  of the checks that ran fails — odds that do not match their
+  fingerprint, say — the status is `failed`, not `pending`.
+- **`invalid`** — the input could not be read at all, so nothing was checked. `invalid.message`
+  says why in plain words and names the input (`commitmentHex is missing or has the wrong type`);
+  a missing `serverSeedHex` is `invalid`, because only `null` means "not revealed yet". When the
+  refusal came from the runtime rather than from this library, its text is in `invalid.detail`. Use `verifyFrom(() => ({ ...parsed input... }))` to have refusals from `parseEdition`
+  and `parseSnapshotBody` reported the same way.
 
 Up to **seven** independent claims are checked, and every one of them must hold:
 
 | Check | What a failure would mean |
 |---|---|
-| `commitment` | `SHA-256(revealed seed)` doesn't match the hash published *before* you played — the seed was chosen after the fact. |
+| `commitment` | `SHA-256(revealed seed)` doesn't match the commitment published for this seed pair — the revealed seed is not the committed one. |
 | `editionFingerprint` | The odds you were shown aren't the odds that were frozen when the box was published. |
 | `drawnPpmValue` | The recorded random value isn't what the seed actually produces. |
 | `drawnSlotIndex` | The value doesn't land on the slot you were given. |
 | `snapshotHash` | The prize table you were shown isn't the one recorded against your win. |
-| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified. |
-| `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew. |
+| `snapshotEditionLink` | That prize table belongs to a **different** edition than the odds just verified, or it does not list exactly that edition's slots `0..n-1` (a slot left out, or one added). |
+| `drawnItemId` | The item you were given isn't the item that table puts in the slot you drew, or the table has no entry for that slot. The second case fails even when no item id was given. |
 
-The last three appear only when you pass a `snapshot`. Leave it out and they are absent — and
-`report.caveats` says, in plain language, that the item was never checked. A verifier that prints
+The last three run only when you pass a `snapshot`. Leave it out and they are listed in
+`report.notRun` — and `report.caveats` says, in plain language, that the item was never checked.
+Pass a snapshot without `expected.itemId` and the snapshot is checked but the item is not compared;
+that is reported the same way, never as a pass. A verifier that prints
 green about a link it never looked at is worse than one that stays silent.
 
 ### The second check is the one that matters
@@ -82,18 +112,18 @@ fingerprint recorded on the win. If someone swapped the odds, the fingerprint wo
 
 ### And the slot is a position, not a prize
 
-Verifying the draw and the odds proves you legitimately won *slot 2* at its honest 5%. It says
-nothing about what was in slot 2.
+Checking the draw and the odds shows that the revealed seed lands on *slot 2*, under odds that
+match the fingerprint recorded on the win (5% for that slot). It says nothing about what was in slot 2.
 
-That gap is real and it survives every check above. An operator can run a genuinely fair draw, on
-genuinely fair odds, land you on a real slot — and then hand you a £20 voucher while reporting that
+That gap is real and it survives every check above. An operator can serve a draw and odds that pass
+every check above, land you on a real slot — and then hand you a £20 voucher while reporting that
 slot 2 was always a £20 voucher. Four green checks, one substituted prize.
 
 Closing it is what the `0x03` snapshot preimage is for. It pins which item filled which slot at
 which displayed value, and it **opens with the raw bytes of the edition fingerprint** — so a
 snapshot is bound to one specific set of odds and cannot be lifted from another edition. Pass the
-published snapshot to `verify()` and the chain runs all the way from the seed to the thing in your
-hands.
+published snapshot to `verify()` and the chain runs all the way from the seed to the item recorded
+for your win.
 
 ## The algorithms, in full
 
@@ -101,9 +131,15 @@ Nothing here is secret. You can implement it yourself and check this library too
 
 ### 1. The commitment
 
-Before you play, you're shown `SHA-256(server_seed)`. The seed stays hidden until the seed pair
-retires. Because SHA-256 can't be reversed or collided in practice, the operator is locked into a
-seed they chose before knowing anything about your play.
+For each seed pair the operator publishes `SHA-256(server_seed)`, the commitment. The seed stays
+hidden until the seed pair retires. This library checks that the revealed seed hashes to the
+commitment published for its seed pair. Because SHA-256 can't be reversed or collided in practice,
+no other seed can match.
+
+What it cannot check is *when* the commitment was published. A commitment locks the operator to a
+seed only from the moment you saw it. If you were shown it before you played, the seed was fixed
+before your play. If you were not, that ordering rests on the operator's own records, which this
+library does not read.
 
 ### 2. The draw
 
@@ -179,9 +215,12 @@ implementations; "it passed in Node" says nothing about the engine your players 
 
 | Export | |
 |---|---|
-| `verify(input)` | The whole check. Returns `{ ok, checks, trace, summary }`. |
-| `derive(seed, clientSeed, nonce)` | The derivation loop, with the full rejection trace. |
+| `verify(input)` | The whole check. Returns `{ ok, status, firstFailure, notRun, checks, trace, caveats, summary }`. Never throws. |
+| `verifyFrom(build)` | `verify()`, with the parsing done inside `build` and its refusals reported as `invalid`. |
+| `derive(seed, clientSeed, nonce)` | The derivation loop, with the full trace: every chunk of every attempt, and what the loop did with it. |
 | `slotFor(v, slots)` | The cumulative lookup. Sorts by `slotIndex` itself. |
+| `cumulativeTable(slots)` | The same lookup as a table: slot `i` owns every `v` with `from <= v < to`. |
+| `CHECK_NAMES` / `STEP_OF` | The checks in reading order, and the step (1 to 4) each belongs to. |
 | `editionBytes(edition)` | The canonical `0x01` preimage, for inspection. |
 | `editionFingerprint(edition)` | `SHA-256` of the above, lowercase hex. |
 | `commitment(seedBytes)` | `SHA-256` of the raw seed. |

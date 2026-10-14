@@ -16,6 +16,7 @@ import {
   CHUNK_OFFSETS,
   PPM_TOTAL,
   SERVER_SEED_BYTES,
+  bigEndianUint32,
   bytesFromHex,
   commitment,
   derive,
@@ -29,6 +30,7 @@ import {
   snapshotBytes,
   snapshotHash,
   verify,
+  verifyFrom,
 } from '../src/verifier.js';
 
 const FIXTURE = JSON.parse(
@@ -77,8 +79,8 @@ function asJsonb(bodyText: string): string {
  * The loops below iterate the fixture directly, so within a family no vector can be missed. The
  * gap this ledger closes is one level up: the families themselves are named by hand, so a NEW
  * family added on the platform side would be ignored here in silence — and both repositories would
- * stay green while the verifier proved strictly less than the fixture claims. KAN-50 (the 0x03
- * snapshot preimage, which binds a slot to the item in it) is headed for exactly that shape.
+ * stay green while the verifier proved strictly less than the fixture claims. The 0x03 snapshot
+ * preimage, which binds a slot to the item in it, arrived in exactly that shape.
  *
  * Recorded at the top of each test body rather than the bottom, so a vector that fails its
  * assertions still counts as attempted and reports one clear failure instead of two.
@@ -330,11 +332,16 @@ describe('the snapshot content address — the 0x03 preimage', () => {
 });
 
 describe('verify() end to end', () => {
-  /** The §7 seed and nonce 1, drawn against the pinned golden edition. */
-  async function input(overrides: Record<string, unknown> = {}) {
-    const vector = FIXTURE.editionFingerprint.vectors.find(
+  /** The pinned golden edition every end-to-end case draws against. */
+  function canonicalEditionVector() {
+    return FIXTURE.editionFingerprint.vectors.find(
       (v: { id: string }) => v.id === 'canonical-unsorted-slots',
     );
+  }
+
+  /** The §7 seed and nonce 1, drawn against the pinned golden edition. */
+  async function input(overrides: Record<string, unknown> = {}) {
+    const vector = canonicalEditionVector();
     const edition = parseEdition({ ...vector.edition, slots: vector.edition.slotsAsGiven });
     // `expected` is merged field-by-field and applied LAST: spreading `overrides` wholesale would
     // replace the entire expected block, so a test overriding one claim would silently blank the
@@ -391,15 +398,15 @@ describe('verify() end to end', () => {
     const report = await verify(await input());
 
     assert.equal(report.ok, true);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.editionFingerprint.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
-    assert.equal(report.checks.drawnSlotIndex.ok, true);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.equal(report.checks.drawnSlotIndex?.ok, true);
 
     assert.equal(report.trace.message, 'alice-seed:1:0');
     assert.equal(report.trace.hmacHex, FIXTURE.draw.vectors[0].hmacHex);
     assert.equal(report.trace.value, 186_669);
-    assert.equal(report.trace.computedEditionFingerprint, report.checks.editionFingerprint.expected);
+    assert.equal(report.trace.computedEditionFingerprint, report.checks.editionFingerprint?.expected);
     assert.match(report.summary, /^Verified:/);
   });
 
@@ -407,7 +414,7 @@ describe('verify() end to end', () => {
     const report = await verify(await input({ commitmentHex: 'ab'.repeat(32) }));
 
     assert.equal(report.ok, false);
-    assert.equal(report.checks.commitment.ok, false);
+    assert.equal(report.checks.commitment?.ok, false);
     assert.match(report.summary, /^FAILED: commitment/);
   });
 
@@ -417,9 +424,9 @@ describe('verify() end to end', () => {
     const report = await verify(await input({ expected: { editionFingerprint: 'cd'.repeat(32) } }));
 
     assert.equal(report.ok, false);
-    assert.equal(report.checks.editionFingerprint.ok, false);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
   });
 
   it('says plainly which item it did NOT verify when no snapshot is supplied', async () => {
@@ -447,7 +454,7 @@ describe('verify() end to end', () => {
   });
 
   it('fails when the item recorded on the win is not the item in the drawn slot', async () => {
-    // THE attack KAN-50 exists to stop: a genuinely fair draw, on genuinely fair odds, landing on
+    // THE attack the prize-list check exists to stop: a draw and odds that pass every check, landing on
     // a real slot — and then a different, cheaper prize reported for it. Every check that existed
     // before this story still passes.
     const report = await verify(
@@ -456,10 +463,10 @@ describe('verify() end to end', () => {
 
     assert.equal(report.ok, false);
     assert.equal(report.checks.drawnItemId?.ok, false);
-    assert.equal(report.checks.commitment.ok, true);
-    assert.equal(report.checks.editionFingerprint.ok, true);
-    assert.equal(report.checks.drawnPpmValue.ok, true);
-    assert.equal(report.checks.drawnSlotIndex.ok, true);
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.equal(report.checks.drawnSlotIndex?.ok, true);
     assert.equal(report.checks.snapshotHash?.ok, true);
     assert.match(report.summary, /^FAILED: drawnItemId/);
   });
@@ -498,15 +505,393 @@ describe('verify() end to end', () => {
     assert.equal(report.checks.snapshotHash?.ok, true, 'the foreign snapshot hashes correctly — that is the point');
   });
 
-  it('refuses to pretend when a snapshot arrives without the claims to check it against', async () => {
-    // The key is REMOVED, not set to undefined: `exactOptionalPropertyTypes` makes those two
-    // different types, and it is the absent-key case a real caller produces.
+  it('checks the snapshot but does not pretend about the item when no item id is supplied', async () => {
+    // A lookup by win id alone fetches the published snapshot but has no item to compare. That is an
+    // honest input, so it must not fail — and it must not pass the item either. The key is REMOVED,
+    // not set to undefined: `exactOptionalPropertyTypes` makes those two different types, and it is
+    // the absent-key case a real caller produces.
     const base = await inputWithSnapshot();
     const { itemId: _omitted, ...expectedWithoutItem } = base.expected;
-    await assert.rejects(
-      () => verify({ ...base, expected: expectedWithoutItem }),
-      /expected.snapshotHash and expected.itemId are required/,
+    const report = await verify({ ...base, expected: expectedWithoutItem });
+
+    assert.equal(report.status, 'verified');
+    assert.equal(report.ok, true);
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.equal(report.checks.drawnItemId, undefined);
+    assert.deepEqual(report.notRun.map((n) => n.check), ['drawnItemId']);
+    assert.equal(report.trace.itemIdInDrawnSlot, base.expected.itemId);
+    assert.equal(report.caveats.length, 1);
+    assert.match(report.caveats[0], /NOT VERIFIED: the item recorded for this win/);
+    assert.match(report.summary, /NOT compared/);
+  });
+
+  it('still catches a tampered snapshot when no item id is supplied', async () => {
+    // "Not checked" for the item must never hide a broken prize table.
+    const vector = snapshotVector();
+    const tampered = parseSnapshot({
+      editionFingerprint: vector.editionFingerprint,
+      slots: vector.slotsAsGiven.map((s: Record<string, unknown>, i: number) =>
+        i === 0 ? { ...s, displayedValueCents: '1' } : s,
+      ),
+    });
+    const base = await inputWithSnapshot({ snapshot: tampered });
+    const { itemId: _omitted, ...expectedWithoutItem } = base.expected;
+    const report = await verify({ ...base, expected: expectedWithoutItem });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.snapshotHash?.ok, false);
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.firstFailure?.step, 4);
+  });
+
+  it('fails, rather than throws, when a snapshot arrives without the hash recorded on the win', async () => {
+    const base = await inputWithSnapshot();
+    const { snapshotHash: _omitted, ...expectedWithoutHash } = base.expected;
+    const report = await verify({ ...base, expected: expectedWithoutHash });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.snapshotHash?.ok, false);
+    assert.equal(report.checks.snapshotHash?.field, 'expected.snapshotHash');
+  });
+
+  it('lists every check that did not run, with a reason, when no snapshot is supplied', async () => {
+    const report = await verify(await input());
+
+    assert.equal(report.status, 'verified');
+    assert.deepEqual(
+      report.notRun.map((n) => n.check),
+      ['snapshotHash', 'snapshotEditionLink', 'drawnItemId'],
     );
+    assert.ok(report.notRun.every((n) => n.reason.length > 0));
+  });
+
+  it('traces the cumulative table a reader can check by hand', async () => {
+    // The golden edition: slots 0 and 1 hold 25% each, slot 2 holds 50%.
+    const report = await verify(await input());
+
+    assert.deepEqual(report.trace.cumulative, [
+      { slotIndex: 0, probabilityPpm: 250_000, from: 0, to: 250_000 },
+      { slotIndex: 1, probabilityPpm: 250_000, from: 250_000, to: 500_000 },
+      { slotIndex: 2, probabilityPpm: 500_000, from: 500_000, to: 1_000_000 },
+    ]);
+    const row = report.trace.cumulative?.find((r) => r.slotIndex === report.trace.computedSlotIndex);
+    assert.ok(row && row.from <= 186_669 && 186_669 < row.to, 'the drawn value lies in the drawn row');
+  });
+
+  it('traces all eight chunks of an accepted first chunk', async () => {
+    const report = await verify(await input());
+    const hmac = bytesFromHex(FIXTURE.draw.vectors[0].hmacHex);
+
+    assert.deepEqual(
+      report.trace.chunks,
+      CHUNK_OFFSETS.map((offset, i) => ({
+        attempt: 0,
+        offset,
+        chunk: bigEndianUint32(hmac, offset),
+        verdict: i === 0 ? 'accepted' : 'not-reached',
+      })),
+    );
+  });
+
+  for (const vector of FIXTURE.draw.vectors.filter((v: { rejected: unknown[] }) => v.rejected.length > 0)) {
+    it(`traces rejected, accepted and unread chunks for ${vector.id}`, async () => {
+      const derivation = await derive(SERVER_SEED, vector.clientSeed, vector.nonce);
+      const hmac = bytesFromHex(vector.hmacHex);
+      const expected = CHUNK_OFFSETS.map((offset) => ({
+        attempt: vector.attempt,
+        offset,
+        chunk: bigEndianUint32(hmac, offset),
+        verdict: offset < vector.offset ? 'rejected' : offset === vector.offset ? 'accepted' : 'not-reached',
+      }));
+
+      assert.deepEqual(derivation.chunks, expected);
+      // The rejected entries are the fixture's own rejected list, verdict for verdict.
+      assert.deepEqual(
+        derivation.chunks.filter((c) => c.verdict === 'rejected').map(({ verdict: _v, ...c }) => c),
+        vector.rejected,
+      );
+    });
+  }
+
+  it('fails at step 2, and keeps steps 1 and 3, when the chances do not add up', async () => {
+    // One ppm value changed from 250000 to 250001: the table now sums to 1,000,001. That used to
+    // throw before any check existed; it is a broken claim about the odds, so it fails step 2.
+    const vector = canonicalEditionVector();
+    const broken = parseEdition({
+      ...vector.edition,
+      slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
+        s.slotIndex === 0 ? { ...s, probabilityPpm: 250_001 } : s,
+      ),
+    });
+    const report = await verify(await input({ edition: broken }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.checks.editionFingerprint?.field, 'edition');
+    assert.match(report.checks.editionFingerprint?.error ?? '', /must sum to 1000000, was 1000001/);
+    assert.deepEqual(
+      { check: report.firstFailure?.check, step: report.firstFailure?.step, field: report.firstFailure?.field },
+      { check: 'editionFingerprint', step: 2, field: 'edition' },
+    );
+    assert.equal(report.checks.commitment?.ok, true);
+    assert.equal(report.checks.drawnPpmValue?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnSlotIndex'));
+    assert.equal(report.trace.cumulative, undefined);
+  });
+
+  it('fails at step 1 when the revealed seed is not 32 bytes', async () => {
+    const report = await verify(await input({ serverSeedHex: FIXTURE.draw.serverSeedHex.slice(0, 62) }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.checks.commitment?.ok, false);
+    assert.equal(report.checks.commitment?.field, 'serverSeedHex');
+    assert.equal(report.firstFailure?.step, 1);
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnPpmValue'));
+  });
+
+  for (const [field, overrides] of [
+    ['clientSeed', { clientSeed: 'alice seed' }],
+    ['nonce', { nonce: 0 }],
+  ] as const) {
+    it(`fails at step 3, naming ${field}, when ${field} is not a value the engine accepts`, async () => {
+      const report = await verify(await input(overrides));
+
+      assert.equal(report.status, 'failed');
+      assert.equal(report.checks.commitment?.ok, true);
+      assert.equal(report.checks.drawnPpmValue?.ok, false);
+      assert.equal(report.checks.drawnPpmValue?.field, field);
+      assert.equal(report.firstFailure?.step, 3);
+    });
+  }
+
+  it('is pending, not failed and not passed, while the seed is not revealed', async () => {
+    const report = await verify(await input({ serverSeedHex: null }));
+
+    assert.equal(report.status, 'pending');
+    assert.equal(report.ok, false);
+    assert.equal(report.firstFailure, undefined);
+    assert.equal(report.checks.editionFingerprint?.ok, true, 'the odds are checked before the reveal');
+    assert.equal(report.checks.commitment, undefined);
+    assert.deepEqual(
+      report.notRun.filter((n) => /not been revealed/.test(n.reason)).map((n) => n.check),
+      ['commitment', 'drawnPpmValue', 'drawnSlotIndex'],
+    );
+    assert.ok(report.caveats.some((c) => /NOT VERIFIED: the draw/.test(c)));
+    assert.match(report.summary, /^PENDING:/);
+  });
+
+  it('checks the snapshot of a pending open, and leaves its item for later', async () => {
+    const report = await verify(await inputWithSnapshot({ serverSeedHex: null }));
+
+    assert.equal(report.status, 'pending');
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.equal(report.checks.drawnItemId, undefined);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnItemId' && /not been revealed/.test(n.reason)));
+  });
+
+  it('fails, rather than stays pending, when the odds do not match and the seed is not revealed', async () => {
+    // A check that ran and failed fails the open, whatever is still pending: odds that do not match
+    // their fingerprint cannot be rescued by any seed revealed later.
+    // Chances moved between two slots: the sum is still 1,000,000, so only the fingerprint can see it.
+    const vector = canonicalEditionVector();
+    const swapped = parseEdition({
+      ...vector.edition,
+      slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
+        s.slotIndex === 0 ? { ...s, probabilityPpm: 240_000 } : s.slotIndex === 1 ? { ...s, probabilityPpm: 260_000 } : s,
+      ),
+    });
+    const report = await verify(await input({ serverSeedHex: null, edition: swapped }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.ok, false);
+    assert.equal(report.checks.editionFingerprint?.ok, false);
+    assert.equal(report.firstFailure?.check, 'editionFingerprint');
+    assert.equal(report.firstFailure?.step, 2);
+    assert.match(report.summary, /^FAILED: editionFingerprint did not match/);
+    // The checks that need the seed are still reported as not run, with the reason.
+    assert.deepEqual(
+      report.notRun.filter((n) => /not been revealed/.test(n.reason)).map((n) => n.check),
+      ['commitment', 'drawnPpmValue', 'drawnSlotIndex'],
+    );
+  });
+
+  it('fails, rather than stays pending, when the prize list does not match its hash', async () => {
+    const good = await inputWithSnapshot({ serverSeedHex: null });
+    const snapshot = { ...good.snapshot, slots: good.snapshot.slots.map((s, i) => (i === 0 ? { ...s, displayedValueCents: s.displayedValueCents + 1n } : s)) };
+    const report = await verify({ ...good, snapshot });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.checks.snapshotEditionLink?.ok, true);
+    assert.ok(report.notRun.some((n) => n.check === 'commitment' && /not been revealed/.test(n.reason)));
+  });
+
+  it('fails, rather than stays pending, when the prize list belongs to another edition', async () => {
+    const good = await inputWithSnapshot({ serverSeedHex: null });
+    const foreign = { ...good.snapshot, editionFingerprint: 'ab'.repeat(32) };
+    const report = await verify({ ...good, snapshot: foreign, expected: { ...good.expected, snapshotHash: await snapshotHash(foreign) } });
+
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
+  });
+
+  it('fails a pending open whose commitment can never match: not 64 hex characters', async () => {
+    const report = await verify(await input({ serverSeedHex: null, commitmentHex: 'not hex' }));
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'commitment');
+    assert.equal(report.firstFailure?.field, 'commitmentHex');
+  });
+
+  it('names the earliest step when several checks fail', async () => {
+    // A different seed breaks the commitment (step 1) and, through it, the drawn value (step 3).
+    const report = await verify(await input({ serverSeedHex: 'ab'.repeat(32) }));
+
+    assert.equal(report.checks.commitment?.ok, false);
+    assert.equal(report.checks.drawnPpmValue?.ok, false);
+    assert.equal(report.firstFailure?.check, 'commitment');
+    assert.equal(report.firstFailure?.step, 1);
+  });
+
+  it('looks the item up in the slot the maths chose, not the slot that was claimed', async () => {
+    const good = await inputWithSnapshot();
+    const report = await verify({ ...good, expected: { ...good.expected, drawnSlotIndex: 2 } });
+    const computedSlot = report.trace.computedSlotIndex;
+
+    assert.notEqual(computedSlot, 2);
+    assert.equal(
+      report.trace.itemIdInDrawnSlot,
+      good.snapshot.slots.find((s) => s.slotIndex === computedSlot)?.currentItemId.toLowerCase(),
+    );
+  });
+
+  it('compares items as the bytes the hash covers: an id without hyphens is the same item', async () => {
+    const good = await inputWithSnapshot();
+    const bare = { ...good.snapshot, slots: good.snapshot.slots.map((s) => ({ ...s, currentItemId: s.currentItemId.replace(/-/g, '') })) };
+    assert.equal(await snapshotHash(bare), good.expected.snapshotHash);
+    const report = await verify({ ...good, snapshot: bare });
+
+    assert.equal(report.status, 'verified');
+    assert.equal(report.checks.drawnItemId?.ok, true);
+  });
+
+  /** The canonical snapshot with the drawn slot left out, and the hash of that shorter list. */
+  async function withoutDrawnSlot(overrides: Record<string, unknown> = {}) {
+    const good = await inputWithSnapshot(overrides);
+    const drawn = good.expected.drawnSlotIndex;
+    const shorter = { ...good.snapshot, slots: good.snapshot.slots.filter((s) => s.slotIndex !== drawn) };
+    return { ...good, snapshot: shorter, expected: { ...good.expected, snapshotHash: await snapshotHash(shorter) } };
+  }
+
+  // A server drops the slot you won from the prize list and records the hash of the shorter list.
+  // Both hashes then agree, so only the slot rules below can see it.
+  for (const [what, itemId] of [
+    ['no item id', undefined],
+    ['the item id of the drawn slot', 'canonical'],
+    ['an item id equal to the old stand-in text', '(no such slot in the published snapshot)'],
+  ] as const) {
+    it(`fails a prize list with no entry for the drawn slot, with ${what}`, async () => {
+      const input = await withoutDrawnSlot();
+      const expected = { ...input.expected } as Record<string, unknown>;
+      if (itemId === undefined) delete expected.itemId;
+      else if (itemId !== 'canonical') expected.itemId = itemId;
+      const report = await verify({ ...input, expected } as typeof input);
+
+      assert.equal(report.checks.snapshotHash?.ok, true);
+      assert.equal(report.status, 'failed');
+      assert.equal(report.checks.snapshotEditionLink?.ok, false);
+      assert.equal(report.checks.snapshotEditionLink?.field, 'snapshot.slots');
+      assert.equal(report.checks.drawnItemId?.ok, false);
+      assert.equal(report.checks.drawnItemId?.error, `the prize list has no entry for slot ${input.expected.drawnSlotIndex}`);
+      assert.equal(report.trace.itemIdInDrawnSlot, undefined);
+    });
+  }
+
+  it('fails a prize list that lists a slot the box does not have', async () => {
+    const good = await inputWithSnapshot();
+    const extra = { ...good.snapshot, slots: [...good.snapshot.slots, { ...good.snapshot.slots[0], slotIndex: 9 }] };
+    const report = await verify({ ...good, snapshot: extra, expected: { ...good.expected, snapshotHash: await snapshotHash(extra) } });
+
+    assert.equal(report.checks.snapshotHash?.ok, true);
+    assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
+    assert.equal(report.firstFailure?.field, 'snapshot.slots');
+    assert.equal(report.checks.drawnItemId?.ok, true);
+  });
+
+  it('reads broken JSON in a snapshot body as "not valid JSON", not as a wrong type', async () => {
+    const base = await input();
+    const report = await verifyFrom(() => ({ ...base, snapshot: parseSnapshotBody('{"slots": [') }));
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.invalid?.message, 'the input could not be read: it is not valid JSON');
+    assert.ok(report.invalid?.detail);
+  });
+
+  it('treats a null snapshot hash like an absent one: the prize-list step fails by name', async () => {
+    const good = await inputWithSnapshot();
+    const report = await verify({ ...good, expected: { ...good.expected, snapshotHash: null as unknown as string } });
+
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'snapshotHash');
+    assert.equal(report.firstFailure?.field, 'expected.snapshotHash');
+  });
+
+  it('refuses a missing seed as invalid, by name: only null means "not revealed yet"', async () => {
+    const base = await input();
+    const report = await verify({ ...base, serverSeedHex: undefined as unknown as string });
+
+    assert.equal(report.status, 'invalid');
+    assert.match(report.invalid?.message ?? '', /^serverSeedHex /);
+  });
+
+  for (const [what, broken] of [
+    ['commitmentHex', { commitmentHex: undefined }],
+    ['expected.itemId', { expected: { itemId: null } }],
+    ['snapshot.slots', { snapshot: { editionFingerprint: 'ab'.repeat(32), slots: {} } }],
+  ] as const) {
+    it(`names ${what} when it is missing or of the wrong type, in plain words`, async () => {
+      const report = await verify((await inputWithSnapshot(broken as Record<string, unknown>)) as never);
+
+      assert.equal(report.status, 'invalid');
+      assert.equal(report.invalid?.message, `${what} is missing or has the wrong type`);
+      assert.equal(report.invalid?.detail, undefined);
+    });
+  }
+
+  it('keeps a runtime error out of the message, in invalid.detail only', async () => {
+    const report = await verifyFrom(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'x')");
+    });
+
+    assert.equal(report.status, 'invalid');
+    assert.doesNotMatch(report.invalid?.message ?? '', /Cannot read properties/);
+    assert.match(report.invalid?.detail ?? '', /Cannot read properties/);
+  });
+
+  it('reports an input it cannot read as invalid instead of throwing', async () => {
+    const base = await input();
+    // No `expected` block at all: there is nothing to check against, so no step can be named.
+    const report = await verify({ ...base, expected: undefined as unknown as typeof base.expected });
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.ok, false);
+    assert.ok(report.invalid?.message);
+    assert.match(report.summary, /^CANNOT CHECK:/);
+    assert.equal(report.notRun.length, 7);
+  });
+
+  it('turns a refusal while parsing into an invalid report', async () => {
+    const base = await input();
+    const report = await verifyFrom(() => ({ ...base, edition: parseEdition({ slots: {} }) }));
+
+    assert.equal(report.status, 'invalid');
+    assert.equal(report.ok, false);
+    assert.equal(report.invalid?.message, 'edition.slots must be an array');
   });
 });
 

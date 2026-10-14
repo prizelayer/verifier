@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..8863b45 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -974,7 +974,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+       trace.computedSnapshotHash = computedSnapshotHash;
+       checks.snapshotHash =
+         expectedHash === undefined
+-          ? unusable('', 'expected.snapshotHash', 'a snapshot was supplied without the snapshot hash recorded on the win')
++          ? check('', '')
+           : check(expectedHash, computedSnapshotHash);
+     }
+ 

@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index b9e234d..70d838f 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -998,7 +998,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     } else {
+       // The fingerprint inside the list AND the slots it lists: exactly the box's slots 0..n-1. A
+       // list that leaves a slot out can otherwise hash cleanly and say nothing about that slot.
+-      const link = check(computedFingerprint, snapshot.editionFingerprint.toLowerCase());
++      const link = check(computedFingerprint, seedRevealed ? snapshot.editionFingerprint.toLowerCase() : computedFingerprint);
+       const boxSlots = input.edition.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+       const listSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
+       checks.snapshotEditionLink =

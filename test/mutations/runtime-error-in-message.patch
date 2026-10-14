@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index b9e234d..0073d98 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1111,7 +1111,7 @@ function failureOf(name: CheckName, failed: Check): Failure {
+ function invalidReport(error: unknown): VerificationReport {
+   // Only this library's own refusals are worded for a reader. Anything else (a TypeError from a
+   // value of the wrong type) keeps its runtime text in `detail`, never in the message.
+-  const own = error instanceof Error && error.constructor === Error;
++  const own = error instanceof Error;
+   const message = own
+     ? error.message
+     : error instanceof SyntaxError

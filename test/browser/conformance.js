@@ -163,6 +163,21 @@ export async function runConformance(fixture) {
   eq('verifyWithSnapshot.item', withSnapshot.checks.drawnItemId.ok, true);
   eq('verifyWithSnapshot.chain', withSnapshot.checks.snapshotEditionLink.ok, true);
   eq('verifyWithSnapshot.caveats', withSnapshot.caveats.length, 0);
+  eq('verifyWithSnapshot.status', withSnapshot.status, 'verified');
+
+  // A seed that is not revealed yet is the state most lookups meet first. The odds must still be
+  // checked, in the browser's own Web Crypto, and the report must not pass.
+  const pending = await verify({
+    serverSeedHex: null,
+    commitmentHex: fixture.draw.commitmentHex,
+    clientSeed: 'alice-seed',
+    nonce: 1,
+    edition,
+    expected: { editionFingerprint: golden.editionFingerprint, drawnPpmValue: 186669, drawnSlotIndex: drawnSlot },
+  });
+  eq('verifyPending.status', pending.status, 'pending');
+  eq('verifyPending.ok', pending.ok, false);
+  eq('verifyPending.fingerprint', pending.checks.editionFingerprint.ok, true);
 
   // --- the same fail-closed completeness check the Node suite makes ---
   // Without it the guarantee would hold in Node only: a family added on the platform side would

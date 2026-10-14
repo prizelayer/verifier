@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..28a957c 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -975,7 +975,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+       checks.snapshotHash =
+         expectedHash === undefined
+           ? unusable('', 'expected.snapshotHash', 'a snapshot was supplied without the snapshot hash recorded on the win')
+-          : check(expectedHash, computedSnapshotHash);
++          : check(expectedHash, input.expected.itemId === undefined ? expectedHash : computedSnapshotHash);
+     }
+ 
+     if (computedFingerprint === undefined) {

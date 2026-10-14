@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..e18cc1a 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -924,7 +924,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+   let derivation: Derivation | undefined;
+   if (input.serverSeedHex === null) {
+     // Its shape needs no seed: a commitment that is not 64 hex characters can never be matched.
+-    if (/^[0-9a-f]{64}$/i.test(input.commitmentHex)) skip('commitment', SEED_NOT_REVEALED);
++    if (input.commitmentHex !== null) skip('commitment', SEED_NOT_REVEALED);
+     else checks.commitment = unusable(input.commitmentHex, 'commitmentHex', 'the commitment must be 64 hex characters');
+     skip('drawnPpmValue', SEED_NOT_REVEALED);
+   } else {

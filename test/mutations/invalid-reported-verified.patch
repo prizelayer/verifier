@@ -1,0 +1,15 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..f5b2103 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1095,8 +1095,8 @@ function invalidReport(error: unknown): VerificationReport {
+   const invalid: { message: string; detail?: string } = { message };
+   if (!own) invalid.detail = messageOf(error);
+   return {
+-    ok: false,
+-    status: 'invalid',
++    ok: true,
++    status: 'verified',
+     invalid,
+     notRun: CHECK_NAMES.map((check) => ({ check, reason: 'the input could not be read' })),
+     checks: {},

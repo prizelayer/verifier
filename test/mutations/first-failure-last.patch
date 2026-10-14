@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 82ce911..972a2f9 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1049,7 +1049,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     caveats,
+     summary: summaryOf(status, failed, input, trace),
+   };
+-  const first = failed[0];
++  const first = failed[failed.length - 1];
+   if (first !== undefined) report.firstFailure = failureOf(first, checks[first] as Check);
+   return report;
+ }

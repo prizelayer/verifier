@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9fc7248..d434654 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -518,7 +518,7 @@ export function slotFor(v: number, slots: readonly Pick<SlotOdds, 'slotIndex' |
+ export function cumulativeTable(slots: readonly Pick<SlotOdds, 'slotIndex' | 'probabilityPpm'>[]): CumulativeRow[] {
+   let from = 0;
+   return sortedSlots(slots).map((slot) => {
+-    const row = { slotIndex: slot.slotIndex, probabilityPpm: slot.probabilityPpm, from, to: from + slot.probabilityPpm };
++    const row = { slotIndex: slot.slotIndex, probabilityPpm: slot.probabilityPpm, from, to: from + slot.probabilityPpm - 1 };
+     from = row.to;
+     return row;
+   });
