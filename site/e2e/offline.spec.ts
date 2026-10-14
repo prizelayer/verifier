@@ -48,3 +48,23 @@ test("the route catches a network request in this engine", async ({ page, contex
   await page.goto("https://example.org/").catch(() => undefined)
   expect(refused).toEqual(["https://example.org/"])
 })
+
+// A lookup is the one moment the page asks a server, and only after the button. With the network
+// refused, the page must say it could not reach us, and the only request tried is the open's own.
+test("a lookup from file:// asks only for the open, and only after the button", async ({ page, context }) => {
+  const winId = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+  const refused: string[] = []
+  await context.route(/^(https?|wss?):/, (route) => {
+    refused.push(route.request().url())
+    return route.abort()
+  })
+
+  await page.goto(`${pathToFileURL(PAGE).href}#open=${winId}`)
+  await expect(page.getByRole("textbox", { name: "Look up an open by its id" })).toHaveValue(winId)
+  expect(refused).toEqual([])
+  await page.getByRole("button", { name: "Look up" }).click()
+
+  await expect(page.getByText("Your browser could not reach our server.")).toBeVisible()
+  console.log(`network requests refused (${refused.length}): ${refused.join(", ") || "none"}`)
+  expect(refused).toEqual([`https://public-api.dev.prizelayer.com/verify/opens/${winId}`])
+})

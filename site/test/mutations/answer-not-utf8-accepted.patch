@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index e67e97d..96f9571 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -135,7 +135,7 @@ async function readCapped(response: Response): Promise<string> {
+   if (response.body === null) return ""
+   const reader = response.body.getReader()
+   // Fatal: a byte that is not UTF-8 is refused, so the box only ever holds what the server sent.
+-  const decoder = new TextDecoder("utf-8", { fatal: true })
++  const decoder = new TextDecoder("utf-8", { fatal: false })
+   let text = ""
+   let size = 0
+   for (;;) {

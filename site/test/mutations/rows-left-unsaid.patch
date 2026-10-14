@@ -1,0 +1,13 @@
+diff --git a/site/src/rows.tsx b/site/src/rows.tsx
+index c20fa5a..bd55773 100644
+--- a/site/src/rows.tsx
++++ b/site/src/rows.tsx
+@@ -46,7 +46,7 @@ export function Rows<T>({
+           </Fragment>
+         )
+       })}
+-      {left > 0 ? (
++      {left > 0 && false ? (
+         <tr data-more-rows={left}>
+           <td colSpan={columns} className="py-2">
+             <span className="block">{moreRows(left)}</span>

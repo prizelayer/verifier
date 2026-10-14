@@ -1,6 +1,7 @@
 import { CHECK_NAMES, STEP_OF, type Check, type CheckName, type VerificationInput, type VerificationReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups, snapshotGroups } from "./preimage"
+import { Rows } from "./rows"
 import { CHECK_WORDS } from "./verdict"
 import {
   CHECK_LABELS,
@@ -162,14 +163,19 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
               </tr>
             </thead>
             <tbody>
-              {input.edition.slots.map((s) => (
-                <tr key={s.slotIndex}>
-                  <td>{s.slotIndex}</td>
-                  <td>{percent(s.probabilityPpm)}</td>
-                  <td>{String(s.requiredBuyBackValueCents)}</td>
-                  <td>{String(s.requiredMarketValueCents)}</td>
-                </tr>
-              ))}
+              <Rows
+                rows={input.edition.slots}
+                columns={4}
+                keep={(s) => s.slotIndex === trace.computedSlotIndex}
+                row={(s) => (
+                  <tr key={s.slotIndex}>
+                    <td>{s.slotIndex}</td>
+                    <td>{percent(s.probabilityPpm)}</td>
+                    <td>{String(s.requiredBuyBackValueCents)}</td>
+                    <td>{String(s.requiredMarketValueCents)}</td>
+                  </tr>
+                )}
+              />
             </tbody>
           </table>
           {checks.editionFingerprint ? (
@@ -218,19 +224,24 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
                 </tr>
               </thead>
               <tbody>
-                {trace.cumulative.map((row) => {
-                  // The library's own lookup decides the row; the page does not compare v with the bounds.
-                  const has = row.slotIndex === trace.computedSlotIndex
-                  return (
-                    <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
-                      <td>{row.slotIndex}</td>
-                      <td>
-                        {row.to === row.from ? "none" : `${row.from.toLocaleString("en")} to ${(row.to - 1).toLocaleString("en")}`}
-                      </td>
-                      <td>{has ? "yes, here" : ""}</td>
-                    </tr>
-                  )
-                })}
+                <Rows
+                  rows={trace.cumulative}
+                  columns={3}
+                  keep={(row) => row.slotIndex === trace.computedSlotIndex}
+                  row={(row) => {
+                    // The library's own lookup decides the row; the page does not compare v with the bounds.
+                    const has = row.slotIndex === trace.computedSlotIndex
+                    return (
+                      <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
+                        <td>{row.slotIndex}</td>
+                        <td>
+                          {row.to === row.from ? "none" : `${row.from.toLocaleString("en")} to ${(row.to - 1).toLocaleString("en")}`}
+                        </td>
+                        <td>{has ? "yes, here" : ""}</td>
+                      </tr>
+                    )
+                  }}
+                />
               </tbody>
             </table>
           ) : null}

@@ -2,15 +2,18 @@ import { useEffect, useId, useRef, useState } from "react"
 import type { VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
+import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { StepCards } from "./steps"
 import { COULD_NOT_FINISH, STEPS } from "./words"
 import { caveatOf, verdictOf } from "./verdict"
 
-export function App() {
+export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const [text, setText] = useState("")
   const [checked, setChecked] = useState<Checked | null>(null)
   const [running, setRunning] = useState(false)
+  // A lookup in flight: the box and its buttons wait, so the answer cannot land over a pasted proof.
+  const [lookingUp, setLookingUp] = useState(false)
   const verdictRef = useRef<HTMLDivElement>(null)
   // The text on screen now, read when a check finishes: a result is kept only for the text it checked.
   const current = useRef("")
@@ -56,13 +59,24 @@ export function App() {
           device, with the same numbers, and see if you get the same answer.
         </p>
         <p>
-          Nothing on this page asks our server whether the open was fair. You can turn your internet off now
-          and it still works.
+          Nothing on this page asks our server whether the open was fair. Once the proof is in the field, you
+          can turn your internet off and the check still works.
         </p>
         <p>Read "What this does not prove" below. It is short, and it matters.</p>
       </header>
 
-      <section aria-labelledby={`${fieldId}-label`} className="space-y-3">
+      <LookupBox
+        disabled={running}
+        shownText={text}
+        onBusy={setLookingUp}
+        fetchFn={fetchFn}
+        onFound={(found) => {
+          edit(found)
+          void run(found)
+        }}
+      />
+
+      <section aria-labelledby={`${fieldId}-label`} aria-busy={lookingUp} className="space-y-3">
         <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
           Paste a proof
         </label>
@@ -70,11 +84,11 @@ export function App() {
           id={fieldId}
           value={text}
           onChange={(event) => edit(event.target.value)}
-          readOnly={running}
+          readOnly={running || lookingUp}
           rows={10}
           spellCheck={false}
           aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
-          className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
+          className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
         />
         {checked?.kind === "notAProof" ? (
           <p id={`${fieldId}-problem`} className="text-fail">
@@ -82,7 +96,7 @@ export function App() {
           </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => run(text)} disabled={running || text.trim() === ""}>
+          <Button onClick={() => run(text)} disabled={running || lookingUp || text.trim() === ""}>
             Check
           </Button>
           <Button
@@ -91,7 +105,7 @@ export function App() {
               edit(EXAMPLE_TEXT)
               void run(EXAMPLE_TEXT)
             }}
-            disabled={running}
+            disabled={running || lookingUp}
           >
             Try the example
           </Button>

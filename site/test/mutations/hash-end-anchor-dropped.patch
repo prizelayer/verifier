@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index e67e97d..54774c9 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -36,7 +36,7 @@ class Unreachable extends Error {}
+ /** Our server took longer than {@link LOOKUP_TIMEOUT_MS}. */
+ class TimedOut extends Error {}
+ 
+-const HASH = /^[0-9a-f]{64}$/
++const HASH = /^[0-9a-f]{64}/
+ 
+ /** How a reader sees the fields a fault names: in words, not as the API spells them. */
+ const LABEL: Record<string, string> = {

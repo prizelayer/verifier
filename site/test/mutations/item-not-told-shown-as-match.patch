@@ -1,8 +1,8 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index b79846f..3f52449 100644
+index 2913da3..99deee7 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -117,7 +117,7 @@ function inputWords(field: string | undefined, error: string, input: Verificatio
+@@ -118,7 +118,7 @@ function inputWords(field: string | undefined, error: string, input: Verificatio
  }
  
  function notRunWords(name: CheckName, report: VerificationReport, input: VerificationInput): string {

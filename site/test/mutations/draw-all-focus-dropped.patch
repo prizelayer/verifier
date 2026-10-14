@@ -1,0 +1,13 @@
+diff --git a/site/src/rows.tsx b/site/src/rows.tsx
+index c20fa5a..a6d000a 100644
+--- a/site/src/rows.tsx
++++ b/site/src/rows.tsx
+@@ -24,7 +24,7 @@ export function Rows<T>({
+   useEffect(() => {
+     if (all && table.current) {
+       table.current.tabIndex = -1
+-      table.current.focus()
++
+     }
+   }, [all])
+   const shown = all ? rows.map((item, index) => ({ item, index })) : firstRows(rows, keep)

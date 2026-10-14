@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..80fcdd3 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -99,7 +99,7 @@ export function LookupBox({
+           readOnly={busy}
+           rows={2}
+           spellCheck={false}
+-          aria-invalid={invalid || undefined}
++          aria-invalid={(invalid && false) || undefined}
+           aria-describedby={result !== null || busy ? resultId : undefined}
+           className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-base break-all sm:h-9 sm:py-1.5 sm:text-sm"
+         />

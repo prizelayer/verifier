@@ -1,0 +1,13 @@
+diff --git a/site/src/layOut.ts b/site/src/layOut.ts
+index 1619a76..d962453 100644
+--- a/site/src/layOut.ts
++++ b/site/src/layOut.ts
+@@ -20,7 +20,7 @@ export function layOutParts(text: string): { text: string; added: boolean }[] |
+     const c = text[i]
+     if (inString) {
+       own(c)
+-      if (c === "\\") own(text[++i] ?? "")
++      if (c === "\\") i++
+       else if (c === '"') inString = false
+       continue
+     }

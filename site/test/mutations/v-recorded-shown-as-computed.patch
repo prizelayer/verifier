@@ -1,8 +1,8 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index b79846f..6e49f4c 100644
+index 2913da3..e4ba92b 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -198,7 +198,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+@@ -204,7 +204,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
            </p>
            <Chunks chunks={trace.chunks} value={trace.value} />
            {checks.drawnPpmValue ? (

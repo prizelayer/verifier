@@ -1,0 +1,13 @@
+diff --git a/site/src/layOut.ts b/site/src/layOut.ts
+index 1619a76..100f1fe 100644
+--- a/site/src/layOut.ts
++++ b/site/src/layOut.ts
+@@ -25,7 +25,7 @@ export function layOutParts(text: string): { text: string; added: boolean }[] |
+       continue
+     }
+     if (/\s/.test(c)) return null
+-    if (c === '"') inString = true
++    if (c === '"') inString = false
+     if ((c === "}" || c === "]") && !(text[i - 1] === "{" || text[i - 1] === "[")) add(--depth)
+     else if (c === "}" || c === "]") depth--
+     own(c)

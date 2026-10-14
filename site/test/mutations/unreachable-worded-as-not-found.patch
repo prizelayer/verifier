@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..fd7153a 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -149,7 +149,7 @@ function LookupWords({ result }: { result: LookupResult }) {
+     case "notFound":
+       return <p className={FAULT}>{LOOKUP_WORDS.notFound}</p>
+     case "unreachable":
+-      return <p className={FAULT}>{LOOKUP_WORDS.unreachable}</p>
++      return <p className={FAULT}>{LOOKUP_WORDS.notFound}</p>
+     case "timedOut":
+       return <p className={FAULT}>{LOOKUP_WORDS.timedOut}</p>
+     case "serverFault":

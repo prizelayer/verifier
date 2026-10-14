@@ -1,0 +1,13 @@
+diff --git a/site/src/lookup.ts b/site/src/lookup.ts
+index e67e97d..5da69b4 100644
+--- a/site/src/lookup.ts
++++ b/site/src/lookup.ts
+@@ -161,7 +161,7 @@ function decode(decoder: TextDecoder, bytes: Uint8Array | undefined): string {
+ function objectOf(text: string, what: string): Record<string, unknown> {
+   // A key written twice would be read as its last copy here, and refused later by the check: refuse
+   // it now, so the lookup never reports a proof the check will not read.
+-  const problem = structureProblem(text)
++  const problem = structureProblem("{}")
+   if (problem !== null) {
+     throw new ServerFault(
+       "tooDeep" in problem

@@ -1,0 +1,13 @@
+diff --git a/site/src/rows.tsx b/site/src/rows.tsx
+index c20fa5a..31852a6 100644
+--- a/site/src/rows.tsx
++++ b/site/src/rows.tsx
+@@ -35,7 +35,7 @@ export function Rows<T>({
+         const previous = at === 0 ? -1 : shown[at - 1].index
+         return (
+           <Fragment key={index}>
+-            {index > previous + 1 ? (
++            {index > previous + 1 && false ? (
+               <tr data-skipped-rows={`${previous + 1}-${index - 1}`}>
+                 <td colSpan={columns} className="py-1 text-muted-foreground">
+                   {skippedRows(previous + 1, index - 1)}

@@ -1,13 +1,13 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index b79846f..c23b16d 100644
+index 2913da3..f245419 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -220,7 +220,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
-               <tbody>
-                 {trace.cumulative.map((row) => {
-                   // The library's own lookup decides the row; the page does not compare v with the bounds.
--                  const has = row.slotIndex === trace.computedSlotIndex
-+                  const has = row.slotIndex === input.expected.drawnSlotIndex
-                   return (
-                     <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
-                       <td>{row.slotIndex}</td>
+@@ -230,7 +230,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+                   keep={(row) => row.slotIndex === trace.computedSlotIndex}
+                   row={(row) => {
+                     // The library's own lookup decides the row; the page does not compare v with the bounds.
+-                    const has = row.slotIndex === trace.computedSlotIndex
++                    const has = row.slotIndex === input.expected.drawnSlotIndex
+                     return (
+                       <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
+                         <td>{row.slotIndex}</td>

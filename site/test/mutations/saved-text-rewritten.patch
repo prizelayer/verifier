@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a2e9c79..21fc8d3 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -159,7 +159,7 @@ function LookupWords({ result }: { result: LookupResult }) {
+ 
+ /** Downloads the proof as a file; nothing is stored in the browser. */
+ function save(text: string, winId: string) {
+-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }))
++  const url = URL.createObjectURL(new Blob([JSON.stringify(JSON.parse(text))], { type: "application/json" }))
+   const link = document.createElement("a")
+   link.href = url
+   link.download = `proof-${winId}.json`

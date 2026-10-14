@@ -25,9 +25,12 @@ for pattern in 'type="module"' 'crossorigin' 'src="/' 'href="/' 'url(/'; do
 done
 grep -F -q '<script defer src="./assets/app-' "$html" || bad "$html does not load ./assets/app-*.js as a classic deferred script"
 
-# The page asks no server anything: its own policy says so, and no other origin is compiled in.
-grep -F -q "connect-src 'none'" "$html" || bad "$html does not carry connect-src 'none'"
-allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com)$'
+# The page may ask one server, for a lookup: its own policy names only that host, and no other
+# origin is compiled in. The host is the one constant of src/lookup.ts.
+api='https://public-api.dev.prizelayer.com'
+policy=$(grep -oE 'content="[^"]*connect-src[^"]*"' "$html" | grep -oE 'connect-src [^;"]*' || true)
+[ "$policy" = "connect-src $api" ] || bad "$html carries '$policy', not 'connect-src $api'"
+allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com|https://public-api\.dev\.prizelayer\.com)$'
 origins=$(grep -ohE '(https?|wss?)://[A-Za-z0-9.-]+' $files | sort -u)
 echo "check-bundle: origins in the bundle: $(echo $origins)"
 for origin in $origins; do

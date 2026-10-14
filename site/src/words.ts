@@ -123,3 +123,36 @@ export const SEED_LOCKED = "not run: the secret is still locked"
 
 /** Shown if a check stops on an error nobody planned for, instead of a page stuck at "Computing". */
 export const COULD_NOT_FINISH = "The check could not finish. Nothing was checked; reload the page and try again."
+
+/** The lookup's words, one per result (plan 3.2). */
+export const LOOKUP_WORDS = {
+  busy: "Fetching the public data of this open from our server (this can take up to 15 seconds)…",
+  notAnId: "This is not an open id. An open id looks like 7c9e6679-7425-40de-944b-e07fc1f90ae7.",
+  notFound: "We found no open with this id. Check the id, or paste the proof instead.",
+  timedOut:
+    "Our server did not answer within 15 seconds, so nothing was checked. Try again. If you saved this proof before, paste it below.",
+  unreachable:
+    "Your browser could not reach our server. Check your connection and try again. If you saved this proof before, paste it below: the check itself does not need our server.",
+  serverFault: (message: string) =>
+    `Our server sent a faulty answer, so nothing was checked: ${message}. Try again later. If you saved this proof before, paste it below.`,
+  found: "We fetched the public data of this open and put it in the proof field below. The check ran in your browser.",
+  sharing:
+    "Anyone you give this proof or this id to can read this open, and can see how many opens were made with the same secret and when it was retired. It does not say who you are.",
+} as const
+
+/**
+ * How many rows a table draws before it asks. A box with 100,000 slots took about 12 seconds to
+ * draw in full, and the check itself does not need the rows on screen.
+ */
+export const FIRST_ROWS = 200
+
+/** The words under a cut table: what is not drawn, and that the check still used it. */
+export const moreRows = (count: number) =>
+  `${count.toLocaleString("en")} rows are not drawn here. Your browser used all of them in the check.`
+
+/** The marker where a cut table skips rows before a row it keeps (row numbers count from 0). */
+export const skippedRows = (from: number, to: number) =>
+  `Rows ${from.toLocaleString("en")} to ${to.toLocaleString("en")} are not drawn here.`
+
+/** Drawing very many rows takes the browser a while; the button says so. */
+export const SLOW_DRAW_ROWS = 20_000
