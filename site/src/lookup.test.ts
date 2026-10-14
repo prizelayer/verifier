@@ -142,14 +142,16 @@ describe("lookUp", () => {
     const path = `/verify/editions/${edition.editionId}`
     const atCap = JSON.stringify(edition)
     const padded = atCap.slice(0, -1) + `,"pad":"${"x".repeat(MAX_ANSWER_BYTES - atCap.length - 9)}"}`
-    expect(padded).toHaveLength(MAX_ANSWER_BYTES)
+    expect(padded.length).toBe(MAX_ANSWER_BYTES)
     expect((await lookUp(WIN, null, withAnswer(path, { status: 200, body: padded }).fetchFn)).kind).toBe("found")
     const over = padded.slice(0, -2) + `x"}`
-    expect(over).toHaveLength(MAX_ANSWER_BYTES + 1)
-    expect(await lookUp(WIN, null, withAnswer(path, { status: 200, body: over }).fetchFn)).toEqual({
-      kind: "serverFault",
-      message: `our server's answer for ${path} is larger than ${MAX_ANSWER_BYTES} bytes`,
-    })
+    expect(over.length).toBe(MAX_ANSWER_BYTES + 1)
+    // Compared field by field: a failure must print a kind and a sentence, never the 1 MB answer.
+    const result = await lookUp(WIN, null, withAnswer(path, { status: 200, body: over }).fetchFn)
+    expect(result.kind).toBe("serverFault")
+    expect("message" in result ? result.message : undefined).toBe(
+      `our server's answer for ${path} is larger than ${MAX_ANSWER_BYTES} bytes`,
+    )
   })
 
   it("refuses an answer whose declared length is over the cap before reading it", async () => {
