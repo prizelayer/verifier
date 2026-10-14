@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 0b5d654..4ba96ff 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -69,7 +69,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
+         const check = report.checks[name]
+         const state = check ? (check.ok ? "matches" : "does not match") : notRunWords(name, report, input)
+         // The sentence follows the result: a mismatch never sits next to the words of a match.
+-        const sentence = check ? (check.ok ? CHECK_WORDS[name] : FAIL_WORDS[name]) : null
++        const sentence = check ? (check.ok || FAIL_WORDS ? CHECK_WORDS[name] : null) : null
+         return (
+           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
+             <span className="font-medium">{CHECK_LABELS[name]}:</span> <span className="font-semibold">{state}</span>

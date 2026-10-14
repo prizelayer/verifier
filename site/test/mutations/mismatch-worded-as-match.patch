@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 0b5d654..ddc2228 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -67,7 +67,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
+     <ul className="space-y-2" aria-label={`The checks of step ${step}`}>
+       {CHECK_NAMES.filter((name) => STEP_OF[name] === step).map((name) => {
+         const check = report.checks[name]
+-        const state = check ? (check.ok ? "matches" : "does not match") : notRunWords(name, report, input)
++        const state = check ? "matches" : notRunWords(name, report, input)
+         // The sentence follows the result: a mismatch never sits next to the words of a match.
+         const sentence = check ? (check.ok ? CHECK_WORDS[name] : FAIL_WORDS[name]) : null
+         return (

@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 0b5d654..90c34e9 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -92,7 +92,7 @@ function unusableWords(field: string | undefined, error: string, input: Verifica
+ }
+ 
+ function notRunWords(name: CheckName, report: VerificationReport, input: VerificationInput): string {
+-  if (name === "drawnItemId" && input.snapshot && input.expected.itemId === undefined) return NOT_TOLD_ITEM
++  if (name === "drawnItemId" && input.snapshot && input.expected.itemId === undefined) return "matches"
+   if (!input.snapshot && STEP_OF[name] === 4 && name !== "drawnSlotIndex") return NO_PRIZE_LIST
+   if (input.serverSeedHex === null) return SEED_LOCKED
+   return `not run: ${report.notRun.find((n) => n.check === name)?.reason ?? "no reason given"}`

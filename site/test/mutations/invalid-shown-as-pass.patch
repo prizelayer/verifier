@@ -1,0 +1,13 @@
+diff --git a/site/src/verdict.ts b/site/src/verdict.ts
+index ee465c4..922322d 100644
+--- a/site/src/verdict.ts
++++ b/site/src/verdict.ts
+@@ -33,7 +33,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+         line: LOCKED,
+       }
+     case "invalid":
+-      return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
++      return { word: "PASS", line: report.invalid?.message ?? report.summary }
+   }
+ }
+ 

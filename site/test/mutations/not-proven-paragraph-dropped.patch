@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index ff442d0..ae268dd 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -100,7 +100,7 @@ export function App() {
+           recorded for your win.
+         </p>
+         <p>
+-          You were not shown the fingerprint or the client seed before you played. Our server created both,
++          Our server created both,
+           and this page reads both from our server. The record that the fingerprint existed before your open
+           is in our audit log. This page does not check that log yet.
+         </p>

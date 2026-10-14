@@ -1,0 +1,13 @@
+diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
+index 5c09e71..3b02bbc 100644
+--- a/site/src/bytes.tsx
++++ b/site/src/bytes.tsx
+@@ -44,7 +44,7 @@ function Row({ name, value, against }: { name: string; value: string | undefined
+ function Marked({ value, against }: { value: string; against: string }) {
+   const parts: { text: string; differs: boolean }[] = []
+   for (let i = 0; i < value.length; i++) {
+-    const differs = value[i] !== against[i]
++    const differs = value[i] !== against[i] && false
+     const last = parts[parts.length - 1]
+     if (last && last.differs === differs) last.text += value[i]
+     else parts.push({ text: value[i], differs })
