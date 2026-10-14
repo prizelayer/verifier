@@ -4,8 +4,9 @@ A static page that checks one open in your own browser, with the library in `../
 Paste a proof, or press "Try the example"; for those, nothing is sent anywhere. Or type an open's id
 and press "Look up": only then does the page fetch that open's public data, with four plain GET
 requests to the one host its own policy names (`connect-src https://public-api.dev.prizelayer.com`,
-the `API_BASE` constant of `src/lookup.ts`). The fetched data is put in the box unchanged, and the
-check runs in your browser exactly as for a pasted proof. "Save this proof" downloads it as a file.
+the `API_BASE` constant of `src/lookup.ts`). The fetched data is put in the proof field unchanged,
+and the check runs in your browser exactly as for a pasted proof. "Save this proof" downloads it as a
+file, and "Show this proof laid out" shows it with line breaks added, for reading only.
 
 ```
 npm ci

@@ -61,6 +61,8 @@ describe("a box with many slots", () => {
     expect(drawn.querySelectorAll("tbody tr[data-contains-v]")).toHaveLength(SLOTS)
     expect(drawn.querySelectorAll("[data-skipped-rows]")).toHaveLength(0)
     // The button went away with its row: the focus is on the table it drew, not lost to the page.
-    expect(document.activeElement).toBe(drawn)
+    // Compared as a boolean and a tag: a failure must never print the 2,000-row page.
+    expect(document.activeElement?.tagName).toBe("TABLE")
+    expect(document.activeElement === drawn).toBe(true)
   })
 })

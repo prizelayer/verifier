@@ -18,6 +18,11 @@ afterEach(() => {
 
 const lookUpButton = () => screen.getByRole("button", { name: "Look up" }) as HTMLButtonElement
 const idField = () => screen.getByRole("textbox", { name: "Look up an open by its id" }) as HTMLTextAreaElement
+/** What has the focus, in a few words: a failure must never print the page's DOM. */
+const focused = () => {
+  const active = document.activeElement
+  return active?.tagName === "BUTTON" ? `button ${active.textContent}` : (active?.tagName ?? "nothing")
+}
 const box = () => screen.getByRole("textbox", { name: "Paste a proof" }) as HTMLTextAreaElement
 
 /** The example server, with every answer held back until `release` is called. */
@@ -49,7 +54,7 @@ describe("the focus around a lookup", () => {
     // aria-disabled, not disabled: a disabled button would drop the focus to the page.
     expect(lookUpButton().disabled).toBe(false)
     expect(lookUpButton().getAttribute("aria-disabled")).toBe("true")
-    expect(document.activeElement).toBe(lookUpButton())
+    expect(focused()).toBe("button Look up")
     await user.click(lookUpButton())
     await user.keyboard("{Enter}")
     expect(server.asked).toHaveLength(1)
@@ -68,7 +73,7 @@ describe("the focus around a lookup", () => {
     render(<App fetchFn={fetchFn} />)
     await user.click(lookUpButton())
     expect(await screen.findByText(words)).toBeTruthy()
-    expect(document.activeElement).toBe(lookUpButton())
+    expect(focused()).toBe("button Look up")
   })
 
   it("stays on Look up when the lookup times out", async () => {
@@ -83,7 +88,7 @@ describe("the focus around a lookup", () => {
     await user.click(lookUpButton())
     await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS)
     expect(await screen.findByText(LOOKUP_WORDS.timedOut)).toBeTruthy()
-    expect(document.activeElement).toBe(lookUpButton())
+    expect(focused()).toBe("button Look up")
   })
 
   it("moves to the verdict when the lookup finds the open", async () => {
