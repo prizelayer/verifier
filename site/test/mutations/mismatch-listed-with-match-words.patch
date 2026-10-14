@@ -1,5 +1,5 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 5d0b4f1..1dd1660 100644
+index 333cc8a..175e50d 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
 @@ -134,7 +134,7 @@ function Checks({ report }: { report: VerificationReport }) {
