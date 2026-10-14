@@ -186,8 +186,10 @@ jobs:
     # The library's sentinel above reads src/ only, so it cannot see the page. This one breaks the
     # page in ways a reader would be misled by (a FAIL shown as PASS, a mismatch drawn as a match,
     # the "what this does not prove" paragraph gone), and the build fails if the page's tests still
-    # pass. Same rules: the mutant must type-check, and nothing may stay applied.
+    # pass. Same rules: the mutant must type-check, and nothing may stay applied. A run that does not
+    # end is an error naming its patch, never a catch: a test run that hangs proves nothing.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -210,18 +212,36 @@ jobs:
           for patch in "${patches[@]}"; do
             echo "::group::$patch"
             git apply "$patch" || { echo "::error::$patch no longer applies — rebase it onto site/src"; exit 1; }
-            if ! (cd site && npx tsc -b); then
+            set +e
+            (cd site && timeout 300 npx tsc -b)
+            status=$?
+            set -e
+            if [ $status -eq 124 ]; then
+              echo "::error::$patch: the type-check did not finish within 300 s."
+              exit 1
+            fi
+            if [ $status -ne 0 ]; then
               echo "::error::$patch breaks the type-check rather than the page. A mutation must"
               echo "::error::compile, or it proves nothing about what the tests catch."
               exit 1
             fi
-            if (cd site && npx vitest run); then
+            started=$(date +%s)
+            set +e
+            (cd site && timeout 300 npx vitest run)
+            status=$?
+            set -e
+            seconds=$(( $(date +%s) - started ))
+            if [ $status -eq 124 ]; then
+              echo "::error::$patch: the page's tests did not finish within 300 s. A hang is not a catch."
+              exit 1
+            fi
+            if [ $status -eq 0 ]; then
               echo "::error::$patch did NOT redden the page's tests. A reader would be misled and"
               echo "::error::the suite would not notice."
               exit 1
             fi
             git apply -R "$patch"
-            echo "caught: $patch"
+            echo "caught: $patch (${seconds} s)"
             echo "::endgroup::"
           done
           git diff --exit-code site/src/
