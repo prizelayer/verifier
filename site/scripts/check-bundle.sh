@@ -42,6 +42,8 @@ done < "$here/storage-apis.txt"
 
 # The words that must be there, and the two sentences that must not be, until the page can prove them.
 for required in 'Check an open yourself' 'What this does not prove' \
+  'The secret we revealed is the one we registered.' 'The chances are the ones recorded on your open.' \
+  'The pick itself.' 'From the number to your item.' \
   'You were not shown the fingerprint or the client seed before you played' \
   'So this page cannot prove, on its own, that we did not choose the secret after your open.' \
   'This page does not check that record.'; do

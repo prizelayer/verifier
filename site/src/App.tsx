@@ -1,24 +1,27 @@
-import { useId, useRef, useState } from "react"
-import { CHECK_NAMES, STEP_OF, type VerificationReport } from "@verifier"
+import { useEffect, useId, useRef, useState } from "react"
+import type { VerificationInput, VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
-import { checkProof } from "./proof"
-import { CHECK_WORDS, verdictOf } from "./verdict"
-import { CHECK_LABELS, FAIL_WORDS, unusableWords } from "./words"
+import { checkProof, type Checked } from "./proof"
+import { StepCards } from "./steps"
+import { STEPS } from "./words"
+import { caveatOf, verdictOf } from "./verdict"
 
 export function App() {
   const [text, setText] = useState("")
-  const [report, setReport] = useState<VerificationReport | null>(null)
+  const [checked, setChecked] = useState<Checked | null>(null)
   const [running, setRunning] = useState(false)
   const verdictRef = useRef<HTMLDivElement>(null)
   // The text on screen now, read when a check finishes: a result is kept only for the text it checked.
   const current = useRef("")
   const fieldId = useId()
+  const report = checked?.kind === "report" ? checked.report : null
+  const input = checked?.kind === "report" ? checked.input : null
 
   function edit(value: string) {
     current.current = value
     setText(value)
-    setReport(null)
+    setChecked(null)
   }
 
   async function run(proof: string) {
@@ -26,9 +29,15 @@ export function App() {
     const result = await checkProof(proof)
     setRunning(false)
     if (proof !== current.current) return
-    setReport(result)
+    setChecked(result)
     verdictRef.current?.focus()
   }
+
+  // The failing card is scrolled to; the focus stays on the verdict, which a screen reader reads first.
+  const failingStep = report?.firstFailure?.step
+  useEffect(() => {
+    if (failingStep !== undefined) document.querySelector(`[data-step="${failingStep}"]`)?.scrollIntoView?.({ block: "nearest" })
+  }, [failingStep, checked])
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 space-y-8">
@@ -56,8 +65,14 @@ export function App() {
           readOnly={running}
           rows={10}
           spellCheck={false}
+          aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
           className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
         />
+        {checked?.kind === "notAProof" ? (
+          <p id={`${fieldId}-problem`} className="text-fail">
+            {checked.message}
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => run(text)} disabled={running || text.trim() === ""}>
             Check
@@ -76,10 +91,10 @@ export function App() {
       </section>
 
       <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
-        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
+        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} input={input} /> : null}
       </div>
 
-      {report ? <Checks report={report} /> : null}
+      {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
 
       <section aria-labelledby="not-proven" className="space-y-3">
         <h2 id="not-proven" className="text-lg font-semibold">
@@ -108,43 +123,34 @@ export function App() {
   )
 }
 
-function Verdict({ report }: { report: VerificationReport }) {
+function Verdict({ report, input }: { report: VerificationReport; input: VerificationInput | null }) {
   const { word, line } = verdictOf(report)
+  const caveat = caveatOf(report, input)
   const tone =
     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-pending"
   return (
     <div className="space-y-1" data-status={report.status}>
       <p className={`text-3xl font-bold ${tone}`}>{word}</p>
       <p>{line}</p>
+      {caveat ? <p data-caveat="yes">{caveat}</p> : null}
     </div>
   )
 }
 
-function Checks({ report }: { report: VerificationReport }) {
+/** Before any check: the four steps, greyed, with their explanations readable. */
+function EmptySteps() {
   return (
-    <ol className="space-y-2" aria-label="The checks">
-      {CHECK_NAMES.map((name) => {
-        const check = report.checks[name]
-        const skipped = report.notRun.find((n) => n.check === name)
-        const state = check ? (check.ok ? "matches" : check.error !== undefined ? "cannot be checked" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
-        // The sentence follows the result: a mismatch never sits next to the words of a match.
-        const sentence = !check
-          ? null
-          : check.ok
-            ? CHECK_WORDS[name]
-            : check.error !== undefined
-              ? unusableWords(check.field, check.error)
-              : FAIL_WORDS[name]
-        return (
-          <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
-            <span className="font-medium">
-              Step {STEP_OF[name]}. {CHECK_LABELS[name]}:
-            </span>{" "}
-            <span className="font-semibold">{state}</span>
-            {sentence ? `. ${sentence}` : null}
-          </li>
-        )
-      })}
-    </ol>
+    <div className="space-y-6 text-muted-foreground" aria-label="The four steps">
+      {STEPS.map(({ step, title, text }) => (
+        <section key={step} aria-labelledby={`step-${step}`} data-step={step} className="space-y-2 rounded-lg border border-border p-4">
+          <h2 id={`step-${step}`} className="text-lg font-semibold">
+            Step {step} — {title}
+          </h2>
+          {text.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
+        </section>
+      ))}
+    </div>
   )
 }

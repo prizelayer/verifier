@@ -1,4 +1,4 @@
-import type { CheckName, VerificationReport } from "@verifier"
+import type { CheckName, VerificationInput, VerificationReport } from "@verifier"
 import { FAIL_WORDS, LOCKED, unusableWords } from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
@@ -39,4 +39,12 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
     case "invalid":
       return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
   }
+}
+
+/** The caveat a PASS carries when the item was not compared. A PASS never hides what it left out. */
+export function caveatOf(report: VerificationReport, input: VerificationInput | null): string | null {
+  if (report.status !== "verified" || input === null) return null
+  if (!input.snapshot) return "The item was not checked: this proof has no prize list, so the page cannot tell which item was in your slot."
+  if (input.expected.itemId === undefined) return "The item was not checked: this page was not told which item you received."
+  return null
 }
