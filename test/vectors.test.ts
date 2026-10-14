@@ -693,7 +693,9 @@ describe('verify() end to end', () => {
     assert.ok(report.notRun.some((n) => n.check === 'drawnItemId' && /not been revealed/.test(n.reason)));
   });
 
-  it('does not let a pending open hide odds that do not match', async () => {
+  it('fails, rather than stays pending, when the odds do not match and the seed is not revealed', async () => {
+    // A check that ran and failed fails the open, whatever is still pending: odds that do not match
+    // their fingerprint cannot be rescued by any seed revealed later.
     // Chances moved between two slots: the sum is still 1,000,000, so only the fingerprint can see it.
     const vector = canonicalEditionVector();
     const swapped = parseEdition({
@@ -704,11 +706,17 @@ describe('verify() end to end', () => {
     });
     const report = await verify(await input({ serverSeedHex: null, edition: swapped }));
 
-    assert.equal(report.status, 'pending');
+    assert.equal(report.status, 'failed');
     assert.equal(report.ok, false);
     assert.equal(report.checks.editionFingerprint?.ok, false);
     assert.equal(report.firstFailure?.check, 'editionFingerprint');
-    assert.match(report.summary, /editionFingerprint did not match/);
+    assert.equal(report.firstFailure?.step, 2);
+    assert.match(report.summary, /^FAILED: editionFingerprint did not match/);
+    // The checks that need the seed are still reported as not run, with the reason.
+    assert.deepEqual(
+      report.notRun.filter((n) => /not been revealed/.test(n.reason)).map((n) => n.check),
+      ['commitment', 'drawnPpmValue', 'drawnSlotIndex'],
+    );
   });
 
   it('reports an input it cannot read as invalid instead of throwing', async () => {

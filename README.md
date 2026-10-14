@@ -64,9 +64,10 @@ report.trace;       // every intermediate value, so you can check the workings b
   odds table from `250000` to `250001` and the table sums to 1,000,001: `editionFingerprint` fails
   with `error` explaining the sum and `field: 'edition'`, `firstFailure.step` is `2`, and the
   commitment and the draw are still recomputed and shown.
-- **`pending`** — `serverSeedHex` is `null` because the seed pair has not retired yet. The odds and
-  the snapshot are checked; the commitment, the draw and the slot are in `notRun`. A pending report
-  can still carry a failed check, and then `firstFailure` names it.
+- **`pending`** — `serverSeedHex` is `null` because the seed pair has not retired yet, and every
+  check that could run passed. The odds and the snapshot are checked; the commitment, the draw and
+  the slot are in `notRun`. If one of the checks that ran fails — odds that do not match their
+  fingerprint, say — the status is `failed`, not `pending`.
 - **`invalid`** — the input could not be read at all, so nothing was checked. `invalid.message`
   says why. Use `verifyFrom(() => ({ ...parsed input... }))` to have refusals from `parseEdition`
   and `parseSnapshotBody` reported the same way.
@@ -75,7 +76,7 @@ Up to **seven** independent claims are checked, and every one of them must hold:
 
 | Check | What a failure would mean |
 |---|---|
-| `commitment` | `SHA-256(revealed seed)` doesn't match the hash published *before* you played — the seed was chosen after the fact. |
+| `commitment` | `SHA-256(revealed seed)` doesn't match the commitment published for this seed pair — the revealed seed is not the committed one. |
 | `editionFingerprint` | The odds you were shown aren't the odds that were frozen when the box was published. |
 | `drawnPpmValue` | The recorded random value isn't what the seed actually produces. |
 | `drawnSlotIndex` | The value doesn't land on the slot you were given. |
@@ -126,9 +127,15 @@ Nothing here is secret. You can implement it yourself and check this library too
 
 ### 1. The commitment
 
-Before you play, you're shown `SHA-256(server_seed)`. The seed stays hidden until the seed pair
-retires. Because SHA-256 can't be reversed or collided in practice, the operator is locked into a
-seed they chose before knowing anything about your play.
+For each seed pair the operator publishes `SHA-256(server_seed)`, the commitment. The seed stays
+hidden until the seed pair retires. This library checks that the revealed seed hashes to the
+commitment published for its seed pair. Because SHA-256 can't be reversed or collided in practice,
+no other seed can match.
+
+What it cannot check is *when* the commitment was published. A commitment locks the operator to a
+seed only from the moment you saw it. If you were shown it before you played, the seed was fixed
+before your play. If you were not, that ordering rests on the operator's own records, which this
+library does not read.
 
 ### 2. The draw
 

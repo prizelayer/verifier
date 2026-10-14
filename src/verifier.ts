@@ -9,7 +9,7 @@
  *
  * It verifies TWO things, and the second is the one that matters:
  *
- *  1. **The draw.** SHA-256(server seed) matches the commitment published before play; then the
+ *  1. **The draw.** SHA-256(server seed) matches the commitment published for its seed pair; then the
  *     HMAC-SHA256 derivation of `specs/rng-fairness.md` §3 reproduces the ppm value `v`; then §4's
  *     cumulative lookup maps `v` onto a slot.
  *
@@ -168,7 +168,11 @@ export interface VerificationInput {
    * verified before the draw can.
    */
   serverSeedHex: string | null;
-  /** The commitment published BEFORE play. This is the promise being checked. */
+  /**
+   * The commitment published for this seed pair. The check is that the revealed seed hashes to it.
+   * WHEN it was published is not something this library can see: that is proven by whoever saw
+   * the commitment before playing, or by the publisher's own records.
+   */
   commitmentHex: string;
   clientSeed: string;
   nonce: number;
@@ -255,9 +259,10 @@ export interface Failure {
 
 /**
  * - `verified`: every check that ran passed, and the commitment, the odds, the draw and the slot all ran.
- * - `failed`: at least one check failed, or an input it needed was unusable.
- * - `pending`: the server seed is not revealed yet. The checks that do not need it ran and are
- *   reported, a failed one included; the draw itself cannot be checked yet.
+ * - `failed`: at least one check that ran failed, or an input it needed was unusable. This wins over
+ *   `pending`: odds that do not match their fingerprint fail the open whatever the seed turns out to be.
+ * - `pending`: the server seed is not revealed yet, and every check that could run passed. The draw
+ *   itself cannot be checked yet.
  * - `invalid`: the input could not be read at all. Nothing was checked.
  */
 export type VerificationStatus = 'verified' | 'failed' | 'pending' | 'invalid';
@@ -275,7 +280,7 @@ export interface VerificationReport {
   /** True only when {@link status} is `verified`. A single failure invalidates the whole verification. */
   ok: boolean;
   status: VerificationStatus;
-  /** Present when a check failed: the first one in step order. A `pending` report can carry one. */
+  /** Present when `status` is `failed`: the first failing check in step order. */
   firstFailure?: Failure;
   /** Present when `status` is `invalid`: why the input could not be read. */
   invalid?: { message: string };
@@ -389,7 +394,7 @@ export async function hmacSha256(key: Uint8Array, message: Uint8Array): Promise<
   return new Uint8Array(await subtle().sign('HMAC', handle, toBuffer(message)));
 }
 
-/** The commitment published before play: SHA-256 over the raw seed bytes, lowercase hex. */
+/** The commitment of a seed pair: SHA-256 over the raw seed bytes, lowercase hex. */
 export async function commitment(serverSeed: Uint8Array): Promise<string> {
   requireSeed(serverSeed);
   return hexFromBytes(await sha256(serverSeed));
@@ -1019,11 +1024,9 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
 
   const failed = CHECK_NAMES.filter((name) => checks[name]?.ok === false);
   const coreRan = CORE_CHECKS.every((name) => checks[name]?.ok === true);
-  const status: VerificationStatus = !seedRevealed
-    ? 'pending'
-    : failed.length > 0 || !coreRan
-      ? 'failed'
-      : 'verified';
+  // A check that ran and failed fails the open, whatever is still pending.
+  const status: VerificationStatus =
+    failed.length > 0 ? 'failed' : !seedRevealed ? 'pending' : coreRan ? 'verified' : 'failed';
 
   const report: VerificationReport = {
     ok: status === 'verified',
@@ -1046,10 +1049,7 @@ function summaryOf(
   trace: VerificationReport['trace'],
 ): string {
   if (status === 'pending') {
-    return (
-      'PENDING: the server seed has not been revealed yet, so the draw cannot be checked. ' +
-      (failed.length > 0 ? `${failed.join(', ')} did not match.` : 'Every check that could run matched.')
-    );
+    return 'PENDING: the server seed has not been revealed yet, so the draw cannot be checked. Every check that could run matched.';
   }
   if (status === 'failed') return `FAILED: ${failed.join(', ')} did not match. This open is not verified.`;
 
