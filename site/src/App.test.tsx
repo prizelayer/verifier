@@ -1,6 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it } from "vitest"
+import { parseSnapshotBody, snapshotHash } from "@verifier"
 import { App } from "./App"
 import { EXAMPLE_PROOF } from "./example"
 import { expectNoAxeViolations } from "./test/axe"
@@ -57,6 +58,29 @@ describe("the page", () => {
     expect(await screen.findByText("FAIL")).toBeTruthy()
   })
 
+  it("drops a result whose text was edited while the check ran", async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole("button", { name: "Try the example" }))
+    // The check is running now; the text changes before its result arrives.
+    fireEvent.change(screen.getByRole("textbox", { name: "Paste a proof" }), { target: { value: "edited" } })
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Check" }).hasAttribute("disabled")).toBe(false))
+    expect(screen.queryByText("PASS")).toBeNull()
+    expect(document.querySelector("[data-status], [data-check]")).toBeNull()
+  })
+
+  it("does not say a secret was revealed when a pending proof's commitment cannot be used", async () => {
+    const proof = {
+      ...EXAMPLE_PROOF,
+      seedPair: { ...EXAMPLE_PROOF.seedPair, revealedServerSeed: null, serverSeedCommitment: "not hex" },
+    }
+    expect((await check(proof)).textContent).toBe("FAIL")
+    const line = "Step 1 cannot be checked. The value seedPair.serverSeedCommitment cannot be used: the commitment must be 64 hex characters."
+    expect(screen.getByText(line)).toBeTruthy()
+    expect(document.body.textContent).not.toContain(FAIL_WORDS.commitment)
+  })
+
   it("shows CANNOT CHECK YET for a secret not revealed yet, with what can and cannot be checked", async () => {
     const pending = { ...EXAMPLE_PROOF, seedPair: { ...EXAMPLE_PROOF.seedPair, revealedServerSeed: null } }
     expect((await check(pending)).textContent).toBe("CANNOT CHECK YET")
@@ -95,6 +119,25 @@ describe("tampering", () => {
     expect(row?.getAttribute("data-state")).toBe("mismatch")
     expect(row?.textContent).toContain(`does not match. ${FAIL_WORDS.drawnPpmValue}`)
     expect(row?.textContent).not.toContain(CHECK_WORDS.drawnPpmValue)
+  })
+
+  // A server leaves the slot you won out of the prize list and records the hash of the shorter list.
+  it("a prize list without the drawn slot, its hash recomputed, fails at step 4 with or without an item", async () => {
+    for (const keepItem of [true, false]) {
+      cleanup()
+      const body = { ...EXAMPLE_PROOF.snapshot.body, slots: EXAMPLE_PROOF.snapshot.body.slots.filter((s) => s.slot_index !== 0) }
+      const hash = await snapshotHash(parseSnapshotBody(body))
+      const proof: Record<string, unknown> = {
+        ...EXAMPLE_PROOF,
+        open: { ...EXAMPLE_PROOF.open, snapshotHash: hash },
+        snapshot: { ...EXAMPLE_PROOF.snapshot, snapshotHash: hash, body },
+      }
+      if (!keepItem) delete proof.received
+      expect((await check(proof)).textContent).toBe("FAIL")
+      expect(document.querySelector('[data-check="snapshotHash"]')?.getAttribute("data-state")).toBe("match")
+      expect(document.querySelector('[data-check="drawnItemId"]')?.getAttribute("data-state")).toBe("mismatch")
+      expect(screen.getByText(/^Step 4 cannot be checked\. The value snapshot\.body\.slots cannot be used/)).toBeTruthy()
+    }
   })
 })
 

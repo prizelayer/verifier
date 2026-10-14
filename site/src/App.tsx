@@ -4,20 +4,29 @@ import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { checkProof } from "./proof"
 import { CHECK_WORDS, verdictOf } from "./verdict"
-import { CHECK_LABELS, FAIL_WORDS } from "./words"
+import { CHECK_LABELS, FAIL_WORDS, unusableWords } from "./words"
 
 export function App() {
   const [text, setText] = useState("")
   const [report, setReport] = useState<VerificationReport | null>(null)
   const [running, setRunning] = useState(false)
   const verdictRef = useRef<HTMLDivElement>(null)
+  // The text on screen now, read when a check finishes: a result is kept only for the text it checked.
+  const current = useRef("")
   const fieldId = useId()
+
+  function edit(value: string) {
+    current.current = value
+    setText(value)
+    setReport(null)
+  }
 
   async function run(proof: string) {
     setRunning(true)
     const result = await checkProof(proof)
-    setReport(result)
     setRunning(false)
+    if (proof !== current.current) return
+    setReport(result)
     verdictRef.current?.focus()
   }
 
@@ -43,11 +52,8 @@ export function App() {
         <textarea
           id={fieldId}
           value={text}
-          onChange={(event) => {
-            // A result is only ever shown for the text it was computed from.
-            setText(event.target.value)
-            setReport(null)
-          }}
+          onChange={(event) => edit(event.target.value)}
+          readOnly={running}
           rows={10}
           spellCheck={false}
           className="w-full rounded-lg border border-border bg-background p-3 font-mono text-xs"
@@ -59,7 +65,7 @@ export function App() {
           <Button
             variant="outline"
             onClick={() => {
-              setText(EXAMPLE_TEXT)
+              edit(EXAMPLE_TEXT)
               void run(EXAMPLE_TEXT)
             }}
             disabled={running}
@@ -122,7 +128,13 @@ function Checks({ report }: { report: VerificationReport }) {
         const skipped = report.notRun.find((n) => n.check === name)
         const state = check ? (check.ok ? "matches" : "does not match") : `not run: ${skipped?.reason ?? "no reason given"}`
         // The sentence follows the result: a mismatch never sits next to the words of a match.
-        const sentence = check ? (check.ok ? CHECK_WORDS[name] : FAIL_WORDS[name]) : null
+        const sentence = !check
+          ? null
+          : check.ok
+            ? CHECK_WORDS[name]
+            : check.error !== undefined
+              ? unusableWords(check.field, check.error)
+              : FAIL_WORDS[name]
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
             <span className="font-medium">

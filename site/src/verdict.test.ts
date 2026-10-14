@@ -13,6 +13,17 @@ function report(status: VerificationReport["status"], failed?: CheckName): Verif
 // One row per result the library can give, and a FAIL at every check of every step: the word and
 // the line come from `status` and `firstFailure` only, and a FAIL never quotes the words of a match.
 describe("verdictOf", () => {
+  it("a failure on an input that cannot be used names the input and claims no comparison", () => {
+    const r = report("failed", "commitment")
+    r.firstFailure = { check: "commitment", step: 1, field: "commitmentHex", message: "the commitment must be 64 hex characters" }
+    const { word, line } = verdictOf(r)
+    expect(word).toBe("FAIL")
+    expect(line).toBe(
+      "Step 1 cannot be checked. The value seedPair.serverSeedCommitment cannot be used: the commitment must be 64 hex characters.",
+    )
+    expect(line).not.toContain(FAIL_WORDS.commitment)
+  })
+
   it("verified is PASS", () => {
     expect(verdictOf(report("verified")).word).toBe("PASS")
   })

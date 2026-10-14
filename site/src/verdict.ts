@@ -1,5 +1,5 @@
 import type { CheckName, VerificationReport } from "@verifier"
-import { FAIL_WORDS, LOCKED } from "./words"
+import { FAIL_WORDS, LOCKED, unusableWords } from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
 export const CHECK_WORDS: Record<CheckName, string> = {
@@ -24,7 +24,11 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
       const failure = report.firstFailure
       return {
         word: "FAIL",
-        line: failure ? `Step ${failure.step} does not match: ${FAIL_WORDS[failure.check]}` : report.summary,
+        line: !failure
+          ? report.summary
+          : failure.field !== undefined
+            ? `Step ${failure.step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
+            : `Step ${failure.step} does not match: ${FAIL_WORDS[failure.check]}`,
       }
     }
     case "pending":

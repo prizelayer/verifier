@@ -31,3 +31,23 @@ export const LOCKED =
   "It is revealed at your first open after 1,000 opens on this secret, or at your first open more " +
   "than 24 hours after it was created. Until then your browser can check the chances (step 2) and, " +
   "when the proof has one, the prize list, but not the pick itself."
+
+/** The library's names for its inputs, as the fields of the pasted proof a reader can find. */
+export const PROOF_FIELD: Record<string, string> = {
+  serverSeedHex: "seedPair.revealedServerSeed",
+  commitmentHex: "seedPair.serverSeedCommitment",
+  clientSeed: "seedPair.clientSeed",
+  nonce: "open.nonce",
+  edition: "edition",
+  snapshot: "snapshot.body",
+  "snapshot.slots": "snapshot.body.slots",
+  "expected.snapshotHash": "open.snapshotHash",
+}
+
+/**
+ * Why a check failed because an input could not be used. It claims no comparison: a pending proof
+ * with a broken commitment revealed no secret, so it must not read "the secret we revealed".
+ */
+export function unusableWords(field: string | undefined, error: string): string {
+  return `The value ${PROOF_FIELD[field ?? ""] ?? field ?? "given"} cannot be used: ${error}.`
+}
