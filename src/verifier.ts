@@ -882,6 +882,9 @@ export async function verifyFrom(build: () => VerificationInput): Promise<Verifi
   return verify(input);
 }
 
+/** The checks a `verified` report must have run: the commitment, the odds, the draw and the slot. */
+const CORE_CHECKS = ['commitment', 'editionFingerprint', 'drawnPpmValue', 'drawnSlotIndex'] as const;
+
 const SEED_NOT_REVEALED = 'the server seed has not been revealed yet; it is published when its seed pair retires';
 const NO_SNAPSHOT = 'no prize-table snapshot was supplied';
 
@@ -1015,9 +1018,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
   }
 
   const failed = CHECK_NAMES.filter((name) => checks[name]?.ok === false);
-  const coreRan = (['commitment', 'editionFingerprint', 'drawnPpmValue', 'drawnSlotIndex'] as const).every(
-    (name) => checks[name]?.ok === true,
-  );
+  const coreRan = CORE_CHECKS.every((name) => checks[name]?.ok === true);
   const status: VerificationStatus = !seedRevealed
     ? 'pending'
     : failed.length > 0 || !coreRan
@@ -1075,7 +1076,7 @@ function failureOf(name: CheckName, failed: Check): Failure {
 }
 
 function invalidReport(error: unknown): VerificationReport {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   return {
     ok: false,
     status: 'invalid',
@@ -1113,8 +1114,12 @@ function attempt<T>(fn: () => T): Attempt<T> {
   try {
     return { ok: true, value: fn() };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    return { ok: false, error: messageOf(error) };
   }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 // ---------------------------------------------------------------------------

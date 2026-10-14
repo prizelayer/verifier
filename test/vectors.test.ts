@@ -332,11 +332,16 @@ describe('the snapshot content address — the 0x03 preimage', () => {
 });
 
 describe('verify() end to end', () => {
-  /** The §7 seed and nonce 1, drawn against the pinned golden edition. */
-  async function input(overrides: Record<string, unknown> = {}) {
-    const vector = FIXTURE.editionFingerprint.vectors.find(
+  /** The pinned golden edition every end-to-end case draws against. */
+  function canonicalEditionVector() {
+    return FIXTURE.editionFingerprint.vectors.find(
       (v: { id: string }) => v.id === 'canonical-unsorted-slots',
     );
+  }
+
+  /** The §7 seed and nonce 1, drawn against the pinned golden edition. */
+  async function input(overrides: Record<string, unknown> = {}) {
+    const vector = canonicalEditionVector();
     const edition = parseEdition({ ...vector.edition, slots: vector.edition.slotsAsGiven });
     // `expected` is merged field-by-field and applied LAST: spreading `overrides` wholesale would
     // replace the entire expected block, so a test overriding one claim would silently blank the
@@ -612,9 +617,7 @@ describe('verify() end to end', () => {
   it('fails at step 2, and keeps steps 1 and 3, when the chances do not add up', async () => {
     // One ppm value changed from 250000 to 250001: the table now sums to 1,000,001. That used to
     // throw before any check existed; it is a broken claim about the odds, so it fails step 2.
-    const vector = FIXTURE.editionFingerprint.vectors.find(
-      (v: { id: string }) => v.id === 'canonical-unsorted-slots',
-    );
+    const vector = canonicalEditionVector();
     const broken = parseEdition({
       ...vector.edition,
       slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
@@ -692,9 +695,7 @@ describe('verify() end to end', () => {
 
   it('does not let a pending open hide odds that do not match', async () => {
     // Chances moved between two slots: the sum is still 1,000,000, so only the fingerprint can see it.
-    const vector = FIXTURE.editionFingerprint.vectors.find(
-      (v: { id: string }) => v.id === 'canonical-unsorted-slots',
-    );
+    const vector = canonicalEditionVector();
     const swapped = parseEdition({
       ...vector.edition,
       slots: vector.edition.slotsAsGiven.map((s: { slotIndex: number }) =>
