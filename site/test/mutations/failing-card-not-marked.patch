@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index b79846f..347cd96 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -46,7 +46,7 @@ export function StepCards({ report, input }: Props) {
+             key={step}
+             aria-labelledby={`step-${step}`}
+             data-step={step}
+-            data-failed={failed ? "yes" : "no"}
++            data-failed="no"
+             className={`space-y-3 rounded-lg border p-4 ${failed ? "border-fail" : "border-border"}`}
+           >
+             <h2 id={`step-${step}`} className="text-lg font-semibold">

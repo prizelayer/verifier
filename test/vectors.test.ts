@@ -805,7 +805,10 @@ describe('verify() end to end', () => {
       assert.equal(report.checks.snapshotHash?.ok, true);
       assert.equal(report.status, 'failed');
       assert.equal(report.checks.snapshotEditionLink?.ok, false);
-      assert.equal(report.checks.snapshotEditionLink?.field, 'snapshot.slots');
+      // A mismatch of slot lists, compared and shown: not an input that could not be used.
+      assert.equal(report.checks.snapshotEditionLink?.error, undefined);
+      assert.equal(report.checks.snapshotEditionLink?.expected, '0,1,2');
+      assert.equal(report.checks.snapshotEditionLink?.computed, [0, 1, 2].filter((i) => i !== input.expected.drawnSlotIndex).join(','));
       assert.equal(report.checks.drawnItemId?.ok, false);
       assert.equal(report.checks.drawnItemId?.error, `the prize list has no entry for slot ${input.expected.drawnSlotIndex}`);
       assert.equal(report.trace.itemIdInDrawnSlot, undefined);
@@ -819,7 +822,8 @@ describe('verify() end to end', () => {
 
     assert.equal(report.checks.snapshotHash?.ok, true);
     assert.equal(report.firstFailure?.check, 'snapshotEditionLink');
-    assert.equal(report.firstFailure?.field, 'snapshot.slots');
+    assert.equal(report.firstFailure?.field, undefined);
+    assert.equal(report.firstFailure?.message, 'expected 0,1,2, computed 0,1,2,9');
     assert.equal(report.checks.drawnItemId?.ok, true);
   });
 
@@ -839,6 +843,19 @@ describe('verify() end to end', () => {
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'snapshotHash');
     assert.equal(report.firstFailure?.field, 'expected.snapshotHash');
+  });
+
+  it('answers, and never throws, for input nested 20,000 levels deep', async () => {
+    const base = await inputWithSnapshot();
+    const deep = '['.repeat(20_000) + ']'.repeat(20_000);
+    const reports = [
+      // The deep value where the slots should be.
+      await verifyFrom(() => ({ ...base, snapshot: parseSnapshotBody(`{"slots":${deep}}`) })),
+      // A deep object handed to verify() directly.
+      await verify({ ...base, expected: { ...base.expected, itemId: JSON.parse(deep) } }),
+    ];
+    // Both inputs are broken, so neither may pass; what matters is that each one gets an answer.
+    for (const report of reports) assert.ok(['failed', 'invalid'].includes(report.status), report.status);
   });
 
   it('refuses a missing seed as invalid, by name: only null means "not revealed yet"', async () => {

@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index cd61797..3cc58bc 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -104,7 +104,7 @@ export function App() {
+ 
+       {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
+ 
+-      <section aria-labelledby="not-proven" className="space-y-3">
++      <section aria-labelledby="not-proven" className="space-y-3" hidden>
+         <h2 id="not-proven" className="text-lg font-semibold">
+           What this does not prove
+         </h2>

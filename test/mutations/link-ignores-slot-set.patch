@@ -1,5 +1,5 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index b9e234d..212c26c 100644
+index 0580ef9..0b09a5d 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
 @@ -999,7 +999,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
@@ -9,5 +9,5 @@ index b9e234d..212c26c 100644
 -      const boxSlots = input.edition.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
 +      const boxSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
        const listSlots = snapshot.slots.map((s) => s.slotIndex).sort((a, b) => a - b).join(',');
-       checks.snapshotEditionLink =
-         link.ok && listSlots !== boxSlots
+       // A different set of slots is a mismatch, not an unusable input: the comparison was made, and
+       // `expected`/`computed` then hold the two slot lists.

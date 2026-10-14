@@ -1,0 +1,13 @@
+diff --git a/site/src/rawText.ts b/site/src/rawText.ts
+index 80f3b9f..671b384 100644
+--- a/site/src/rawText.ts
++++ b/site/src/rawText.ts
+@@ -109,7 +109,7 @@ export function structureProblem(text: string): StructureProblem | null {
+       }
+       i = end
+     } else if (c === "{" || c === "[") {
+-      if (stack.length >= MAX_NESTING) return { tooDeep: true }
++      if (stack.length >= MAX_NESTING && false) return { tooDeep: true }
+       stack.push({ names: c === "{" ? new Set() : null, expectKey: c === "{" })
+       i++
+     } else if (c === "}" || c === "]") {

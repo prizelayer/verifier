@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index b79846f..d6a655e 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -40,7 +40,7 @@ export function StepCards({ report, input }: Props) {
+         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
+         const text = pending && step === 1 ? STEP1_PENDING.text : stepText
+         // Shown on a failed step too: its own mismatch may only be the echo of the earlier one.
+-        const dependent = dependsOnFailed(step)
++        const dependent = false && dependsOnFailed(step)
+         return (
+           <section
+             key={step}

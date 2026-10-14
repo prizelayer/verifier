@@ -40,3 +40,13 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
       return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
   }
 }
+
+/** The caveat a PASS carries when the item was not compared. A PASS never hides what it left out. */
+export function caveatOf(report: VerificationReport): string | null {
+  if (report.status !== "verified" || report.notRun.length === 0) return null
+  // Read from what the library did not run, so a check it skips in a later version is not missed.
+  const skipped = new Set(report.notRun.map((n) => n.check))
+  if (skipped.has("snapshotHash")) return "The item was not checked: this proof has no prize list, so the page cannot tell which item was in your slot."
+  if (skipped.has("drawnItemId") && skipped.size === 1) return "The item was not checked: this page was not told which item you received."
+  return `Not checked: ${report.notRun.map((n) => `${n.check} (${n.reason})`).join("; ")}.`
+}

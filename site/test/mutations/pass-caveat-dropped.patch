@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index cd61797..e818506 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -140,7 +140,7 @@ function Verdict({ report }: { report: VerificationReport }) {
+     <div className="space-y-1" data-status={report.status}>
+       <p className={`text-3xl font-bold ${tone}`}>{word}</p>
+       <p>{line}</p>
+-      {caveat ? <p data-caveat="yes">{caveat}</p> : null}
++      {caveat && false ? <p data-caveat="yes">{caveat}</p> : null}
+     </div>
+   )
+ }

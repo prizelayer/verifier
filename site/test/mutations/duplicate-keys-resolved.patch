@@ -1,0 +1,13 @@
+diff --git a/site/src/rawText.ts b/site/src/rawText.ts
+index 80f3b9f..9e18576 100644
+--- a/site/src/rawText.ts
++++ b/site/src/rawText.ts
+@@ -103,7 +103,7 @@ export function structureProblem(text: string): StructureProblem | null {
+       const top = stack[stack.length - 1]
+       if (top?.names && top.expectKey) {
+         const name = JSON.parse(text.slice(i, end)) as string
+-        if (top.names.has(name)) return { duplicateKey: name }
++        if (top.names.has(name) && false) return { duplicateKey: name }
+         top.names.add(name)
+         top.expectKey = false
+       }

@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index b79846f..6e4b4a4 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -249,7 +249,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+               ) : null}
+               {checks.snapshotEditionLink ? <LinkView check={checks.snapshotEditionLink} boxFingerprint={trace.computedEditionFingerprint} /> : null}
+               {checks.drawnItemId ? (
+-                <Compare label="drawnItemId" expectedLabel="Item recorded for your win" computedLabel="Item in that slot" check={checks.drawnItemId} />
++                <Compare label="drawnItemId" expectedLabel="Item recorded for your win" computedLabel="Item in that slot" check={{ ...checks.drawnItemId, computed: checks.drawnItemId.expected }} />
+               ) : trace.itemIdInDrawnSlot !== undefined ? (
+                 <p className="text-sm" data-compare="drawnItemId">
+                   Item in that slot: <code className="font-mono text-xs">{trace.itemIdInDrawnSlot}</code>. The item you
