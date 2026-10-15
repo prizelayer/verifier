@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from "react"
 import type { VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
-import { Footer } from "./footer"
 import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { StepCards } from "./steps"
@@ -52,100 +51,97 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   }, [failingStep, checked])
 
   return (
-    <>
-      <main className="mx-auto max-w-3xl px-4 py-8 space-y-8">
-        <header className="space-y-3">
-          <h1 className="text-2xl font-semibold">Check an open yourself</h1>
-          <p>
-            When you open a box, our server picks your item. This page lets you repeat that pick on your own
-            device, with the same numbers, and see if you get the same answer.
-          </p>
-          <p>
-            Nothing on this page asks our server whether the open was fair. Once the proof is in the field, you
-            can turn your internet off and the check still works.
-          </p>
-          <p>Read "What this does not prove" below. It is short, and it matters.</p>
-        </header>
+    <main className="mx-auto max-w-3xl px-4 py-8 space-y-8">
+      <header className="space-y-3">
+        <h1 className="text-2xl font-semibold">Check an open yourself</h1>
+        <p>
+          When you open a box, our server picks your item. This page lets you repeat that pick on your own
+          device, with the same numbers, and see if you get the same answer.
+        </p>
+        <p>
+          Nothing on this page asks our server whether the open was fair. Once the proof is in the field, you
+          can turn your internet off and the check still works.
+        </p>
+        <p>Read "What this does not prove" below. It is short, and it matters.</p>
+      </header>
 
-        <LookupBox
-          disabled={running}
-          shownText={text}
-          onBusy={setLookingUp}
-          fetchFn={fetchFn}
-          onFound={(found) => {
-            edit(found)
-            void run(found)
-          }}
+      <LookupBox
+        disabled={running}
+        shownText={text}
+        onBusy={setLookingUp}
+        fetchFn={fetchFn}
+        onFound={(found) => {
+          edit(found)
+          void run(found)
+        }}
+      />
+
+      <section aria-labelledby={`${fieldId}-label`} aria-busy={lookingUp} className="space-y-3">
+        <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
+          Paste a proof
+        </label>
+        <textarea
+          id={fieldId}
+          value={text}
+          onChange={(event) => edit(event.target.value)}
+          readOnly={running || lookingUp}
+          rows={10}
+          spellCheck={false}
+          aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
+          className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
         />
-
-        <section aria-labelledby={`${fieldId}-label`} aria-busy={lookingUp} className="space-y-3">
-          <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
-            Paste a proof
-          </label>
-          <textarea
-            id={fieldId}
-            value={text}
-            onChange={(event) => edit(event.target.value)}
-            readOnly={running || lookingUp}
-            rows={10}
-            spellCheck={false}
-            aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
-            className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
-          />
-          {checked?.kind === "notAProof" ? (
-            <p id={`${fieldId}-problem`} className="text-fail">
-              {checked.message}
-            </p>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => run(text)} disabled={running || lookingUp || text.trim() === ""}>
-              Check
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                edit(EXAMPLE_TEXT)
-                void run(EXAMPLE_TEXT)
-              }}
-              disabled={running || lookingUp}
-            >
-              Try the example
-            </Button>
-          </div>
-        </section>
-
-        <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
-          {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
+        {checked?.kind === "notAProof" ? (
+          <p id={`${fieldId}-problem`} className="text-fail">
+            {checked.message}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => run(text)} disabled={running || lookingUp || text.trim() === ""}>
+            Check
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              edit(EXAMPLE_TEXT)
+              void run(EXAMPLE_TEXT)
+            }}
+            disabled={running || lookingUp}
+          >
+            Try the example
+          </Button>
         </div>
+      </section>
 
-        {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
+      <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
+        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
+      </div>
 
-        <section aria-labelledby="not-proven" className="space-y-3">
-          <h2 id="not-proven" className="text-lg font-semibold">
-            What this does not prove
-          </h2>
-          <p>
-            This page checks four things: the secret we revealed matches the fingerprint our server published;
-            the chances match the fingerprint recorded on your open; the pick, redone from the secret, the
-            client seed and the counter, gives the number we recorded; and that number lands on the item
-            recorded for your win.
-          </p>
-          <p>
-            You were not shown the fingerprint or the client seed before you played. Our server created both,
-            and this page reads both from our server. When our server creates a fingerprint for a player, it
-            writes a record in its audit log. This page does not check that record.
-          </p>
-          <p>So this page cannot prove, on its own, that we did not choose the secret after your open.</p>
-          <p>It also cannot prove that the item was in stock or that it was sent to you.</p>
-          <p>
-            You received this page from us. If you do not trust the copy we serve, open the copy on GitHub
-            Pages, or download the code and run it yourself. That does not remove us from the picture
-            completely: we wrote the code, and you still have to read it or trust someone who did.
-          </p>
-        </section>
-      </main>
-      <Footer />
-    </>
+      {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
+
+      <section aria-labelledby="not-proven" className="space-y-3">
+        <h2 id="not-proven" className="text-lg font-semibold">
+          What this does not prove
+        </h2>
+        <p>
+          This page checks four things: the secret we revealed matches the fingerprint our server published;
+          the chances match the fingerprint recorded on your open; the pick, redone from the secret, the
+          client seed and the counter, gives the number we recorded; and that number lands on the item
+          recorded for your win.
+        </p>
+        <p>
+          You were not shown the fingerprint or the client seed before you played. Our server created both,
+          and this page reads both from our server. When our server creates a fingerprint for a player, it
+          writes a record in its audit log. This page does not check that record.
+        </p>
+        <p>So this page cannot prove, on its own, that we did not choose the secret after your open.</p>
+        <p>It also cannot prove that the item was in stock or that it was sent to you.</p>
+        <p>
+          You received this page from us. If you do not trust the copy we serve, open the copy on GitHub
+          Pages, or download the code and run it yourself. That does not remove us from the picture
+          completely: we wrote the code, and you still have to read it or trust someone who did.
+        </p>
+      </section>
+    </main>
   )
 }
 

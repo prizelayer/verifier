@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
-import { App } from "./App"
+import { Page } from "./page"
 import { Footer, REPO_URL, SUMS_URL } from "./footer"
 import { expectNoAxeViolations } from "./test/axe"
 import { FOOTER } from "./words"
@@ -40,13 +40,13 @@ describe("the footer (where this copy comes from)", () => {
   })
 
   it("is on the page, after the main content, and has no accessibility violation", async () => {
-    const { container } = render(<App />)
+    const { container } = render(<Page />)
     expect(container.lastElementChild?.tagName).toBe("FOOTER")
     await expectNoAxeViolations(container)
   })
 
   it("a test build names no build: only the publish workflow sets the two values", () => {
-    render(<App />)
+    render(<Page />)
     expect(footer().textContent).toContain(FOOTER.notPublished)
   })
 })
