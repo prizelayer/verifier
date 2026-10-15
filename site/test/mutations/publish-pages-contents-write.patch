@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..582fc3f 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -150,6 +150,7 @@ jobs:
+       name: github-pages
+       url: ${{ steps.deploy.outputs.page_url }}
+     permissions:
++      contents: write
+       pages: write
+       id-token: write
+     steps:

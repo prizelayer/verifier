@@ -1,8 +1,8 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index f2b062c..343bf37 100644
+index 664c945..50387b1 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -75,7 +75,6 @@ export function fetchBytes(url, timeoutMs = 20_000) {
+@@ -79,7 +79,6 @@ export function fetchBytes(url, timeoutMs = 20_000) {
        res.on("end", () => {
          const encoding = res.headers["content-encoding"]
          if (res.statusCode !== 200) resolve({ state: "STATUS", status: res.statusCode })

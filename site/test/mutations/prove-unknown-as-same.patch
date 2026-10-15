@@ -1,8 +1,8 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index f2b062c..bda109e 100644
+index 664c945..82bba01 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -130,9 +130,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
+@@ -139,9 +139,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
      const states = got.map(([, h]) => h)
      const verdict = states.includes("MISSING")
        ? "MISSING"

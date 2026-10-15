@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 4578542..c160611 100644
+index 6562b15..c7a3c16 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -82,7 +82,7 @@ jobs:
+@@ -86,7 +86,7 @@ jobs:
    publish-s3:
      name: Publish to our CloudFront host
      needs: build

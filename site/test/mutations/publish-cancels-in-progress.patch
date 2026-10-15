@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 4578542..fb84206 100644
+index 6562b15..2a6ad25 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -24,7 +24,7 @@ on:
+@@ -26,7 +26,7 @@ on:
  # can never cross on the two hosts.
  concurrency:
    group: verifier-publish

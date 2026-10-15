@@ -1,11 +1,11 @@
 diff --git a/site/src/footer.tsx b/site/src/footer.tsx
-index 2b86e94..2eb68e7 100644
+index 1c312c8..307f444 100644
 --- a/site/src/footer.tsx
 +++ b/site/src/footer.tsx
 @@ -4,7 +4,7 @@ import { FOOTER } from "./words"
  
  export const REPO_URL = "https://github.com/prizelayer/verifier"
- /** The list as the GitHub Pages host serves it: a host we do not run. */
+ /** The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. */
 -export const SUMS_URL = "https://prizelayer.github.io/verifier/SHA256SUMS"
 +export const SUMS_URL = "./SHA256SUMS"
  

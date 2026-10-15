@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 4578542..8985659 100644
+index 6562b15..4ca0989 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -42,7 +42,7 @@ jobs:
+@@ -44,7 +44,7 @@ jobs:
          with:
            persist-credentials: false
  

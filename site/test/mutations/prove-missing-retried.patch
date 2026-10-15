@@ -1,13 +1,13 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index f2b062c..90299eb 100644
+index 664c945..7bcd10f 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -118,7 +118,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
+@@ -127,7 +127,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
    const served = new Map()
    for (const [name, base] of hosts) served.set(name, await readHost(name, base, paths, fetchFn))
    const [lastName, lastBase] = hosts[hosts.length - 1]
 -  const differsOnLast = () => paths.filter((p) => /^[0-9a-f]{64}$/.test(served.get(lastName).get(p)) && served.get(lastName).get(p) !== build.get(p))
 +  const differsOnLast = () => paths.filter((p) => served.get(lastName).get(p) !== build.get(p))
-   for (let waited = 0; differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
+   for (let waited = 0; retryLast && differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
      log(`${lastName}: ${differsOnLast().join(", ")} still DIFFERENT after ${waited / 1000} s; reading ${lastName} again in ${retryEveryMs / 1000} s`)
      await sleep(retryEveryMs)
