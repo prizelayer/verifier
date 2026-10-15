@@ -1,0 +1,13 @@
+diff --git a/site/scripts/sha256sums.mjs b/site/scripts/sha256sums.mjs
+index 4a441ab..8a0c0e6 100644
+--- a/site/scripts/sha256sums.mjs
++++ b/site/scripts/sha256sums.mjs
+@@ -20,7 +20,7 @@ export function filesUnder(dir) {
+     }
+   }
+   walk(dir)
+-  return out.filter((p) => p !== SUMS_FILE).sort()
++  return out.sort()
+ }
+ 
+ export function sumsOf(dir) {

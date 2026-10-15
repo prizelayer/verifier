@@ -1,0 +1,12 @@
+diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
+index 4f15d9c..f9ec178 100644
+--- a/site/scripts/prove-identical.mjs
++++ b/site/scripts/prove-identical.mjs
+@@ -71,7 +71,6 @@ export function fetchBytes(url, timeoutMs = 20_000) {
+         const encoding = res.headers["content-encoding"]
+         if (res.statusCode === 404 || res.statusCode === 403) resolve({ state: "MISSING", why: `status ${res.statusCode}` })
+         else if (res.statusCode !== 200) resolve({ state: "UNKNOWN", why: `status ${res.statusCode}` })
+-        else if (encoding && encoding !== "identity") resolve({ state: "UNKNOWN", why: `content-encoding ${encoding}` })
+         else resolve({ state: "OK", bytes: Buffer.concat(chunks) })
+       })
+       res.on("error", (e) => resolve({ state: "UNKNOWN", why: e.message }))

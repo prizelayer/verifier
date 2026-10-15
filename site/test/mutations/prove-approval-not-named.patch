@@ -1,0 +1,13 @@
+diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
+index 4f15d9c..19fefcf 100644
+--- a/site/scripts/prove-identical.mjs
++++ b/site/scripts/prove-identical.mjs
+@@ -27,7 +27,7 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
+ /** Whether this run published anything to compare, and the words when it did not. */
+ export function gate({ switchValue, s3Started, s3Result = "", pagesResult = "" }) {
+   if (switchValue !== "true") return { compare: false, words: "switch off, nothing published, nothing compared" }
+-  if (s3Started !== "true") {
++  if (s3Started === "never") {
+     return {
+       compare: false,
+       words: `not published: approval not given, so the publish job never started (publish-s3: ${s3Result || "no result"}, publish-pages: ${pagesResult || "no result"}); nothing compared`,

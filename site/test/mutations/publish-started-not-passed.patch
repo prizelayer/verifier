@@ -1,0 +1,10 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 3a2423c..88e499a 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -179,4 +179,4 @@ jobs:
+         run: >-
+           node site/scripts/prove-identical.mjs --dist page
+           --host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/"
+-          --switch "$SWITCH" --s3-started "$S3_STARTED" --s3 "$S3_RESULT" --pages "$PAGES_RESULT"
++          --switch "$SWITCH" --s3-started "true" --s3 "$S3_RESULT" --pages "$PAGES_RESULT"

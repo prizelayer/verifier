@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 3a2423c..2e0e729 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -123,8 +123,7 @@ jobs:
+ 
+   publish-pages:
+     name: Publish the same build to GitHub Pages
+-    needs: [build, publish-s3]
+-    if: needs.publish-s3.result == 'success'
++    needs: build
+     runs-on: ubuntu-latest
+     environment:
+       name: github-pages
