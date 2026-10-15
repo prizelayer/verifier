@@ -9,10 +9,12 @@ name: verifier-publish
 #     that environment can assume the publish role, and the Pages job runs only after it, so one
 #     approval covers both hosts and a merge alone publishes nothing.
 #
-# Settings this workflow reads (variables, never secrets: none of them gives any right on its own):
-#   repository:              VERIFIER_DEPLOYABLE, VERIFIER_CLOUDFRONT_HOST
-#   environment "publish":   VERIFIER_AWS_ACCOUNT_ID, VERIFIER_AWS_REGION, VERIFIER_PUBLISH_ROLE,
-#                            VERIFIER_BUCKET, VERIFIER_DISTRIBUTION_ID_PARAMETER
+# Settings this workflow reads (none of them gives any right on its own):
+#   repository variables:          VERIFIER_DEPLOYABLE, VERIFIER_CLOUDFRONT_HOST
+#   environment "publish" secret:  VERIFIER_AWS_ACCOUNT_ID (a secret only so this public log never
+#                                  shows it: GitHub masks a secret wherever it appears)
+#   environment "publish" vars:    VERIFIER_AWS_REGION, VERIFIER_PUBLISH_ROLE, VERIFIER_BUCKET,
+#                                  VERIFIER_DISTRIBUTION_ID_PARAMETER
 #
 # Every action is pinned by its full commit sha; the comment names the release it was read from.
 # A rollback is a revert on main, which this workflow publishes like any other commit.
@@ -70,8 +72,10 @@ jobs:
           VERIFIER_BUILD_COMMIT: ${{ github.sha }}
         run: npm run check-bundle
 
-      - name: SHA256SUMS (printed here, in the public log of this run)
-        run: node scripts/sha256sums.mjs dist
+      - name: SHA256SUMS (printed here, in the public log of this run), and the Node that built it
+        run: |
+          echo "built with node $(node --version)"
+          node scripts/sha256sums.mjs dist
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -98,32 +102,26 @@ jobs:
       - id: started
         run: echo "started=true" >> "$GITHUB_OUTPUT"
 
-      # If a job names an environment before anyone has set it up, GitHub creates it on the spot,
-      # with no required reviewer and none of these variables. So a missing variable stops the run
-      # here, before any credential is asked for: the worst case is a red run that wrote nothing.
-      - name: Refuse to run without the environment's settings
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            site/scripts/publish-guard.sh
+            site/scripts/publish-s3.sh
+          sparse-checkout-cone-mode: false
+
+      # Before any credential and any write: every setting present and of its shape, the account id
+      # and the role masked in this public log, and this commit still the head of main. It runs
+      # after the "started" marker, so a failure here reads as a failed publish.
+      - name: Check the settings and that this build is still the newest
         env:
-          VERIFIER_AWS_ACCOUNT_ID: ${{ vars.VERIFIER_AWS_ACCOUNT_ID }}
+          VERIFIER_AWS_ACCOUNT_ID: ${{ secrets.VERIFIER_AWS_ACCOUNT_ID }}
           VERIFIER_AWS_REGION: ${{ vars.VERIFIER_AWS_REGION }}
           VERIFIER_PUBLISH_ROLE: ${{ vars.VERIFIER_PUBLISH_ROLE }}
           VERIFIER_BUCKET: ${{ vars.VERIFIER_BUCKET }}
           VERIFIER_DISTRIBUTION_ID_PARAMETER: ${{ vars.VERIFIER_DISTRIBUTION_ID_PARAMETER }}
-        run: |
-          missing=""
-          for name in VERIFIER_AWS_ACCOUNT_ID VERIFIER_AWS_REGION VERIFIER_PUBLISH_ROLE VERIFIER_BUCKET VERIFIER_DISTRIBUTION_ID_PARAMETER; do
-            eval "value=\${$name:-}"
-            [ -n "$value" ] || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::the environment publish does not set:$missing. Nothing was published."
-            exit 1
-          fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: site/scripts/publish-s3.sh
-          sparse-checkout-cone-mode: false
+          VERIFIER_CLOUDFRONT_HOST: ${{ vars.VERIFIER_CLOUDFRONT_HOST }}
+        run: sh site/scripts/publish-guard.sh
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -132,8 +130,9 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: arn:aws:iam::${{ vars.VERIFIER_AWS_ACCOUNT_ID }}:role/${{ vars.VERIFIER_PUBLISH_ROLE }}
+          role-to-assume: arn:aws:iam::${{ secrets.VERIFIER_AWS_ACCOUNT_ID }}:role/${{ vars.VERIFIER_PUBLISH_ROLE }}
           aws-region: ${{ vars.VERIFIER_AWS_REGION }}
+          mask-aws-account-id: true
 
       - name: Upload, index.html last, then invalidate
         env:

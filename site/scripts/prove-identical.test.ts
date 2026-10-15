@@ -42,7 +42,7 @@ afterEach(() => servers.splice(0).forEach((s) => s.close()))
 async function serve(dir: string, prefix = "/", headers: Record<string, string> = {}, missing = 404) {
   const server = http.createServer((req, res) => {
     try {
-      const path = decodeURIComponent((req.url ?? "").slice(prefix.length))
+      const path = decodeURIComponent((req.url ?? "").slice(prefix.length)) || "index.html"
       const body = readFileSync(join(dir, path))
       res.writeHead(200, headers).end(body)
     } catch {
@@ -72,7 +72,7 @@ describe("prove-identical: the bytes each host serves, compared with the build",
     const dist = builtDist()
     const r = await run(dist, await serve(hostCopy(dist)), await serve(hostCopy(dist), "/verifier/"))
     expect(r.ok).toBe(true)
-    for (const p of ["SHA256SUMS", "assets/app-1.js", "assets/style-1.css", "index.html"]) expect(r.verdict(p)).toBe("same")
+    for (const p of ["/", "SHA256SUMS", "assets/app-1.js", "assets/style-1.css", "index.html"]) expect(r.verdict(p)).toBe("same")
   })
 
   it("says DIFFERENT for the one file a host serves with one byte changed", async () => {
@@ -136,6 +136,43 @@ describe("prove-identical: the bytes each host serves, compared with the build",
     expect(r.lines.filter((l) => l.includes("still DIFFERENT"))).toHaveLength(3)
   })
 
+  it("does not wait for Pages when the Pages publish did not succeed: waiting cannot bring it", async () => {
+    const dist = builtDist()
+    const old = hostCopy(dist, (d) => writeFileSync(join(d, "index.html"), INDEX.replace("code", "old")))
+    const sleeps: number[] = []
+    const lines: string[] = []
+    const ok = await compare({
+      dist,
+      hosts: [["cloudfront", await serve(hostCopy(dist))], ["pages", await serve(old)]],
+      sleep: async (ms: number) => void sleeps.push(ms),
+      retryLast: false,
+      log: (l: string) => lines.push(l),
+    })
+    expect(ok).toBe(false)
+    expect(sleeps).toEqual([])
+    expect(lines.find((l) => l.startsWith("index.html  "))?.endsWith("DIFFERENT")).toBe(true)
+  })
+
+  it("reads the page's own address too: a host that serves an old page at / is DIFFERENT there", async () => {
+    const dist = builtDist()
+    const cloudfront = hostCopy(dist)
+    const server = http.createServer((req, res) => {
+      if (req.url === "/") return void res.writeHead(200).end(INDEX.replace("code", "old"))
+      try {
+        res.writeHead(200).end(readFileSync(join(cloudfront, decodeURIComponent(req.url ?? ""))))
+      } catch {
+        res.writeHead(404).end()
+      }
+    })
+    servers.push(server)
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r))
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`
+    const r = await run(dist, base, await serve(hostCopy(dist), "/verifier/"))
+    expect(r.ok).toBe(false)
+    expect(r.verdict("/")).toBe("DIFFERENT")
+    expect(r.verdict("index.html")).toBe("same")
+  })
+
   it("passes once the Pages cache serves the new bytes within the wait", async () => {
     const dist = builtDist()
     const pages = hostCopy(dist, (d) => writeFileSync(join(d, "index.html"), INDEX.replace("code", "old")))
@@ -167,7 +204,7 @@ describe("prove-identical: the bytes each host serves, compared with the build",
 describe("prove-identical: the runs that publish nothing say so, and never say same", () => {
   it("names the switch when it is off", () => {
     expect(gate({ switchValue: "", s3Started: "" })).toEqual({ compare: false, words: "switch off, nothing published, nothing compared" })
-    expect(gate({ switchValue: "false", s3Started: "true" }).compare).toBe(false)
+    expect(gate({ switchValue: "false", s3Started: "" }).compare).toBe(false)
   })
 
   it("names the approval when the publish job never started (declined, expired or not yet given)", () => {
@@ -182,6 +219,12 @@ describe("prove-identical: the runs that publish nothing say so, and never say s
 
   it("compares once the publish job has started, whatever its result", () => {
     expect(gate({ switchValue: "true", s3Started: "true", s3Result: "failure" }).compare).toBe(true)
+  })
+
+  it("compares a publish that started even when the switch was turned off during it", () => {
+    // An emergency stop while a job runs must not make the record say that nothing was published.
+    expect(gate({ switchValue: "false", s3Started: "true", s3Result: "success" })).toEqual({ compare: true, words: "" })
+    expect(gate({ switchValue: "", s3Started: "true", s3Result: "cancelled" }).compare).toBe(true)
   })
 
   it("from the command line: exit 0 and the named words, with nothing fetched", () => {

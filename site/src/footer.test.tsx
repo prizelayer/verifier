@@ -25,6 +25,15 @@ describe("the footer (where this copy comes from)", () => {
     expect(REPO_URL).toBe("https://github.com/prizelayer/verifier")
   })
 
+  it("says the Pages list is the latest publish's and the log is kept 90 days, so an older copy is not misread", () => {
+    render(<Footer build={BUILD} />)
+    expect(footer().textContent).toContain("GitHub Pages serves the list of the latest publish only")
+    expect(footer().textContent).toContain("GitHub keeps that log for 90 days.")
+    expect(within(footer()).getByRole("link", { name: FOOTER.sumsLink }).getAttribute("href")).toBe(SUMS_URL)
+    expect(FOOTER.sumsLink).toBe("SHA256SUMS of the latest publish, on GitHub Pages")
+    expect(FOOTER.runLink).toBe("the public log of this run (kept 90 days)")
+  })
+
   it("shows no fingerprint of the page itself, and says why", () => {
     render(<Footer build={BUILD} />)
     expect(footer().textContent).toContain(FOOTER.noSelfHash)

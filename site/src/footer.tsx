@@ -3,7 +3,7 @@ import { BUILD } from "./build"
 import { FOOTER } from "./words"
 
 export const REPO_URL = "https://github.com/prizelayer/verifier"
-/** The list as the GitHub Pages host serves it: a host we do not run. */
+/** The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. */
 export const SUMS_URL = "https://prizelayer.github.io/verifier/SHA256SUMS"
 
 const link = "underline underline-offset-2"

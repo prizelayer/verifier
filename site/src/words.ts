@@ -169,9 +169,9 @@ export const FOOTER = {
   byRun: "by run",
   ofWorkflow: "of its publish workflow.",
   sums:
-    "That run wrote the SHA-256 fingerprint of every file it built into one list, SHA256SUMS. The list is published next to the page, and the run printed the same list in its public log. To check the copy you have, compute the SHA-256 of its files and compare them with the list.",
-  sumsLink: "SHA256SUMS on GitHub Pages",
-  runLink: "the public log of the run",
+    "That run wrote the SHA-256 fingerprint of every file it built into one list, SHA256SUMS, and printed the list in its public log. GitHub keeps that log for 90 days. GitHub Pages serves the list of the latest publish only: if a newer build was published after this copy, that list will not match these files. To check the copy you have, compute the SHA-256 of its files and compare them with the list of its own build.",
+  sumsLink: "SHA256SUMS of the latest publish, on GitHub Pages",
+  runLink: "the public log of this run (kept 90 days)",
   noSelfHash: "This page does not show a fingerprint of itself: a changed page could show any number.",
   notPublished:
     "This copy was not built by the publish workflow, so it names no build and no list of fingerprints. Its code is in the public repository",

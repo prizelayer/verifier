@@ -22,16 +22,18 @@ import { sha256 as sha, SUMS_FILE } from "./sha256sums.mjs"
 
 const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
 
-/** Whether this run published anything to compare, and the words when it did not. */
+/**
+ * Whether this run published anything to compare, and the words when it did not. A publish job that
+ * started is always compared, whatever the switch says by now: the switch is read when this check
+ * runs, and turning it off during a publish must not make the record say nothing was published.
+ */
 export function gate({ switchValue, s3Started, s3Result = "", pagesResult = "" }) {
+  if (s3Started === "true") return { compare: true, words: "" }
   if (switchValue !== "true") return { compare: false, words: "switch off, nothing published, nothing compared" }
-  if (s3Started !== "true") {
-    return {
-      compare: false,
-      words: `not published: approval not given, so the publish job never started (publish-s3: ${s3Result || "no result"}, publish-pages: ${pagesResult || "no result"}); nothing compared`,
-    }
+  return {
+    compare: false,
+    words: `not published: approval not given, so the publish job never started (not approved, declined, expired, or refused by the environment's rules; publish-s3: ${s3Result || "no result"}, publish-pages: ${pagesResult || "no result"}); nothing compared`,
   }
-  return { compare: true, words: "" }
 }
 
 /** The list the build wrote: path → sha-256. A line of any other shape makes the list unusable. */
@@ -61,7 +63,9 @@ export function pageReferences(html) {
 /**
  * The answers that mean "this host does not have the file". Our CloudFront host reads a private
  * bucket with no right to list it, and S3 answers 403, not 404, for a missing key to such a reader;
- * nothing rewrites that answer into the page. GitHub Pages answers 404. Any other status is UNKNOWN.
+ * once the host no longer turns an error into the page (its fallback off, which must be live before
+ * the first publish), that 403 reaches this check. GitHub Pages answers 404. Any other status is
+ * UNKNOWN.
  */
 export const MISSING_STATUSES = { cloudfront: [403, 404], pages: [404] }
 
@@ -89,22 +93,27 @@ async function readHost(name, base, paths, fetchFn) {
   const missing = MISSING_STATUSES[name] ?? [404]
   const out = new Map()
   for (const p of paths) {
-    const r = await fetchFn(new URL(p, base).href)
+    const r = await fetchFn(p === BASE ? base : new URL(p, base).href)
     out.set(p, r.state === "OK" ? sha(r.bytes) : r.state === "STATUS" && missing.includes(r.status) ? "MISSING" : "UNKNOWN")
   }
   return out
 }
 
+/** The page's own address: a reader loads "/", which a host may serve apart from "index.html". */
+export const BASE = "/"
+
 /**
  * Compares both hosts with the build. `hosts` is [[name, baseUrl], …]; the last host is the GitHub
  * Pages one, whose cache may serve the old bytes for a few minutes, so only a DIFFERENT there is
- * read again, every `retryEveryMs`, for at most `retryForMs`. A MISSING or UNKNOWN is never retried
- * into a pass.
+ * read again, every `retryEveryMs`, for at most `retryForMs`, and only when the Pages publish
+ * succeeded (`retryLast`): waiting cannot bring a publish that failed. A MISSING or UNKNOWN is
+ * never retried into a pass.
  */
-export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryEveryMs = 60_000, retryForMs = 900_000, log = console.log }) {
+export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryEveryMs = 60_000, retryForMs = 900_000, retryLast = true, log = console.log }) {
   const sumsText = readFileSync(join(dist, SUMS_FILE), "utf8")
   const build = parseSums(sumsText)
   build.set(SUMS_FILE, sha(Buffer.from(sumsText)))
+  build.set(BASE, build.get("index.html"))
   const paths = [...build.keys()]
   let bad = false
 
@@ -119,7 +128,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
   for (const [name, base] of hosts) served.set(name, await readHost(name, base, paths, fetchFn))
   const [lastName, lastBase] = hosts[hosts.length - 1]
   const differsOnLast = () => paths.filter((p) => /^[0-9a-f]{64}$/.test(served.get(lastName).get(p)) && served.get(lastName).get(p) !== build.get(p))
-  for (let waited = 0; differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
+  for (let waited = 0; retryLast && differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
     log(`${lastName}: ${differsOnLast().join(", ")} still DIFFERENT after ${waited / 1000} s; reading ${lastName} again in ${retryEveryMs / 1000} s`)
     await sleep(retryEveryMs)
     served.set(lastName, await readHost(lastName, lastBase, paths, fetchFn))
@@ -167,7 +176,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`publish-s3: ${a.s3 || "?"} · publish-pages: ${a.pages || "?"} · hosts: ${a.hosts.map(([n, u]) => `${n} ${u}`).join(", ")}`)
   let ok
   try {
-    ok = await compare({ dist: a.dist, hosts: a.hosts, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) })
+    ok = await compare({ dist: a.dist, hosts: a.hosts, retryLast: a.pages === "success", sleep: (ms) => new Promise((r) => setTimeout(r, ms)) })
   } catch (e) {
     console.log(`RESULT: UNKNOWN: ${e.message}`)
     process.exit(1)
