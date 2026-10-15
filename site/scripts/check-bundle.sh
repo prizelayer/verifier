@@ -30,12 +30,19 @@ grep -F -q '<script defer src="./assets/app-' "$html" || bad "$html does not loa
 api='https://public-api.dev.prizelayer.com'
 policy=$(grep -oE 'content="[^"]*connect-src[^"]*"' "$html" | grep -oE 'connect-src [^;"]*' || true)
 [ "$policy" = "connect-src $api" ] || bad "$html carries '$policy', not 'connect-src $api'"
-allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com|https://public-api\.dev\.prizelayer\.com)$'
+# The footer links to the code and to the build's two records, on GitHub: links, never fetched.
+allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com|https://public-api\.dev\.prizelayer\.com|https://github\.com|https://prizelayer\.github\.io)$'
 origins=$(grep -ohE '(https?|wss?)://[A-Za-z0-9.-]+' $files | sort -u)
 echo "check-bundle: origins in the bundle: $(echo $origins)"
 for origin in $origins; do
   echo "$origin" | grep -Eq "$allowed" || bad "origin $origin is not on the allowed list"
 done
+
+# A build of the publish workflow names its own commit in the footer. Asked only when the build
+# was given one, so a local build is not refused for naming none.
+if [ -n "${VERIFIER_BUILD_COMMIT:-}" ]; then
+  grep -F -q "$VERIFIER_BUILD_COMMIT" $js || bad "the script does not name the commit it was built from ($VERIFIER_BUILD_COMMIT)"
+fi
 
 # No browser storage (the same list the source scan reads).
 while IFS= read -r api; do
