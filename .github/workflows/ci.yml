@@ -189,7 +189,8 @@ jobs:
     # pass. Same rules: the mutant must type-check, and nothing may stay applied. A run that does not
     # end is an error naming its patch, never a catch: a test run that hangs proves nothing.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # About 15 s per patch: 107 patches took 27 minutes on 2026-10-15, so the old 30 was too close.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
