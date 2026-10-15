@@ -1,8 +1,8 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index 4f15d9c..d6100e5 100644
+index 0c39c81..8b75eb7 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -113,7 +113,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
+@@ -111,7 +111,7 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
    const served = new Map()
    for (const [name, base] of hosts) served.set(name, await readHost(base, paths, fetchFn))
    const [lastName, lastBase] = hosts[hosts.length - 1]

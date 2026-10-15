@@ -1,8 +1,8 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index 4f15d9c..e90b325 100644
+index 0c39c81..2ad51ba 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -106,7 +106,6 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
+@@ -104,7 +104,6 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
    for (const ref of pageReferences(readFileSync(join(dist, "index.html"), "utf8"))) {
      if (!build.has(ref)) {
        log(`NOT LISTED  ${ref}  (index.html loads it, ${SUMS_FILE} does not name it, so it cannot be compared)`)

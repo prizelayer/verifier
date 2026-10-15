@@ -14,15 +14,13 @@
 //
 // Usage: node scripts/prove-identical.mjs --dist <dir> --host cloudfront=<url> --host pages=<url>
 //          --switch <value> --s3-started <value> [--s3 <job result>] [--pages <job result>]
-import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import http from "node:http"
 import https from "node:https"
 import { join } from "node:path"
+import { sha256 as sha, SUMS_FILE } from "./sha256sums.mjs"
 
-const SUMS_FILE = "SHA256SUMS"
 const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
-const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
 
 /** Whether this run published anything to compare, and the words when it did not. */
 export function gate({ switchValue, s3Started, s3Result = "", pagesResult = "" }) {

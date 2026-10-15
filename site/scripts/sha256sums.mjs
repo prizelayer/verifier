@@ -9,6 +9,9 @@ import { join, relative, sep } from "node:path"
 
 export const SUMS_FILE = "SHA256SUMS"
 
+/** The one way both the list and the check hash bytes. */
+export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex")
+
 /** Every file under `dir`, as a path relative to it with "/" separators, sorted. */
 export function filesUnder(dir) {
   const out = []
@@ -25,7 +28,7 @@ export function filesUnder(dir) {
 
 export function sumsOf(dir) {
   return filesUnder(dir)
-    .map((p) => `${createHash("sha256").update(readFileSync(join(dir, p))).digest("hex")}  ${p}\n`)
+    .map((p) => `${sha256(readFileSync(join(dir, p)))}  ${p}\n`)
     .join("")
 }
 

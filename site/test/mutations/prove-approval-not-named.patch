@@ -1,8 +1,8 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index 4f15d9c..19fefcf 100644
+index 0c39c81..d51b28f 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
-@@ -27,7 +27,7 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
+@@ -25,7 +25,7 @@ const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
  /** Whether this run published anything to compare, and the words when it did not. */
  export function gate({ switchValue, s3Started, s3Result = "", pagesResult = "" }) {
    if (switchValue !== "true") return { compare: false, words: "switch off, nothing published, nothing compared" }
