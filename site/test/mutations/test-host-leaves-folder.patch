@@ -1,0 +1,12 @@
+diff --git a/site/scripts/prove-identical.test.ts b/site/scripts/prove-identical.test.ts
+index 0556c44..6b0ffdc 100644
+--- a/site/scripts/prove-identical.test.ts
++++ b/site/scripts/prove-identical.test.ts
+@@ -48,7 +48,6 @@ async function serve(dir: string, prefix = "/", headers: Record<string, string>
+       const path = decodeURIComponent((req.url ?? "").slice(prefix.length))
+       if (!path && rootPage !== undefined) return void res.writeHead(200, headers).end(rootPage)
+       const file = resolve(root, path || "index.html")
+-      if (!file.startsWith(root + sep)) return void res.writeHead(missing).end("not found")
+       const body = readFileSync(file)
+       res.writeHead(200, headers).end(body)
+     } catch {
