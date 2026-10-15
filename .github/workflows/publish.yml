@@ -98,6 +98,27 @@ jobs:
       - id: started
         run: echo "started=true" >> "$GITHUB_OUTPUT"
 
+      # If a job names an environment before anyone has set it up, GitHub creates it on the spot,
+      # with no required reviewer and none of these variables. So a missing variable stops the run
+      # here, before any credential is asked for: the worst case is a red run that wrote nothing.
+      - name: Refuse to run without the environment's settings
+        env:
+          VERIFIER_AWS_ACCOUNT_ID: ${{ vars.VERIFIER_AWS_ACCOUNT_ID }}
+          VERIFIER_AWS_REGION: ${{ vars.VERIFIER_AWS_REGION }}
+          VERIFIER_PUBLISH_ROLE: ${{ vars.VERIFIER_PUBLISH_ROLE }}
+          VERIFIER_BUCKET: ${{ vars.VERIFIER_BUCKET }}
+          VERIFIER_DISTRIBUTION_ID_PARAMETER: ${{ vars.VERIFIER_DISTRIBUTION_ID_PARAMETER }}
+        run: |
+          missing=""
+          for name in VERIFIER_AWS_ACCOUNT_ID VERIFIER_AWS_REGION VERIFIER_PUBLISH_ROLE VERIFIER_BUCKET VERIFIER_DISTRIBUTION_ID_PARAMETER; do
+            eval "value=\${$name:-}"
+            [ -n "$value" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::the environment publish does not set:$missing. Nothing was published."
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

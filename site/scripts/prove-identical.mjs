@@ -58,7 +58,14 @@ export function pageReferences(html) {
   return refs
 }
 
-/** GET one URL with compression refused; the bytes, or MISSING (404) or UNKNOWN (anything else). */
+/**
+ * The answers that mean "this host does not have the file". Our CloudFront host reads a private
+ * bucket with no right to list it, and S3 answers 403, not 404, for a missing key to such a reader;
+ * nothing rewrites that answer into the page. GitHub Pages answers 404. Any other status is UNKNOWN.
+ */
+export const MISSING_STATUSES = { cloudfront: [403, 404], pages: [404] }
+
+/** GET one URL with compression refused; the bytes, or the status of any answer that is not 200. */
 export function fetchBytes(url, timeoutMs = 20_000) {
   return new Promise((resolve) => {
     const get = url.startsWith("https:") ? https.get : http.get
@@ -67,8 +74,7 @@ export function fetchBytes(url, timeoutMs = 20_000) {
       res.on("data", (c) => chunks.push(c))
       res.on("end", () => {
         const encoding = res.headers["content-encoding"]
-        if (res.statusCode === 404 || res.statusCode === 403) resolve({ state: "MISSING", why: `status ${res.statusCode}` })
-        else if (res.statusCode !== 200) resolve({ state: "UNKNOWN", why: `status ${res.statusCode}` })
+        if (res.statusCode !== 200) resolve({ state: "STATUS", status: res.statusCode })
         else if (encoding && encoding !== "identity") resolve({ state: "UNKNOWN", why: `content-encoding ${encoding}` })
         else resolve({ state: "OK", bytes: Buffer.concat(chunks) })
       })
@@ -79,11 +85,12 @@ export function fetchBytes(url, timeoutMs = 20_000) {
   })
 }
 
-async function readHost(base, paths, fetchFn) {
+async function readHost(name, base, paths, fetchFn) {
+  const missing = MISSING_STATUSES[name] ?? [404]
   const out = new Map()
   for (const p of paths) {
     const r = await fetchFn(new URL(p, base).href)
-    out.set(p, r.state === "OK" ? sha(r.bytes) : r.state)
+    out.set(p, r.state === "OK" ? sha(r.bytes) : r.state === "STATUS" && missing.includes(r.status) ? "MISSING" : "UNKNOWN")
   }
   return out
 }
@@ -109,13 +116,13 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
   }
 
   const served = new Map()
-  for (const [name, base] of hosts) served.set(name, await readHost(base, paths, fetchFn))
+  for (const [name, base] of hosts) served.set(name, await readHost(name, base, paths, fetchFn))
   const [lastName, lastBase] = hosts[hosts.length - 1]
   const differsOnLast = () => paths.filter((p) => /^[0-9a-f]{64}$/.test(served.get(lastName).get(p)) && served.get(lastName).get(p) !== build.get(p))
   for (let waited = 0; differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
     log(`${lastName}: ${differsOnLast().join(", ")} still DIFFERENT after ${waited / 1000} s; reading ${lastName} again in ${retryEveryMs / 1000} s`)
     await sleep(retryEveryMs)
-    served.set(lastName, await readHost(lastBase, paths, fetchFn))
+    served.set(lastName, await readHost(lastName, lastBase, paths, fetchFn))
   }
 
   for (const p of paths) {

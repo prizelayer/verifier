@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -71,6 +72,29 @@ describe("the publish workflow", () => {
     expect(check).toContain("          S3_STARTED: ${{ needs.publish-s3.outputs.started }}\n")
     expect(check).toContain('--s3-started "$S3_STARTED"')
     expect(check).toContain('--switch "$SWITCH"')
+  })
+
+  it("stops the S3 job, before any credential, when the environment does not set its five variables", () => {
+    const s3 = job("publish-s3")
+    const steps = s3.slice(s3.indexOf("    steps:\n")).split("\n      - ")
+    const check = steps[2]
+    expect(check).toContain("name: Refuse to run without the environment's settings")
+    const names = ["VERIFIER_AWS_ACCOUNT_ID", "VERIFIER_AWS_REGION", "VERIFIER_PUBLISH_ROLE", "VERIFIER_BUCKET", "VERIFIER_DISTRIBUTION_ID_PARAMETER"]
+    for (const name of names) expect(check).toContain(`          ${name}: \${{ vars.${name} }}\n`)
+    expect(check).toContain(`for name in ${names.join(" ")}; do`)
+    expect(check).toContain("exit 1")
+    expect(s3.indexOf("Refuse to run without")).toBeLessThan(s3.indexOf("configure-aws-credentials"))
+
+    // The step's own script, run as the runner runs it: red with any variable empty, green with all.
+    const script = check.slice(check.indexOf("run: |\n") + "run: |\n".length).replace(/^ {10}/gm, "")
+    const all = Object.fromEntries(names.map((n) => [n, "x"]))
+    const runWith = (env: Record<string, string>) => spawnSync("bash", ["-e", "-c", script], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } })
+    expect(runWith(all).status).toBe(0)
+    for (const name of names) {
+      const r = runWith({ ...all, [name]: "" })
+      expect(r.status).toBe(1)
+      expect(r.stdout).toContain(`does not set: ${name}.`)
+    }
   })
 
   it("checks both hosts whatever the publish jobs did, once the build exists", () => {

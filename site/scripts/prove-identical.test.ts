@@ -35,15 +35,18 @@ function hostCopy(dist: string, edit: (dir: string) => void = () => {}) {
 const servers: http.Server[] = []
 afterEach(() => servers.splice(0).forEach((s) => s.close()))
 
-/** Serves `dir` under `prefix`; 404 for a file it does not have. `headers` are added to every answer. */
-async function serve(dir: string, prefix = "/", headers: Record<string, string> = {}) {
+/**
+ * Serves `dir` under `prefix`; `missing` is the status for a file it does not have (404, or 403 as
+ * S3 answers a reader that cannot list the bucket). `headers` are added to every answer.
+ */
+async function serve(dir: string, prefix = "/", headers: Record<string, string> = {}, missing = 404) {
   const server = http.createServer((req, res) => {
     try {
       const path = decodeURIComponent((req.url ?? "").slice(prefix.length))
       const body = readFileSync(join(dir, path))
       res.writeHead(200, headers).end(body)
     } catch {
-      res.writeHead(404).end("not found")
+      res.writeHead(missing).end("not found")
     }
   })
   servers.push(server)
@@ -89,6 +92,23 @@ describe("prove-identical: the bytes each host serves, compared with the build",
     expect(r.ok).toBe(false)
     expect(r.verdict("assets/style-1.css")).toBe("MISSING")
     expect(sleeps).toEqual([])
+  })
+
+  it("reads a 403 from the CloudFront host as MISSING, because S3 answers 403 for a missing key there", async () => {
+    const dist = builtDist()
+    const cloudfront = hostCopy(dist, (d) => rmSync(join(d, "assets/app-1.js")))
+    const r = await run(dist, await serve(cloudfront, "/", {}, 403), await serve(hostCopy(dist)))
+    expect(r.ok).toBe(false)
+    expect(r.verdict("assets/app-1.js")).toBe("MISSING")
+    expect(r.lines.find((l) => l.startsWith("assets/app-1.js  "))).toContain("cloudfront MISSING")
+  })
+
+  it("reads a 403 from the Pages host as UNKNOWN: Pages answers 404 for a missing file", async () => {
+    const dist = builtDist()
+    const pages = hostCopy(dist, (d) => rmSync(join(d, "assets/app-1.js")))
+    const r = await run(dist, await serve(hostCopy(dist)), await serve(pages, "/", {}, 403))
+    expect(r.ok).toBe(false)
+    expect(r.verdict("assets/app-1.js")).toBe("UNKNOWN")
   })
 
   it("says UNKNOWN, never same, when a host cannot be reached", async () => {
