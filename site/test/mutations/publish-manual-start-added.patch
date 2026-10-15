@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index cb8abad..02f9a21 100644
+index 4578542..e0251a3 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
 @@ -17,6 +17,7 @@ name: verifier-publish

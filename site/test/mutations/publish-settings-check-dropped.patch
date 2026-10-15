@@ -1,0 +1,15 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 4578542..2c9e795 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -114,10 +114,6 @@ jobs:
+             eval "value=\${$name:-}"
+             [ -n "$value" ] || missing="$missing $name"
+           done
+-          if [ -n "$missing" ]; then
+-            echo "::error::the environment publish does not set:$missing. Nothing was published."
+-            exit 1
+-          fi
+ 
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+         with:

@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index cb8abad..b9c5329 100644
+index 4578542..f4ab4f2 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -123,8 +123,7 @@ jobs:
+@@ -144,8 +144,7 @@ jobs:
  
    publish-pages:
      name: Publish the same build to GitHub Pages

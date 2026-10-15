@@ -1,0 +1,13 @@
+diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
+index f2b062c..e307d57 100644
+--- a/site/scripts/prove-identical.mjs
++++ b/site/scripts/prove-identical.mjs
+@@ -63,7 +63,7 @@ export function pageReferences(html) {
+  * bucket with no right to list it, and S3 answers 403, not 404, for a missing key to such a reader;
+  * nothing rewrites that answer into the page. GitHub Pages answers 404. Any other status is UNKNOWN.
+  */
+-export const MISSING_STATUSES = { cloudfront: [403, 404], pages: [404] }
++export const MISSING_STATUSES = { cloudfront: [404], pages: [404] }
+ 
+ /** GET one URL with compression refused; the bytes, or the status of any answer that is not 200. */
+ export function fetchBytes(url, timeoutMs = 20_000) {

@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index cb8abad..7536989 100644
+index 4578542..d843fee 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -149,7 +149,7 @@ jobs:
+@@ -170,7 +170,7 @@ jobs:
      name: Both hosts serve the build's bytes
      needs: [build, publish-s3, publish-pages]
      # Whatever the publish jobs did, so a half publish is reported rather than skipped.

@@ -1,5 +1,5 @@
 diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
-index 0c39c81..d51b28f 100644
+index f2b062c..51c0b58 100644
 --- a/site/scripts/prove-identical.mjs
 +++ b/site/scripts/prove-identical.mjs
 @@ -25,7 +25,7 @@ const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
