@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import http from "node:http"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve, sep } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 // @ts-expect-error a plain .mjs script, run by node in the workflow
 import { compare, gate, pageReferences, parseSums } from "./prove-identical.mjs"
@@ -37,13 +37,19 @@ afterEach(() => servers.splice(0).forEach((s) => s.close()))
 
 /**
  * Serves `dir` under `prefix`; `missing` is the status for a file it does not have (404, or 403 as
- * S3 answers a reader that cannot list the bucket). `headers` are added to every answer.
+ * S3 answers a reader that cannot list the bucket). `headers` are added to every answer. `rootPage`,
+ * when given, is answered at the prefix itself instead of index.html. A path that leaves `dir`
+ * answers `missing`: the test server must not read files outside its folder.
  */
-async function serve(dir: string, prefix = "/", headers: Record<string, string> = {}, missing = 404) {
+async function serve(dir: string, prefix = "/", headers: Record<string, string> = {}, missing = 404, rootPage?: string) {
+  const root = resolve(dir)
   const server = http.createServer((req, res) => {
     try {
-      const path = decodeURIComponent((req.url ?? "").slice(prefix.length)) || "index.html"
-      const body = readFileSync(join(dir, path))
+      const path = decodeURIComponent((req.url ?? "").slice(prefix.length))
+      if (!path && rootPage !== undefined) return void res.writeHead(200, headers).end(rootPage)
+      const file = resolve(root, path || "index.html")
+      if (!file.startsWith(root + sep)) return void res.writeHead(missing).end("not found")
+      const body = readFileSync(file)
       res.writeHead(200, headers).end(body)
     } catch {
       res.writeHead(missing).end("not found")
@@ -66,6 +72,23 @@ async function run(dist: string, cloudfront: string, pages: string, sleeps: numb
   })
   return { ok, lines, verdict: (path: string) => lines.find((l) => l.startsWith(`${path}  `))?.split("  ").pop() }
 }
+
+describe("the test host itself", () => {
+  it("answers 404 for a path that leaves its folder, plain or encoded, and never reads the file", async () => {
+    const dir = hostCopy(builtDist())
+    const outside = join(dir, "..", `outside-${process.pid}-${Date.now()}`)
+    writeFileSync(outside, "secret")
+    const name = outside.split(sep).pop()
+    const base = await serve(dir)
+    const get = (path: string) =>
+      new Promise<number>((done, fail) => http.get(base.replace(/\/$/, "") + path, (res) => done(res.resume().statusCode ?? 0)).on("error", fail))
+    expect(readFileSync(outside, "utf8")).toBe("secret")
+    expect(await get("/index.html")).toBe(200)
+    expect(await get(`/../${name}`)).toBe(404)
+    expect(await get(`/%2e%2e%2f${name}`)).toBe(404)
+    rmSync(outside)
+  })
+})
 
 describe("prove-identical: the bytes each host serves, compared with the build", () => {
   it("says same, file by file and by name, when both hosts serve the build's bytes", async () => {
@@ -155,18 +178,7 @@ describe("prove-identical: the bytes each host serves, compared with the build",
 
   it("reads the page's own address too: a host that serves an old page at / is DIFFERENT there", async () => {
     const dist = builtDist()
-    const cloudfront = hostCopy(dist)
-    const server = http.createServer((req, res) => {
-      if (req.url === "/") return void res.writeHead(200).end(INDEX.replace("code", "old"))
-      try {
-        res.writeHead(200).end(readFileSync(join(cloudfront, decodeURIComponent(req.url ?? ""))))
-      } catch {
-        res.writeHead(404).end()
-      }
-    })
-    servers.push(server)
-    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r))
-    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`
+    const base = await serve(hostCopy(dist), "/", {}, 404, INDEX.replace("code", "old"))
     const r = await run(dist, base, await serve(hostCopy(dist), "/verifier/"))
     expect(r.ok).toBe(false)
     expect(r.verdict("/")).toBe("DIFFERENT")
