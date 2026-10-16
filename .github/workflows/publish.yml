@@ -1,0 +1,204 @@
+name: verifier-publish
+
+# Publishes the verification page: one build, two hosts, then a check that both serve the build's
+# bytes. It runs on a push to main and on nothing else: no manual start, no other branch.
+#
+# Nothing is published unless both of these hold:
+#   - the repository variable VERIFIER_DEPLOYABLE is "true";
+#   - a required reviewer approves the job publish-s3 in the environment "publish". Only a job in
+#     that environment can assume the publish role, and the Pages job runs only after it, so one
+#     approval covers both hosts and a merge alone publishes nothing.
+#
+# Settings this workflow reads (none of them gives any right on its own):
+#   repository variables:          VERIFIER_DEPLOYABLE, VERIFIER_CLOUDFRONT_HOST
+#   environment "publish" secret:  VERIFIER_AWS_ACCOUNT_ID (a secret only so this public log never
+#                                  shows it: GitHub masks a secret wherever it appears)
+#   environment "publish" vars:    VERIFIER_AWS_REGION, VERIFIER_PUBLISH_ROLE, VERIFIER_BUCKET,
+#                                  VERIFIER_DISTRIBUTION_ID_PARAMETER
+#
+# Every action is pinned by its full commit sha; the comment names the release it was read from.
+# A rollback is a revert on main, which this workflow publishes like any other commit.
+on:
+  push:
+    branches: [main]
+
+# One publish at a time, and a second merge waits rather than cancelling the first, so two builds
+# can never cross on the two hosts.
+concurrency:
+  group: verifier-publish
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build the page and list its files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint, type-check and the page's tests
+        run: |
+          npm run lint -- --deny-warnings
+          npm run typecheck
+          npm test
+
+      - name: Build, naming this commit and this run in the footer
+        env:
+          VERIFIER_BUILD_COMMIT: ${{ github.sha }}
+          VERIFIER_BUILD_RUN_ID: ${{ github.run_id }}
+        run: npm run build
+
+      - name: No browser storage in the built bundle
+        run: SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts
+
+      - name: Bundle check
+        env:
+          VERIFIER_BUILD_COMMIT: ${{ github.sha }}
+        run: npm run check-bundle
+
+      - name: SHA256SUMS (printed here, in the public log of this run), and the Node that built it
+        run: |
+          echo "built with node $(node --version)"
+          node scripts/sha256sums.mjs dist
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: page
+          path: site/dist/
+          if-no-files-found: error
+
+  publish-s3:
+    name: Publish to our CloudFront host
+    needs: build
+    if: vars.VERIFIER_DEPLOYABLE == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: publish
+      url: https://${{ vars.VERIFIER_CLOUDFRONT_HOST }}/
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      started: ${{ steps.started.outputs.started }}
+    steps:
+      # The first step: it runs only once the approval is given. prove-identical reads it to tell a
+      # publish that never started from one that started and failed.
+      - id: started
+        run: echo "started=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            site/scripts/publish-guard.sh
+            site/scripts/publish-s3.sh
+          sparse-checkout-cone-mode: false
+
+      # Before any credential and any write: every setting present and of its shape, the account id
+      # and the role masked in this public log, and this commit still the head of main. It runs
+      # after the "started" marker, so a failure here reads as a failed publish.
+      - name: Check the settings and that this build is still the newest
+        env:
+          VERIFIER_AWS_ACCOUNT_ID: ${{ secrets.VERIFIER_AWS_ACCOUNT_ID }}
+          VERIFIER_AWS_REGION: ${{ vars.VERIFIER_AWS_REGION }}
+          VERIFIER_PUBLISH_ROLE: ${{ vars.VERIFIER_PUBLISH_ROLE }}
+          VERIFIER_BUCKET: ${{ vars.VERIFIER_BUCKET }}
+          VERIFIER_DISTRIBUTION_ID_PARAMETER: ${{ vars.VERIFIER_DISTRIBUTION_ID_PARAMETER }}
+          VERIFIER_CLOUDFRONT_HOST: ${{ vars.VERIFIER_CLOUDFRONT_HOST }}
+        run: sh site/scripts/publish-guard.sh
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: page
+          path: page
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.VERIFIER_AWS_ACCOUNT_ID }}:role/${{ vars.VERIFIER_PUBLISH_ROLE }}
+          aws-region: ${{ vars.VERIFIER_AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Upload, index.html last, then invalidate
+        env:
+          BUCKET: ${{ vars.VERIFIER_BUCKET }}
+          DISTRIBUTION_ID_PARAMETER: ${{ vars.VERIFIER_DISTRIBUTION_ID_PARAMETER }}
+          COMMIT: ${{ github.sha }}
+        run: sh site/scripts/publish-s3.sh page
+
+  publish-pages:
+    name: Publish the same build to GitHub Pages
+    needs: [build, publish-s3]
+    if: needs.publish-s3.result == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: page
+          path: page
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: page/
+
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  prove-identical:
+    name: Both hosts serve the build's bytes
+    needs: [build, publish-s3, publish-pages]
+    # Whatever the publish jobs did, so a half publish is reported rather than skipped.
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            site/scripts/prove-identical.mjs
+            site/scripts/sha256sums.mjs
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: page
+          path: page
+
+      - name: Fetch every listed file from both hosts and compare
+        env:
+          SWITCH: ${{ vars.VERIFIER_DEPLOYABLE }}
+          S3_STARTED: ${{ needs.publish-s3.outputs.started }}
+          S3_RESULT: ${{ needs.publish-s3.result }}
+          PAGES_RESULT: ${{ needs.publish-pages.result }}
+          CLOUDFRONT: https://${{ vars.VERIFIER_CLOUDFRONT_HOST }}/
+        run: >-
+          node site/scripts/prove-identical.mjs --dist page
+          --host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/"
+          --switch "$SWITCH" --s3-started "$S3_STARTED" --s3 "$S3_RESULT" --pages "$PAGES_RESULT"

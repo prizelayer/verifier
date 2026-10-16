@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 6626af6..5bedfb5 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -169,7 +169,7 @@ export const FOOTER = {
+   byRun: "by run",
+   ofWorkflow: "of its publish workflow.",
+   sums:
+-    "That run wrote the SHA-256 fingerprint of every file it built into one list, SHA256SUMS, and printed the list in its public log. GitHub keeps that log for 90 days. GitHub Pages serves the list of the latest publish only: if a newer build was published after this copy, that list will not match these files. To check the copy you have, compute the SHA-256 of its files and compare them with the list of its own build.",
++    "That run wrote the SHA-256 fingerprint of every file it built into one list, SHA256SUMS, and printed the list in its public log. GitHub keeps that log for 90 days. To check the copy you have, compute the SHA-256 of its files and compare them with the list of its own build.",
+   sumsLink: "SHA256SUMS of the latest publish, on GitHub Pages",
+   runLink: "the public log of this run (kept 90 days)",
+   noSelfHash: "This page does not show a fingerprint of itself: a changed page could show any number.",

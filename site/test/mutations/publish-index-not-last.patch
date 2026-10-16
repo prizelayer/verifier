@@ -1,0 +1,12 @@
+diff --git a/site/scripts/publish-s3.sh b/site/scripts/publish-s3.sh
+index 12127b1..9bff785 100644
+--- a/site/scripts/publish-s3.sh
++++ b/site/scripts/publish-s3.sh
+@@ -25,7 +25,6 @@ echo "publish-s3: 2/5 the files the page loads"
+ aws s3 cp "$dist" "s3://$BUCKET/" --recursive --exclude index.html --exclude SHA256SUMS --cache-control "$immutable" --only-show-errors
+ echo "publish-s3: 3/5 SHA256SUMS, then index.html"
+ aws s3 cp "$dist/SHA256SUMS" "s3://$BUCKET/SHA256SUMS" --cache-control no-cache --content-type "text/plain; charset=utf-8" --only-show-errors
+-aws s3 cp "$dist/index.html" "s3://$BUCKET/index.html" --cache-control no-cache --content-type "text/html; charset=utf-8" --only-show-errors
+ echo "publish-s3: 4/5 remove files no build of this page loads any more"
+ aws s3 sync "$dist" "s3://$BUCKET/" --delete --exclude "releases/*" --exclude index.html --exclude SHA256SUMS --cache-control "$immutable" --only-show-errors
+ echo "publish-s3: 5/5 drop the edge's copies and wait"

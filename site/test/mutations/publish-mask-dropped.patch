@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..e05fced 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -132,7 +132,6 @@ jobs:
+         with:
+           role-to-assume: arn:aws:iam::${{ secrets.VERIFIER_AWS_ACCOUNT_ID }}:role/${{ vars.VERIFIER_PUBLISH_ROLE }}
+           aws-region: ${{ vars.VERIFIER_AWS_REGION }}
+-          mask-aws-account-id: true
+ 
+       - name: Upload, index.html last, then invalidate
+         env:

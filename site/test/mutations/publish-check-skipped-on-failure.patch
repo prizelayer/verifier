@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..ca0c3cb 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -169,7 +169,7 @@ jobs:
+     name: Both hosts serve the build's bytes
+     needs: [build, publish-s3, publish-pages]
+     # Whatever the publish jobs did, so a half publish is reported rather than skipped.
+-    if: always() && needs.build.result == 'success'
++    if: needs.build.result == 'success'
+     runs-on: ubuntu-latest
+     permissions:
+       contents: read

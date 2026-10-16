@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..cbe2669 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -19,6 +19,7 @@ name: verifier-publish
+ # Every action is pinned by its full commit sha; the comment names the release it was read from.
+ # A rollback is a revert on main, which this workflow publishes like any other commit.
+ on:
++  workflow_dispatch:
+   push:
+     branches: [main]
+ 

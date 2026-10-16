@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..0b88cb0 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -88,9 +88,6 @@ jobs:
+     needs: build
+     if: vars.VERIFIER_DEPLOYABLE == 'true' && github.ref == 'refs/heads/main'
+     runs-on: ubuntu-latest
+-    environment:
+-      name: publish
+-      url: https://${{ vars.VERIFIER_CLOUDFRONT_HOST }}/
+     permissions:
+       contents: read
+       id-token: write

@@ -1,0 +1,12 @@
+diff --git a/site/scripts/publish-guard.sh b/site/scripts/publish-guard.sh
+index dfffc16..e1c8890 100644
+--- a/site/scripts/publish-guard.sh
++++ b/site/scripts/publish-guard.sh
+@@ -26,7 +26,6 @@ echo "::add-mask::$VERIFIER_AWS_ACCOUNT_ID"
+ echo "::add-mask::arn:aws:iam::$VERIFIER_AWS_ACCOUNT_ID:role/$VERIFIER_PUBLISH_ROLE"
+ 
+ shape() { printf '%s' "$2" | grep -Eqx "$3" || fail "$1 does not have the shape of $4"; }
+-shape VERIFIER_AWS_ACCOUNT_ID "$VERIFIER_AWS_ACCOUNT_ID" '[0-9]{12}' "an account id (12 digits)"
+ shape VERIFIER_AWS_REGION "$VERIFIER_AWS_REGION" '[a-z]{2}(-[a-z]+)+-[0-9]' "a region"
+ shape VERIFIER_PUBLISH_ROLE "$VERIFIER_PUBLISH_ROLE" '[A-Za-z0-9+=,.@_-]{1,64}' "a role name"
+ shape VERIFIER_BUCKET "$VERIFIER_BUCKET" '[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]' "a bucket name"

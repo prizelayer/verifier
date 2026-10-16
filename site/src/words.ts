@@ -156,3 +156,23 @@ export const skippedRows = (from: number, to: number) =>
 
 /** Drawing very many rows takes the browser a while; the button says so. */
 export const SLOW_DRAW_ROWS = 20_000
+
+/**
+ * The footer: which build made this copy, and where a reader checks it. It never shows a
+ * fingerprint of the page itself, because a changed page could show any number; it sends the
+ * reader to two records on GitHub instead.
+ */
+export const FOOTER = {
+  title: "Where this copy comes from",
+  built: "This copy was built from commit",
+  ofRepo: "of the public repository",
+  byRun: "by run",
+  ofWorkflow: "of its publish workflow.",
+  sums:
+    "That run wrote the SHA-256 fingerprint of every file it built into one list, SHA256SUMS, and printed the list in its public log. GitHub keeps that log for 90 days. GitHub Pages serves the list of the latest publish only: if a newer build was published after this copy, that list will not match these files. To check the copy you have, compute the SHA-256 of its files and compare them with the list of its own build.",
+  sumsLink: "SHA256SUMS of the latest publish, on GitHub Pages",
+  runLink: "the public log of this run (kept 90 days)",
+  noSelfHash: "This page does not show a fingerprint of itself: a changed page could show any number.",
+  notPublished:
+    "This copy was not built by the publish workflow, so it names no build and no list of fingerprints. Its code is in the public repository",
+} as const

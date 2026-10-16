@@ -1,0 +1,12 @@
+diff --git a/site/scripts/prove-identical.mjs b/site/scripts/prove-identical.mjs
+index 664c945..d7d601f 100644
+--- a/site/scripts/prove-identical.mjs
++++ b/site/scripts/prove-identical.mjs
+@@ -30,6 +30,7 @@ const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
+ export function gate({ switchValue, s3Started, s3Result = "", pagesResult = "" }) {
+   if (s3Started === "true") return { compare: true, words: "" }
+   if (switchValue !== "true") return { compare: false, words: "switch off, nothing published, nothing compared" }
++  if (s3Result !== "x") return { compare: true, words: "" }
+   return {
+     compare: false,
+     words: `not published: approval not given, so the publish job never started (not approved, declined, expired, or refused by the environment's rules; publish-s3: ${s3Result || "no result"}, publish-pages: ${pagesResult || "no result"}); nothing compared`,

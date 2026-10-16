@@ -1,0 +1,13 @@
+diff --git a/site/src/footer.tsx b/site/src/footer.tsx
+index 1c312c8..ee06fc1 100644
+--- a/site/src/footer.tsx
++++ b/site/src/footer.tsx
+@@ -27,7 +27,7 @@ export function Footer({ build = BUILD }: { build?: BuildInfo | null }) {
+           <p>
+             {FOOTER.built}{" "}
+             <a className={link} href={`${REPO_URL}/commit/${build.commit}`} rel="noreferrer">
+-              <code>{build.commit.slice(0, 12)}</code>
++              <code>{build.commit}</code>
+             </a>{" "}
+             {FOOTER.ofRepo}{" "}
+             <a className={link} href={REPO_URL} rel="noreferrer">

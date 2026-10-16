@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..c7a3c16 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -86,7 +86,7 @@ jobs:
+   publish-s3:
+     name: Publish to our CloudFront host
+     needs: build
+-    if: vars.VERIFIER_DEPLOYABLE == 'true' && github.ref == 'refs/heads/main'
++    if: github.ref == 'refs/heads/main'
+     runs-on: ubuntu-latest
+     environment:
+       name: publish

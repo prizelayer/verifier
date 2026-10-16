@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+index 6562b15..4ca0989 100644
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -44,7 +44,7 @@ jobs:
+         with:
+           persist-credentials: false
+ 
+-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
++      - uses: actions/setup-node@v7 # v7.1.0
+         with:
+           node-version: '22'
+           cache: npm
