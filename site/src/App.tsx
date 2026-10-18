@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
-import { StepCards } from "./steps"
-import { COULD_NOT_FINISH, STEPS } from "./words"
+import { SourceLine, StepCards } from "./steps"
+import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEPS } from "./words"
 import { caveatOf, verdictOf } from "./verdict"
 
 export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
@@ -65,6 +65,15 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
         <p>Read "What this does not prove" below. It is short, and it matters.</p>
       </header>
 
+      <section aria-labelledby="first-visit" data-first-visit className="space-y-3">
+        <h2 id="first-visit" className="text-lg font-semibold">
+          {FIRST_VISIT.heading}
+        </h2>
+        <p>{FIRST_VISIT.link}</p>
+        <p>{FIRST_VISIT.noTyping}</p>
+        <p>{FIRST_VISIT.pending}</p>
+      </section>
+
       <LookupBox
         disabled={running}
         shownText={text}
@@ -80,6 +89,9 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
         <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
           Paste a proof
         </label>
+        <p id={`${fieldId}-what`} className="text-sm text-muted-foreground">
+          {PROOF_EXPLAINED}
+        </p>
         <textarea
           id={fieldId}
           value={text}
@@ -87,7 +99,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           readOnly={running || lookingUp}
           rows={10}
           spellCheck={false}
-          aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-problem` : undefined}
+          aria-describedby={checked?.kind === "notAProof" ? `${fieldId}-what ${fieldId}-problem` : `${fieldId}-what`}
           className="w-full rounded-lg border border-input bg-background p-3 font-mono text-xs"
         />
         {checked?.kind === "notAProof" ? (
@@ -128,11 +140,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           client seed and the counter, gives the number we recorded; and that number lands on the item
           recorded for your win.
         </p>
-        <p>
-          You were not shown the fingerprint or the client seed before you played. Our server created both,
-          and this page reads both from our server. When our server creates a fingerprint for a player, it
-          writes a record in its audit log. This page does not check that record.
-        </p>
+        <p>{NOT_PROVEN_SEEDS}</p>
         <p>So this page cannot prove, on its own, that we did not choose the secret after your open.</p>
         <p>It also cannot prove that the item was in stock or that it was sent to you.</p>
         <p>
@@ -149,7 +157,8 @@ function Verdict({ report }: { report: VerificationReport }) {
   const { word, line } = verdictOf(report)
   const caveat = caveatOf(report)
   const tone =
-    report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-pending"
+    // Pending is not a warning: it is neutral ink, never the colour of a pass or a fail.
+    report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"
   return (
     <div className="space-y-1" data-status={report.status}>
       <p className={`text-3xl font-bold ${tone}`}>{word}</p>
@@ -163,11 +172,12 @@ function Verdict({ report }: { report: VerificationReport }) {
 function EmptySteps() {
   return (
     <div className="space-y-6 text-muted-foreground" aria-label="The four steps">
-      {STEPS.map(({ step, title, text }) => (
+      {STEPS.map(({ step, title, text, source }) => (
         <section key={step} aria-labelledby={`step-${step}`} data-step={step} className="space-y-2 rounded-lg border border-border p-4">
           <h2 id={`step-${step}`} className="text-lg font-semibold">
             Step {step} — {title}
           </h2>
+          <SourceLine source={source} />
           {text.map((p) => (
             <p key={p}>{p}</p>
           ))}

@@ -50,16 +50,20 @@ while IFS= read -r api; do
   if grep -F -q -- "$api" $js; then bad "the script uses $api"; fi
 done < "$here/storage-apis.txt"
 
-# The words that must be there, and the two sentences that must not be, until the page can prove them.
+# The words that must be there, and the sentences that must not be: the claims the page cannot prove, and
+# the two sentences that stopped being true once the player page showed the fingerprint before play and let a
+# player set the client seed, so they cannot come back.
 for required in 'Check an open yourself' 'What this does not prove' \
   'The secret we revealed is the one we registered.' 'The chances are the ones recorded on your open.' \
   'The pick itself.' 'From the number to your item.' \
-  'You were not shown the fingerprint or the client seed before you played' \
+  'On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed.' \
+  'You never type a seed or a box here.' \
   'So this page cannot prove, on its own, that we did not choose the secret after your open.' \
   'This page does not check that record.'; do
   grep -F -q -- "$required" $js || bad "the script does not contain: $required"
 done
-for forbidden in 'published before you played' 'could not have changed it' 'existed before your open is in our audit log'; do
+for forbidden in 'published before you played' 'could not have changed it' 'existed before your open is in our audit log' \
+  'You cannot set your own yet' 'You were not shown the fingerprint'; do
   if grep -F -i -q -- "$forbidden" $files; then bad "the bundle contains: $forbidden"; fi
 done
 

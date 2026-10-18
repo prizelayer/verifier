@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e67e97d..ad2fc25 100644
+index 7fd3a87..9c77e2a 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -25,7 +25,7 @@ export type LookupResult =
-   | { kind: "timedOut" }
+@@ -26,7 +26,7 @@ export type LookupResult =
    | { kind: "serverFault"; message: string }
  
--const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+ // Lower case only: an id is lower-cased before this check, so the id fetched and shown is one spelling.
+-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
++const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
  
- /** A fault in our server's answer, as opposed to a network that did not answer at all. */
- class ServerFault extends Error {}
+ /** The id as it is fetched and shown: trimmed and lower-cased. */
+ export function normalId(text: string): string {

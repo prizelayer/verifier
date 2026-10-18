@@ -1,13 +1,13 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 2913da3..3fcde2c 100644
+index 9b34616..b02e2f5 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
 @@ -35,7 +35,7 @@ export function StepCards({ report, input }: Props) {
  
    return (
      <div className="space-y-6">
--      {STEPS.map(({ step, title: stepTitle, method, text: stepText }) => {
-+      {STEPS.filter((s) => s.step !== 2).map(({ step, title: stepTitle, method, text: stepText }) => {
+-      {STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
++      {STEPS.filter((s) => s.step !== 2).map(({ step, title: stepTitle, method, text: stepText, source }) => {
          const failed = failedSteps.has(step)
          // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
          const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle

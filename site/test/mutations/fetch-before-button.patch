@@ -1,5 +1,5 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index a2e9c79..a106e80 100644
+index 87f927a..59e8da5 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
 @@ -25,7 +25,7 @@ export function LookupBox({
@@ -10,4 +10,4 @@ index a2e9c79..a106e80 100644
 +  const [fromAddress] = useState(() => { const f = fromFragment(window.location.hash); if (f) void lookUp(f.winId, f.itemId, fetchFn); return f })
    const [winId, setWinId] = useState(fromAddress?.winId ?? "")
    // The item id in the address belongs to the open in the address, not to an id typed later.
-   const itemId = fromAddress !== null && winId.trim() === fromAddress.winId ? fromAddress.itemId : null
+   const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
