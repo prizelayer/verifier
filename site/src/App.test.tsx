@@ -6,7 +6,7 @@ import { App } from "./App"
 import { EXAMPLE_PROOF } from "./example"
 import { expectNoAxeViolations } from "./test/axe"
 import { CHECK_WORDS } from "./verdict"
-import { FAIL_WORDS, LOCKED, NOT_TOLD_ITEM, STEPS } from "./words"
+import { FAIL_WORDS, LOCKED, NOT_PROVEN_SEEDS, NOT_TOLD_ITEM, STEPS } from "./words"
 
 afterEach(cleanup)
 
@@ -96,7 +96,7 @@ describe("the page", () => {
     expect(document.querySelectorAll('[data-failed="yes"], [data-dependent]').length).toBe(0)
     // The limits are on screen together with the PASS, not only on an empty page.
     expect(screen.getByRole("heading", { name: "What this does not prove" })).toSatisfy(shown)
-    expect(screen.getByText(/^You were not shown the fingerprint or the client seed before you played/)).toSatisfy(shown)
+    expect(screen.getByText(/^This page reads the fingerprint and the client seed from our server\. On its own, it cannot tell/)).toSatisfy(shown)
     expect(screen.getByText("So this page cannot prove, on its own, that we did not choose the secret after your open.")).toSatisfy(shown)
     expect(screen.getByText(/When our server creates a fingerprint for a player, it writes a record in its audit log\. This page does not check that record\.$/)).toSatisfy(shown)
   })
@@ -152,7 +152,7 @@ describe("the page", () => {
   it("always shows what the page does not prove", () => {
     render(<App />)
     expect(screen.getByRole("heading", { name: "What this does not prove" })).toBeTruthy()
-    expect(screen.getByText(/You were not shown the fingerprint or the client seed before you played/)).toBeTruthy()
+    expect(screen.getByText(NOT_PROVEN_SEEDS)).toBeTruthy()
     expect(screen.getByText("So this page cannot prove, on its own, that we did not choose the secret after your open.")).toBeTruthy()
   })
 

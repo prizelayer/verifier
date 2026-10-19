@@ -18,6 +18,16 @@ npm ci && npm run build
   poisons every network entry point and then verifies anyway.
 - **Built separately from the engine it checks.** That separation is the point; see below.
 
+## Checking an open
+
+The page is built from `site/` in this repository and published at <https://d1c8hkgbfkzbx4.cloudfront.net/>, the address the player page's link opens, with a mirror on GitHub Pages at <https://prizelayer.github.io/verifier/>.
+
+In your vault, every card and every History line has a link, "Check this open yourself". It opens this page with that open's id already filled in. Then press "Look up".
+
+You never type a seed or a box here. "Look up" fetches the public records of that open from our server: the open, its seed pair, its box and its prize list. Your browser reads the secret, the client seed and the chances from those records, and redoes the pick itself. It sends our server nothing but the open's id and the ids our server gives back for it.
+
+If the secret of this open is not revealed yet, the page shows "CANNOT CHECK YET" and says when it will be. Until then your browser checks the chances (step 2) and, when the proof has one, the prize list, but not the pick itself (steps 1 and 3, and the item in step 4).
+
 ## Why this is a separate repository
 
 A `/verify` endpoint on PrizeLayer's own servers would be PrizeLayer marking its own homework. The

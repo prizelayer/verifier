@@ -111,8 +111,9 @@ describe("the id field", () => {
     expect(await screen.findByText(LOOKUP_WORDS.notAnId)).toBeTruthy()
     expect(idField().value).toBe("not-an-id")
     expect(idField().getAttribute("aria-invalid")).toBe("true")
-    const described = document.getElementById(idField().getAttribute("aria-describedby") ?? "")
-    expect(described?.textContent).toBe(LOOKUP_WORDS.notAnId)
+    // The field is described by its help line and, after a press, by the result: the refusal is one of them.
+    const described = (idField().getAttribute("aria-describedby") ?? "").split(" ").map((id) => document.getElementById(id)?.textContent)
+    expect(described).toEqual([LOOKUP_WORDS.help, LOOKUP_WORDS.notAnId])
     await user.clear(idField())
     await user.keyboard(`${WIN}{Enter}`)
     await waitFor(() => expect(document.querySelector("[data-status] p")?.textContent).toBe("PASS"))

@@ -1,12 +1,12 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index a2e9c79..f54a0d5 100644
+index 87f927a..58de613 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
 @@ -28,7 +28,7 @@ export function LookupBox({
    const [fromAddress] = useState(() => fromFragment(window.location.hash))
    const [winId, setWinId] = useState(fromAddress?.winId ?? "")
    // The item id in the address belongs to the open in the address, not to an id typed later.
--  const itemId = fromAddress !== null && winId.trim() === fromAddress.winId ? fromAddress.itemId : null
+-  const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
 +  const itemId = fromAddress !== null && true ? fromAddress.itemId : null
    const [busy, setBusy] = useState(false)
    // The result, with the id it was looked up for: the saved file is named after that id.

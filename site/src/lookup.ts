@@ -25,7 +25,13 @@ export type LookupResult =
   | { kind: "timedOut" }
   | { kind: "serverFault"; message: string }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// Lower case only: an id is lower-cased before this check, so the id fetched and shown is one spelling.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+/** The id as it is fetched and shown: trimmed and lower-cased. */
+export function normalId(text: string): string {
+  return text.trim().toLowerCase()
+}
 
 /** A fault in our server's answer, as opposed to a network that did not answer at all. */
 class ServerFault extends Error {}
@@ -57,7 +63,8 @@ export async function lookUp(
   itemId: string | null,
   fetchFn: typeof fetch = fetch,
 ): Promise<LookupResult> {
-  const id = winId.trim()
+  const id = normalId(winId)
+  // Nothing is fetched before the id has the shape of one.
   if (!UUID.test(id)) return { kind: "notAnId" }
   const abort = new AbortController()
   const timer = setTimeout(() => abort.abort(), LOOKUP_TIMEOUT_MS)
@@ -204,5 +211,5 @@ export function fromFragment(hash: string): { winId: string; itemId: string | nu
   const winId = params.get("open")
   if (winId === null) return null
   const itemId = params.get("item")
-  return { winId, itemId: itemId !== null && UUID.test(itemId) ? itemId : null }
+  return { winId, itemId: itemId !== null && UUID.test(normalId(itemId)) ? normalId(itemId) : null }
 }

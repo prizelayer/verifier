@@ -35,7 +35,7 @@ export function StepCards({ report, input }: Props) {
 
   return (
     <div className="space-y-6">
-      {STEPS.map(({ step, title: stepTitle, method, text: stepText }) => {
+      {STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
         const failed = failedSteps.has(step)
         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
@@ -58,6 +58,7 @@ export function StepCards({ report, input }: Props) {
                 </span>
               ) : null}
             </h2>
+            <SourceLine source={source} />
             {text.map((p) => (
               <p key={p}>{p}</p>
             ))}
@@ -295,4 +296,17 @@ function LinkView({ check, boxFingerprint }: { check: Check; boxFingerprint: str
 
 function percent(ppm: number): string {
   return `${(ppm / 10_000).toLocaleString("en", { maximumFractionDigits: 4 })}%`
+}
+
+/**
+ * Where a step's values come from, under its title: the field names are
+ * the proof's own, written between backticks in `words.ts` and shown as code, so a reader finds them
+ * in the pasted proof.
+ */
+export function SourceLine({ source }: { source: string }) {
+  return (
+    <p data-source className="text-sm">
+      {source.split("`").map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part))}
+    </p>
+  )
 }

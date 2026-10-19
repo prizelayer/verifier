@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { API_BASE, fromFragment, lookUp, type LookupResult } from "./lookup"
+import { API_BASE, fromFragment, lookUp, normalId, type LookupResult } from "./lookup"
 import { layOut } from "./layOut"
 import { LOOKUP_WORDS } from "./words"
 
@@ -28,7 +28,7 @@ export function LookupBox({
   const [fromAddress] = useState(() => fromFragment(window.location.hash))
   const [winId, setWinId] = useState(fromAddress?.winId ?? "")
   // The item id in the address belongs to the open in the address, not to an id typed later.
-  const itemId = fromAddress !== null && winId.trim() === fromAddress.winId ? fromAddress.itemId : null
+  const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
   const [busy, setBusy] = useState(false)
   // The result, with the id it was looked up for: the saved file is named after that id.
   const [result, setResult] = useState<{ asked: string; result: LookupResult } | null>(null)
@@ -42,8 +42,10 @@ export function LookupBox({
   async function press() {
     // While busy the button keeps its focus (aria-disabled, not disabled), so a press is ignored here.
     if (busy || disabled) return
-    const asked = winId.trim()
+    // The id is fetched, shown and named in the saved file in lower case.
+    const asked = normalId(winId)
     if (asked === "") return
+    if (asked !== winId) setWinId(asked)
     const boxAtPress = shownText
     setBusy(true)
     onBusy?.(true)
@@ -57,7 +59,7 @@ export function LookupBox({
       setBusy(false)
       onBusy?.(false)
     }
-    if (current.current.winId.trim() !== asked || current.current.shownText !== boxAtPress) return
+    if (normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
     setResult({ asked, result: found })
     if (found.kind === "found") onFound(found.text)
   }
@@ -70,6 +72,9 @@ export function LookupBox({
       <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
         Look up an open by its id
       </label>
+      <p id={`${fieldId}-help`} className="text-sm text-muted-foreground">
+        {LOOKUP_WORDS.help}
+      </p>
       <p className="text-sm text-muted-foreground">
         This is the only time the page contacts our server: when you press "Look up", it fetches the public data of
         that open from {new URL(API_BASE).host}. The check itself still runs in your browser.
@@ -100,7 +105,8 @@ export function LookupBox({
           rows={2}
           spellCheck={false}
           aria-invalid={invalid || undefined}
-          aria-describedby={result !== null || busy ? resultId : undefined}
+          placeholder={LOOKUP_WORDS.placeholder}
+          aria-describedby={result !== null || busy ? `${fieldId}-help ${resultId}` : `${fieldId}-help`}
           className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-base break-all sm:h-9 sm:py-1.5 sm:text-sm"
         />
         <Button
