@@ -107,11 +107,37 @@ describe("prove-identical: the bytes each host serves, compared with the build",
     expect(r.verdict("index.html")).toBe("same")
   })
 
-  it("says MISSING for a file a host does not serve, and never reads it again into a pass", async () => {
+  it("says MISSING for a file Pages still does not serve once the wait is over", async () => {
     const dist = builtDist()
     const sleeps: number[] = []
     const pages = hostCopy(dist, (d) => rmSync(join(d, "assets/style-1.css")))
     const r = await run(dist, await serve(hostCopy(dist)), await serve(pages), sleeps)
+    expect(r.ok).toBe(false)
+    expect(r.verdict("assets/style-1.css")).toBe("MISSING")
+    expect(sleeps).toEqual([60_000, 60_000, 60_000])
+  })
+
+  it("reads a MISSING on Pages again, as a path new to it appears, and passes once it serves the bytes", async () => {
+    const dist = builtDist()
+    const pages = hostCopy(dist, (d) => rmSync(join(d, "assets/style-1.css")))
+    const lines: string[] = []
+    const ok = await compare({
+      dist,
+      hosts: [["cloudfront", await serve(hostCopy(dist))], ["pages", await serve(pages)]],
+      sleep: async () => cpSync(join(dist, "assets/style-1.css"), join(pages, "assets/style-1.css")),
+      retryEveryMs: 60_000,
+      retryForMs: 180_000,
+      log: (l: string) => lines.push(l),
+    })
+    expect(ok, lines.join("\n")).toBe(true)
+    expect(lines).toContain("pages: assets/style-1.css still DIFFERENT or MISSING after 0 s; reading pages again in 60 s")
+  })
+
+  it("never reads a MISSING on the CloudFront host again: only the Pages cache can lag", async () => {
+    const dist = builtDist()
+    const sleeps: number[] = []
+    const cloudfront = hostCopy(dist, (d) => rmSync(join(d, "assets/style-1.css")))
+    const r = await run(dist, await serve(cloudfront), await serve(hostCopy(dist)), sleeps)
     expect(r.ok).toBe(false)
     expect(r.verdict("assets/style-1.css")).toBe("MISSING")
     expect(sleeps).toEqual([])
@@ -129,9 +155,11 @@ describe("prove-identical: the bytes each host serves, compared with the build",
   it("reads a 403 from the Pages host as UNKNOWN: Pages answers 404 for a missing file", async () => {
     const dist = builtDist()
     const pages = hostCopy(dist, (d) => rmSync(join(d, "assets/app-1.js")))
-    const r = await run(dist, await serve(hostCopy(dist)), await serve(pages, "/", {}, 403))
+    const sleeps: number[] = []
+    const r = await run(dist, await serve(hostCopy(dist)), await serve(pages, "/", {}, 403), sleeps)
     expect(r.ok).toBe(false)
     expect(r.verdict("assets/app-1.js")).toBe("UNKNOWN")
+    expect(sleeps).toEqual([])
   })
 
   it("says UNKNOWN, never same, when a host cannot be reached", async () => {

@@ -22,6 +22,11 @@ describe("the mirror's root page", () => {
   it("says that production is not live yet, and links to the dev copy", () => {
     expect(html).toContain("<p>The production verifier is not live yet.</p>")
     expect([...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1])).toEqual(["dev/"])
+    expect(html).toContain('<p><a href="dev/">the test copy (dev)</a></p>')
+  })
+
+  it("asks search engines not to list it", () => {
+    expect(html).toContain('<meta name="robots" content="noindex" />')
   })
 
   it("is a page and not a redirect, and loads nothing", () => {

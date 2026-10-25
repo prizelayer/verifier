@@ -145,8 +145,25 @@ describe("the publish workflow", () => {
     expect(downloads("publish-pages")).toEqual(["pages>pages"])
     expect(downloads("prove-identical")).toEqual(["page-dev>page"])
     expect(job("publish-pages")).toContain("          path: pages/\n")
-    expect(job("build")).toContain("          name: page-prod\n          path: site/out/prod/\n")
+    const uploads = [...job("build").matchAll(/upload-artifact@[0-9a-f]{40} # v[\d.]+\n {8}with:\n {10}name: ([\w-]+)\n {10}path: (\S+)\n/g)].map((m) => `${m[1]}<${m[2]}`)
+    expect(uploads).toEqual(["page-dev<site/out/dev/", "page-prod<site/out/prod/", "pages<site/out/pages/"])
+    expect(job("build").match(/upload-artifact@/g)).toHaveLength(3)
     for (const name of ["publish-s3", "publish-pages", "prove-identical"]) expect(job(name)).not.toContain("page-prod")
+  })
+
+  it("names no prod variable or secret anywhere, reads secrets only by name, and reads only these variables", () => {
+    expect(WORKFLOW).not.toMatch(/VERIFIER_PROD/)
+    expect(WORKFLOW).not.toContain("secrets[")
+    expect(WORKFLOW).not.toMatch(/secrets:\s*inherit/)
+    const vars = [...new Set(WORKFLOW.match(/vars\.[A-Za-z_]+/g))].sort()
+    expect(vars).toEqual([
+      "vars.VERIFIER_AWS_REGION",
+      "vars.VERIFIER_BUCKET",
+      "vars.VERIFIER_CLOUDFRONT_HOST",
+      "vars.VERIFIER_DEPLOYABLE",
+      "vars.VERIFIER_DISTRIBUTION_ID_PARAMETER",
+      "vars.VERIFIER_PUBLISH_ROLE",
+    ])
   })
 
   it("ends the prod leg at a named step that publishes nothing: no prod job, role, secret or environment", () => {
