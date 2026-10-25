@@ -20,7 +20,7 @@ import https from "node:https"
 import { join } from "node:path"
 import { sha256 as sha, SUMS_FILE } from "./sha256sums.mjs"
 
-const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
+export const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
 
 /**
  * Whether this run published anything to compare, and the words when it did not. A publish job that

@@ -10,10 +10,8 @@
 //
 // Usage: node scripts/prove-root.mjs --page <file> --url <root url ending in /> --pages <job result>
 import { readFileSync } from "node:fs"
-import { fetchBytes } from "./prove-identical.mjs"
-import { sha256 as sha } from "./sha256sums.mjs"
-
-const short = (h) => (/^[0-9a-f]{64}$/.test(h) ? h.slice(0, 12) : h)
+import { fetchBytes, short } from "./prove-identical.mjs"
+import { sha256 } from "./sha256sums.mjs"
 
 /** Compares the root with the page; the verdict and its one line. */
 export async function proveRoot({ page, url, pagesResult, fetchFn = fetchBytes, sleep, retryEveryMs = 60_000, retryForMs = 900_000, log = console.log }) {
@@ -21,19 +19,21 @@ export async function proveRoot({ page, url, pagesResult, fetchFn = fetchBytes, 
     log(`RESULT: not checked: the Pages publish did not succeed (publish-pages: ${pagesResult || "no result"}), so nothing new is at ${url}`)
     return true
   }
-  const want = sha(readFileSync(page))
+  const want = sha256(readFileSync(page))
+  // What the root answered: its bytes' hash, or the reason there are none (a redirect is a status).
   const read = async () => {
     const r = await fetchFn(url)
-    return r.state === "OK" ? sha(r.bytes) : r.state === "STATUS" ? `status ${r.status}` : "UNKNOWN"
+    return r.state === "OK" ? { state: "OK", hash: sha256(r.bytes) } : { state: r.state === "STATUS" ? `STATUS ${r.status}` : "UNKNOWN" }
   }
+  const differs = (got) => got.state === "OK" && got.hash !== want
   let got = await read()
-  for (let waited = 0; /^[0-9a-f]{64}$/.test(got) && got !== want && waited < retryForMs; waited += retryEveryMs) {
+  for (let waited = 0; differs(got) && waited < retryForMs; waited += retryEveryMs) {
     log(`${url} still DIFFERENT after ${waited / 1000} s; reading it again in ${retryEveryMs / 1000} s`)
     await sleep(retryEveryMs)
     got = await read()
   }
-  const verdict = got === want ? "same" : /^[0-9a-f]{64}$/.test(got) ? "DIFFERENT" : got.toUpperCase()
-  log(`${url}  page ${short(want)} · pages ${short(got)}  ${verdict}`)
+  const verdict = got.state !== "OK" ? got.state : got.hash === want ? "same" : "DIFFERENT"
+  log(`${url}  page ${short(want)} · pages ${got.state === "OK" ? short(got.hash) : got.state}  ${verdict}`)
   log(verdict === "same" ? `RESULT: same: the root serves the not-live page (${page})` : `RESULT: the root does NOT serve the not-live page (${page})`)
   return verdict === "same"
 }
