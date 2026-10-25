@@ -1,13 +1,12 @@
 diff --git a/site/src/footer.tsx b/site/src/footer.tsx
-index 1c312c8..307f444 100644
 --- a/site/src/footer.tsx
 +++ b/site/src/footer.tsx
-@@ -4,7 +4,7 @@ import { FOOTER } from "./words"
- 
- export const REPO_URL = "https://github.com/prizelayer/verifier"
- /** The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. */
--export const SUMS_URL = "https://prizelayer.github.io/verifier/SHA256SUMS"
-+export const SUMS_URL = "./SHA256SUMS"
+@@ -9,7 +9,7 @@
+  * The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. Each
+  * environment's copy links its own list (environments.json, fixed at build time).
+  */
+-export const SUMS_URL: string = __VERIFIER_SUMS_URL__
++export const SUMS_URL: string = "./SHA256SUMS"
  
  const link = "underline underline-offset-2"
  

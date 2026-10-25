@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { expect, test } from "@playwright/test"
+import { environmentFor } from "../scripts/environments"
 
 // The built page, from a file on disk, with the network refused: the example must reach PASS, and
 // the page must ask the network for nothing. The subject is every http(s) or ws(s) request the
@@ -9,6 +10,9 @@ import { expect, test } from "@playwright/test"
 // events are printed as well, but they are not the proof: Firefox reports no event for a file://
 // load, so a list of them is not complete in every engine.
 const PAGE = join(import.meta.dirname, "..", "dist", "index.html")
+// The environment the page in dist/ was built for (KAN-956). It must be named, as for the build:
+// the one request a lookup may try is to that environment's API, never to another one.
+const ENVIRONMENT = environmentFor(process.env, true)
 
 test("the page checks the example from file:// with the network refused", async ({ page, context }) => {
   expect(existsSync(PAGE), `${PAGE} does not exist: run npm run build first`).toBe(true)
@@ -66,5 +70,5 @@ test("a lookup from file:// asks only for the open, and only after the button", 
 
   await expect(page.getByText("Your browser could not reach our server.")).toBeVisible()
   console.log(`network requests refused (${refused.length}): ${refused.join(", ") || "none"}`)
-  expect(refused).toEqual([`https://public-api.dev.prizelayer.com/verify/opens/${winId}`])
+  expect(refused).toEqual([`${ENVIRONMENT.api}/verify/opens/${winId}`])
 })

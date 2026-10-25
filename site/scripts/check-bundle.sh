@@ -2,13 +2,32 @@
 # Reads the BUILT page and fails if it is not the page this repository means to publish.
 #
 # Every rule names the files it read and what it looked for, so a build with nothing in it cannot
-# pass as clean. Usage: sh scripts/check-bundle.sh dist
+# pass as clean. VERIFIER_ENV names the environment the build was made for (KAN-956): its own API
+# must be the policy's one host, and every other environment's API must be nowhere in the bundle.
+# Usage: VERIFIER_ENV=<env> sh scripts/check-bundle.sh dist
 set -eu
 
 dist="${1:?usage: check-bundle.sh <dist dir>}"
 here=$(cd "$(dirname "$0")" && pwd)
 fail=0
 bad() { echo "check-bundle: FAIL: $*"; fail=1; }
+
+# The environment, and its API and the others', from environments.json, read by the same checked
+# reader as the build (scripts/environments.ts), so a value of the wrong shape stops here as well.
+envname="${VERIFIER_ENV:-}"
+[ -n "$envname" ] || { echo "check-bundle: FAIL: VERIFIER_ENV is not set: which environment this build is for is unknown. Nothing was checked."; exit 1; }
+# Line 1 is this environment's API, line 2 its list, then "<name> <api>" for every other one.
+values=$(node --experimental-strip-types --no-warnings --input-type=module -e '
+  const { environments, environmentFor } = await import(process.argv[1])
+  const list = environments()
+  const own = environmentFor({ VERIFIER_ENV: process.argv[2] }, true, list)
+  console.log(own.api); console.log(own.sums)
+  for (const e of list) if (e.name !== own.name) console.log(e.name + " " + e.api)
+' "$here/environments.ts" "$envname" 2>&1) || { echo "check-bundle: FAIL: $(printf '%s\n' "$values" | sed -n 's/^[A-Za-z]*Error: //p' | head -1). Nothing was checked."; exit 1; }
+own_api=$(printf '%s\n' "$values" | sed -n 1p)
+sums=$(printf '%s\n' "$values" | sed -n 2p)
+others=$(printf '%s\n' "$values" | sed -n '3,$p')
+echo "check-bundle: environment $envname: API $own_api, list $sums"
 
 html="$dist/index.html"
 [ -f "$html" ] || { echo "check-bundle: FAIL: $html does not exist"; exit 1; }
@@ -25,16 +44,32 @@ for pattern in 'type="module"' 'crossorigin' 'src="/' 'href="/' 'url(/'; do
 done
 grep -F -q '<script defer src="./assets/app-' "$html" || bad "$html does not load ./assets/app-*.js as a classic deferred script"
 
-# The page may ask one server, for a lookup: its own policy names only that host, and no other
-# origin is compiled in. The host is the one constant of src/lookup.ts.
-api='https://public-api.dev.prizelayer.com'
+# The page may ask one server, for a lookup: its own environment's API. Its policy names only that
+# host, and no other origin is compiled in. The host is the one value of src/lookup.ts.
 policy=$(grep -oE 'content="[^"]*connect-src[^"]*"' "$html" | grep -oE 'connect-src [^;"]*' || true)
-[ "$policy" = "connect-src $api" ] || bad "$html carries '$policy', not 'connect-src $api'"
+[ "$policy" = "connect-src $own_api" ] || bad "$html carries '$policy', not 'connect-src $own_api'"
+grep -F -q -- "$own_api" $js || bad "the script does not name its environment's API $own_api"
+# No other environment's API, anywhere: a production page that could ask dev could show a dev open
+# as proven. Each is named, so a table with one environment says it compared against none. The bare
+# host is forbidden too, so an address put together in the script ("https://" + host) is caught.
+if [ -z "$others" ]; then echo "check-bundle: no other environment in environments.json to forbid"; fi
+while read -r other_name other_api; do
+  [ -n "$other_name" ] || continue
+  other_host="${other_api#https://}"
+  if grep -F -q -- "$other_api" $files; then bad "the bundle names $other_api, the API of $other_name"
+  elif grep -F -q -- "$other_host" $files; then bad "the bundle names $other_host, the host of $other_name's API"
+  else echo "check-bundle: absent: $other_api (the API of $other_name), with or without its scheme"; fi
+done <<OTHERS
+$others
+OTHERS
+# The footer links its environment's list of published files, on a host we do not run.
+grep -F -q -- "$sums" $js || bad "the script does not link its environment's list $sums"
 # The footer links to the code and to the build's two records, on GitHub: links, never fetched.
-allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com|https://public-api\.dev\.prizelayer\.com|https://github\.com|https://prizelayer\.github\.io)$'
+allowed='^(http://www\.w3\.org|https://react\.dev|https://base-ui\.com|https://tailwindcss\.com|https://github\.com|https://prizelayer\.github\.io)$'
 origins=$(grep -ohE '(https?|wss?)://[A-Za-z0-9.-]+' $files | sort -u)
 echo "check-bundle: origins in the bundle: $(echo $origins)"
 for origin in $origins; do
+  [ "$origin" = "$own_api" ] && continue
   echo "$origin" | grep -Eq "$allowed" || bad "origin $origin is not on the allowed list"
 done
 

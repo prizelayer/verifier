@@ -3,8 +3,13 @@ import { BUILD } from "./build"
 import { FOOTER } from "./words"
 
 export const REPO_URL = "https://github.com/prizelayer/verifier"
-/** The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. */
-export const SUMS_URL = "https://prizelayer.github.io/verifier/SHA256SUMS"
+declare const __VERIFIER_SUMS_URL__: string
+
+/**
+ * The list of the latest publish, as the GitHub Pages host serves it: a host we do not run. Each
+ * environment's copy links its own list (environments.json, fixed at build time).
+ */
+export const SUMS_URL: string = __VERIFIER_SUMS_URL__
 
 const link = "underline underline-offset-2"
 

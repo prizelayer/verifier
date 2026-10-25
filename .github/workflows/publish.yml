@@ -60,6 +60,8 @@ jobs:
 
       - name: Build, naming this commit and this run in the footer
         env:
+          # Dev only until the publish matrix (KAN-956 PR-3) builds one artefact per environment.
+          VERIFIER_ENV: dev
           VERIFIER_BUILD_COMMIT: ${{ github.sha }}
           VERIFIER_BUILD_RUN_ID: ${{ github.run_id }}
         run: npm run build
@@ -69,6 +71,7 @@ jobs:
 
       - name: Bundle check
         env:
+          VERIFIER_ENV: dev
           VERIFIER_BUILD_COMMIT: ${{ github.sha }}
         run: npm run check-bundle
 

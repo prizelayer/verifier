@@ -159,19 +159,45 @@ jobs:
       - name: Unit, tamper, accessibility and no-storage tests
         run: npm test
 
-      - name: Build (one classic script, relative paths)
-        run: npm run build
-
-      - name: No browser storage in the built bundle
-        run: SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts
-
-      - name: Bundle check
-        run: npm run check-bundle
-
       - name: Install browser engines
         run: npx playwright install --with-deps chromium firefox webkit
 
-      - name: Open the built page from file:// with the network refused, in three engines
+      # One build per environment (KAN-956): each is built, checked against its own API (and
+      # against every other environment's), and opened from file:// with the network refused.
+      - name: Build for dev (one classic script, relative paths)
+        env:
+          VERIFIER_ENV: dev
+        run: npm run build
+
+      - name: No browser storage in the built bundle (dev)
+        run: SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts
+
+      - name: Bundle check (dev)
+        env:
+          VERIFIER_ENV: dev
+        run: npm run check-bundle
+
+      - name: Open the dev page from file:// with the network refused, in three engines
+        env:
+          VERIFIER_ENV: dev
+        run: npm run test:offline
+
+      - name: Build for prod (one classic script, relative paths)
+        env:
+          VERIFIER_ENV: prod
+        run: npm run build
+
+      - name: No browser storage in the built bundle (prod)
+        run: SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts
+
+      - name: Bundle check (prod)
+        env:
+          VERIFIER_ENV: prod
+        run: npm run check-bundle
+
+      - name: Open the prod page from file:// with the network refused, in three engines
+        env:
+          VERIFIER_ENV: prod
         run: npm run test:offline
 
       - uses: actions/upload-artifact@v4
