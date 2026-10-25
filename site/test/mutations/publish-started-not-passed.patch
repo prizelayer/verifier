@@ -1,10 +1,12 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 6562b15..eb11926 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -201,4 +201,4 @@ jobs:
+@@ -225,7 +225,7 @@ jobs:
          run: >-
            node site/scripts/prove-identical.mjs --dist page
-           --host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/"
+           --host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/dev/"
 -          --switch "$SWITCH" --s3-started "$S3_STARTED" --s3 "$S3_RESULT" --pages "$PAGES_RESULT"
 +          --switch "$SWITCH" --s3-started "true" --s3 "$S3_RESULT" --pages "$PAGES_RESULT"
+ 
+       # Whatever the comparison above found: the root's own answer is a separate fact.
+       - name: The mirror's root serves the not-live page, not the dev copy and not a redirect

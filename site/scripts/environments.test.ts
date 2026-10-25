@@ -5,18 +5,17 @@ import { API_TOKEN, environmentFor, environments, policyFor } from "./environmen
 
 /**
  * One build per environment (KAN-956). The table is pinned by its literals: a change of an address
- * a reader opens is a change of this test. Dev's list stays at the mirror's root until its copy
- * moves to /verifier/dev/ (the owner's decision on KAN-956: the move and that value change
- * together, in the publish pull request).
+ * a reader opens is a change of this test. Dev's list is under /verifier/dev/, where the mirror
+ * serves the dev copy; prod's is at the mirror's root, where production will live (KAN-956).
  */
 const ROOT = join(import.meta.dirname, "..")
 
 describe("environments.json", () => {
   const list = environments()
 
-  it("names dev and prod, each with its own API, and dev unchanged from the published page", () => {
+  it("names dev and prod, each with its own API and its own list on the mirror", () => {
     expect(list).toEqual([
-      { name: "dev", api: "https://public-api.dev.prizelayer.com", sums: "https://prizelayer.github.io/verifier/SHA256SUMS" },
+      { name: "dev", api: "https://public-api.dev.prizelayer.com", sums: "https://prizelayer.github.io/verifier/dev/SHA256SUMS" },
       { name: "prod", api: "https://play.prizelayer.com", sums: "https://prizelayer.github.io/verifier/SHA256SUMS" },
     ])
   })

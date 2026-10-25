@@ -1,7 +1,7 @@
 {
   "dev": {
     "api": "https://public-api.dev.prizelayer.com",
-    "sums": "https://prizelayer.github.io/verifier/SHA256SUMS"
+    "sums": "https://prizelayer.github.io/verifier/dev/SHA256SUMS"
   },
   "prod": {
     "api": "https://play.prizelayer.com",
