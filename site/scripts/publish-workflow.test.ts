@@ -119,6 +119,19 @@ describe("the publish workflow", () => {
     expect(check).toContain('--host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/"')
   })
 
+  it("builds and checks the dev page only, and names it in both steps (one artefact per environment comes with the publish matrix, KAN-956 PR-3)", () => {
+    const steps = job("build").split("\n      - ")
+    const step = (name: string) => {
+      const found = steps.filter((s) => s.startsWith(`name: ${name}`))
+      expect(found, name).toHaveLength(1)
+      return found[0]
+    }
+    expect(step("Build, naming this commit and this run in the footer")).toContain("          VERIFIER_ENV: dev\n")
+    expect(step("Bundle check")).toContain("          VERIFIER_ENV: dev\n")
+    expect(WORKFLOW.match(/VERIFIER_ENV:/g)).toHaveLength(2)
+    expect(WORKFLOW).not.toMatch(/\bprod\b/)
+  })
+
   it("names the commit and the run in the build step only, so the tests see a build that names none", () => {
     expect(WORKFLOW.match(/VERIFIER_BUILD_RUN_ID/g)).toHaveLength(1)
     const build = job("build")

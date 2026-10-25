@@ -68,6 +68,20 @@ describe("check-bundle.sh, per environment", () => {
     expect(r.out).toContain(`FAIL: the bundle names ${DEV.api}, the API of dev`)
   })
 
+  it("fails a prod page whose script names the dev host without its scheme", () => {
+    page({ extra: `var H="https://"+\`${DEV.api.replace("https://", "")}\`` })
+    const r = check("prod")
+    expect(r.status, r.out).toBe(1)
+    expect(r.out).toContain(`FAIL: the bundle names ${DEV.api.replace("https://", "")}, the host of dev's API`)
+  })
+
+  it("fails a dev page whose script names the prod host without its scheme", () => {
+    page({ env: DEV, extra: `var H=\`${PROD.api.replace("https://", "")}\`` })
+    const r = check("dev")
+    expect(r.status, r.out).toBe(1)
+    expect(r.out).toContain(`FAIL: the bundle names ${PROD.api.replace("https://", "")}, the host of prod's API`)
+  })
+
   it("fails a prod page whose script still names the dev API", () => {
     page({ extra: `var D=\`${DEV.api}\`` })
     const r = check("prod")

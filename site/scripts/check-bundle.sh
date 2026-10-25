@@ -50,12 +50,15 @@ policy=$(grep -oE 'content="[^"]*connect-src[^"]*"' "$html" | grep -oE 'connect-
 [ "$policy" = "connect-src $own_api" ] || bad "$html carries '$policy', not 'connect-src $own_api'"
 grep -F -q -- "$own_api" $js || bad "the script does not name its environment's API $own_api"
 # No other environment's API, anywhere: a production page that could ask dev could show a dev open
-# as proven. Each is named, so a table with one environment says it compared against none.
+# as proven. Each is named, so a table with one environment says it compared against none. The bare
+# host is forbidden too, so an address put together in the script ("https://" + host) is caught.
 if [ -z "$others" ]; then echo "check-bundle: no other environment in environments.json to forbid"; fi
 while read -r other_name other_api; do
   [ -n "$other_name" ] || continue
+  other_host="${other_api#https://}"
   if grep -F -q -- "$other_api" $files; then bad "the bundle names $other_api, the API of $other_name"
-  else echo "check-bundle: absent: $other_api (the API of $other_name)"; fi
+  elif grep -F -q -- "$other_host" $files; then bad "the bundle names $other_host, the host of $other_name's API"
+  else echo "check-bundle: absent: $other_api (the API of $other_name), with or without its scheme"; fi
 done <<OTHERS
 $others
 OTHERS
