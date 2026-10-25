@@ -1,11 +1,14 @@
 import { joinProof } from "./proof"
 import { structureProblem } from "./rawText"
 
+declare const __VERIFIER_API__: string
+
 /**
- * The one server this page may ask anything, and only when the reader presses "Look up". The
- * page's Content-Security-Policy names the same host, and the bundle check allows no other.
+ * The one server this page may ask anything, and only when the reader presses "Look up": the public
+ * API of the environment this build is for (environments.json, fixed at build time). The page's
+ * Content-Security-Policy names the same host, and the bundle check allows no other.
  */
-export const API_BASE = "https://public-api.dev.prizelayer.com"
+export const API_BASE: string = __VERIFIER_API__
 
 /**
  * The largest answer the page reads, per request. A real answer is a few kilobytes; the cap stops
