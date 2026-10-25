@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import type { Plugin } from "vite"
 
 /**
  * One build of the page per environment (ADR-KAN-29 point 6 and ADR-KAN-40, amendments of
@@ -54,4 +55,22 @@ function mustFind(list: Environment[], name: string): Environment {
   const found = list.find((e) => e.name === name)
   if (found === undefined) throw new Error(`VERIFIER_ENV '${name}' is not in environments.json (${list.map((e) => e.name).join(", ")})`)
   return found
+}
+
+/** The one place in index.html where the environment's API goes: its policy's connect-src. */
+export const API_TOKEN = "%VERIFIER_API%"
+
+/**
+ * Writes the environment's API into the page's own policy. The token must be in index.html exactly
+ * once and must not survive, so a page can never ship with no API, or with a second one.
+ */
+export function policyFor(environment: Environment): Plugin {
+  return {
+    name: "verifier-policy",
+    transformIndexHtml(html) {
+      const count = html.split(API_TOKEN).length - 1
+      if (count !== 1) throw new Error(`index.html holds ${API_TOKEN} ${count} times, not once`)
+      return html.replace(API_TOKEN, environment.api)
+    },
+  }
 }

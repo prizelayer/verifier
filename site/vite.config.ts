@@ -1,28 +1,9 @@
 import path from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import type { Plugin } from "vite"
 import { defineConfig } from "vitest/config"
 import { buildInfoFrom } from "./scripts/build-info.ts"
-import { environmentFor, type Environment } from "./scripts/environments.ts"
-
-/** The one place in index.html where the environment's API goes: its policy's connect-src. */
-export const API_TOKEN = "%VERIFIER_API%"
-
-/**
- * Writes the environment's API into the page's own policy. The token must be in index.html exactly
- * once and must not survive, so a page can never ship with no API, or with a second one.
- */
-export function policyFor(environment: Environment): Plugin {
-  return {
-    name: "verifier-policy",
-    transformIndexHtml(html) {
-      const count = html.split(API_TOKEN).length - 1
-      if (count !== 1) throw new Error(`index.html holds ${API_TOKEN} ${count} times, not once`)
-      return html.replace(API_TOKEN, environment.api)
-    },
-  }
-}
+import { environmentFor, policyFor } from "./scripts/environments.ts"
 
 /**
  * One build for three places: the CloudFront host, the GitHub Pages host (under /verifier/), and a

@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { API_TOKEN, policyFor } from "../vite.config"
-import { environmentFor, environments } from "./environments"
+import { API_TOKEN, environmentFor, environments, policyFor } from "./environments"
 
 /**
  * One build per environment (KAN-956). The table is pinned by its literals: a change of an address
