@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index 3b2bf9c..d87b471 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -61,7 +61,7 @@ export function LookupBox({
+       // lookUp returns every fault of the network and of our server as a result, so what reaches here
+       // is the page's own: it is named so, and kept in the console for whoever reports it.
+       console.error("lookup failed in the page", error)
+-      found = { kind: "pageFault" }
++      found = { kind: "serverFault", message: "its answer could not be read" }
+     } finally {
+       pressing.current = false
+       setBusy(false)
