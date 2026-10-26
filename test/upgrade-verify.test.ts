@@ -146,6 +146,7 @@ describe('verify on an upgrade win', () => {
         drawnPpmValue: 186_669,
         drawnSlotIndex: 2,
         upgradeStepId: '9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01',
+        stakedSlotIndex: 1,
         stepChancePpm: 400_000,
         stepOutcome: 'won',
       },
@@ -158,7 +159,7 @@ describe('verify on an upgrade win', () => {
     assert.equal(report.status, 'verified', report.summary);
     assert.equal(report.trace.computedSlotIndex, 2);
     assert.equal(report.trace.cumulative?.length, 2);
-    assert.ok(report.caveats.some((c) => c.includes('step 9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01')));
+    assert.ok(report.caveats.some((c) => c.includes('from slot 1') && c.includes('step 9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01')));
   });
 
   it('fails the same win read as a box open', async () => {
@@ -173,7 +174,15 @@ describe('verify on an upgrade win', () => {
     assert.equal(lostValue.firstFailure?.check, 'drawnSlotIndex');
     assert.equal(lostValue.checks.drawnSlotIndex?.computed, 'step lost');
     const unfair = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stepChancePpm: 500_000 } });
-    assert.match(unfair.checks.drawnSlotIndex?.computed ?? '', /no step of this edition reaches slot 2 at 500000 ppm/);
+    assert.match(unfair.checks.drawnSlotIndex?.computed ?? '', /the step from slot 1 has a chance of 400000 ppm, not 500000/);
+  });
+
+  it('fails a win whose staked slot leads to another target', async () => {
+    // From slot 0 the step goes to slot 1 at 416 666 ppm, so neither the chance nor the slot fits.
+    const wrongSlot = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stakedSlotIndex: 0 } });
+    assert.equal(wrongSlot.firstFailure?.check, 'drawnSlotIndex');
+    const fromTop = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stakedSlotIndex: 3 } });
+    assert.match(fromTop.checks.drawnSlotIndex?.computed ?? '', /slot 3 is offered no step/);
   });
 
   it('refuses an upgrade win without its step facts', async () => {
@@ -197,7 +206,7 @@ describe('the field names are the published contract (PR-0 draft)', () => {
   it('the upgraded open answer carries the mark and the step facts', () => {
     const answer = contract('verify-open-upgrade-win');
     assert.equal(answer.gameKind, 'upgrade');
-    for (const key of ['upgradeStepId', 'stepChancePpm', 'stepOutcome', 'drawnPpmValue', 'drawnSlotIndex']) {
+    for (const key of ['upgradeStepId', 'stakedSlotIndex', 'stepChancePpm', 'stepOutcome', 'drawnPpmValue', 'drawnSlotIndex']) {
       assert.ok(key in answer, `the open answer has no ${key}`);
     }
   });

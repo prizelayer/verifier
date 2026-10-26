@@ -200,6 +200,8 @@ export interface VerificationInput {
     itemId?: string;
     /** On an upgrade win: the id of the step that made it (the staked win's id). */
     upgradeStepId?: string;
+    /** On an upgrade win: the slot of the win that was staked for it. Required when `gameKind` is `upgrade`. */
+    stakedSlotIndex?: number;
     /** On an upgrade win: the chance of the step that made it, in ppm. Required when `gameKind` is `upgrade`. */
     stepChancePpm?: number;
     /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
@@ -646,25 +648,24 @@ export function stepOutcome(v: number, chancePpm: number): 'won' | 'lost' {
 }
 
 /**
- * The slot an upgrade win holds, from its step's drawn value: the claimed slot when `v` wins at
- * `chancePpm` AND that chance is a fair step of this edition into that slot from some lower slot;
- * otherwise no slot, with the reason. The staked slot itself is the step page's to check.
+ * The slot an upgrade win holds, from its step's drawn value: the target the edition offers from
+ * `stakedSlot`, when that offer's chance is `chancePpm` and `v` wins at it; otherwise no slot, with
+ * the reason.
  */
 function upgradeWinSlot(
   v: number,
   chancePpm: number,
   edition: Edition,
-  claimedSlot: number,
+  stakedSlot: number,
 ): { outcome: 'won' | 'lost'; slotIndex?: number; why: string } {
   const outcome = stepOutcome(v, chancePpm);
   if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
-  const fair = sortedSlots(edition.slots).some((slot) => {
-    const offer = upgradeTarget(edition, slot.slotIndex);
-    return offer !== null && offer.targetSlotIndex === claimedSlot && offer.chancePpm === chancePpm;
-  });
-  return fair
-    ? { outcome, slotIndex: claimedSlot, why: '' }
-    : { outcome, why: `none: no step of this edition reaches slot ${claimedSlot} at ${chancePpm} ppm` };
+  const offer = upgradeTarget(edition, stakedSlot);
+  if (offer === null) return { outcome, why: `none: slot ${stakedSlot} is offered no step` };
+  if (offer.chancePpm !== chancePpm) {
+    return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
+  }
+  return { outcome, slotIndex: offer.targetSlotIndex, why: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -1071,7 +1072,8 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     // An upgrade win was drawn over the step's table, so the box table must not decide its slot.
     const chancePpm = input.expected.stepChancePpm as number;
     const expectedSlot = String(input.expected.drawnSlotIndex);
-    const step = attempt(() => upgradeWinSlot(derivation!.value, chancePpm, input.edition, input.expected.drawnSlotIndex));
+    const stakedSlot = input.expected.stakedSlotIndex as number;
+    const step = attempt(() => upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot));
     if (!step.ok) {
       checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);
     } else {
@@ -1086,9 +1088,10 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
           : check(expectedSlot, step.value.slotIndex === undefined ? step.value.why : String(step.value.slotIndex));
     }
     caveats.push(
-      'This win was made by an upgrade step. This run checks that the step\'s drawn value wins at the ' +
-        'step\'s chance, and that this chance is a fair step of this edition into this slot. Which win ' +
-        `was staked for it is checked on the step's own page${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}.`,
+      `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
+        'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
+        `${stakedSlot} is shown on the step's own page` +
+        `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}.`,
     );
   } else {
     computedSlotIndex = slotFor(derivation.value, input.edition.slots);
@@ -1309,6 +1312,7 @@ function requireShape(input: VerificationInput): void {
   need(input.gameKind === undefined || input.gameKind === 'box_open' || input.gameKind === 'upgrade', 'gameKind');
   if (input.gameKind === 'upgrade') {
     need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
+    need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }
   if (input.snapshot !== undefined) {
