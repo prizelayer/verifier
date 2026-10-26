@@ -198,7 +198,19 @@ export interface VerificationInput {
      * still checked, and the item comparison is reported as not run, with a caveat — never as a pass.
      */
     itemId?: string;
+    /** On an upgrade win: the id of the step that made it (the staked win's id). */
+    upgradeStepId?: string;
+    /** On an upgrade win: the chance of the step that made it, in ppm. Required when `gameKind` is `upgrade`. */
+    stepChancePpm?: number;
+    /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
+    stepOutcome?: 'won' | 'lost';
   };
+  /**
+   * `upgrade` when the win was made by an upgrade step, not by a box draw. Its drawn value, nonce and
+   * slot are then the step's: the slot is read over the step's two-entry table, never over the box
+   * table. Absent means a box open, checked exactly as before.
+   */
+  gameKind?: 'box_open' | 'upgrade';
 }
 
 /**
@@ -633,6 +645,28 @@ export function stepOutcome(v: number, chancePpm: number): 'won' | 'lost' {
   return slotFor(v, stepTable(chancePpm)) === 0 ? 'won' : 'lost';
 }
 
+/**
+ * The slot an upgrade win holds, from its step's drawn value: the claimed slot when `v` wins at
+ * `chancePpm` AND that chance is a fair step of this edition into that slot from some lower slot;
+ * otherwise no slot, with the reason. The staked slot itself is the step page's to check.
+ */
+function upgradeWinSlot(
+  v: number,
+  chancePpm: number,
+  edition: Edition,
+  claimedSlot: number,
+): { outcome: 'won' | 'lost'; slotIndex?: number; why: string } {
+  const outcome = stepOutcome(v, chancePpm);
+  if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
+  const fair = sortedSlots(edition.slots).some((slot) => {
+    const offer = upgradeTarget(edition, slot.slotIndex);
+    return offer !== null && offer.targetSlotIndex === claimedSlot && offer.chancePpm === chancePpm;
+  });
+  return fair
+    ? { outcome, slotIndex: claimedSlot, why: '' }
+    : { outcome, why: `none: no step of this edition reaches slot ${claimedSlot} at ${chancePpm} ppm` };
+}
+
 // ---------------------------------------------------------------------------
 // The edition fingerprint — the `0x01` canonical preimage
 // ---------------------------------------------------------------------------
@@ -1033,6 +1067,29 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
   } else if (!preimage.ok) {
     skip('drawnSlotIndex', 'it needs the prize table, which is unusable');
+  } else if (input.gameKind === 'upgrade') {
+    // An upgrade win was drawn over the step's table, so the box table must not decide its slot.
+    const chancePpm = input.expected.stepChancePpm as number;
+    const expectedSlot = String(input.expected.drawnSlotIndex);
+    const step = attempt(() => upgradeWinSlot(derivation!.value, chancePpm, input.edition, input.expected.drawnSlotIndex));
+    if (!step.ok) {
+      checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);
+    } else {
+      trace.cumulative = cumulativeTable(stepTable(chancePpm));
+      if (step.value.slotIndex !== undefined) {
+        computedSlotIndex = step.value.slotIndex;
+        trace.computedSlotIndex = computedSlotIndex;
+      }
+      checks.drawnSlotIndex =
+        step.value.outcome !== input.expected.stepOutcome
+          ? { ok: false, expected: `step ${input.expected.stepOutcome}`, computed: `step ${step.value.outcome}` }
+          : check(expectedSlot, step.value.slotIndex === undefined ? step.value.why : String(step.value.slotIndex));
+    }
+    caveats.push(
+      'This win was made by an upgrade step. This run checks that the step\'s drawn value wins at the ' +
+        'step\'s chance, and that this chance is a fair step of this edition into this slot. Which win ' +
+        `was staked for it is checked on the step's own page${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}.`,
+    );
   } else {
     computedSlotIndex = slotFor(derivation.value, input.edition.slots);
     trace.computedSlotIndex = computedSlotIndex;
@@ -1249,6 +1306,11 @@ function requireShape(input: VerificationInput): void {
   // `null` and an absent key both mean "no hash recorded": the snapshot step then fails by name.
   need(input.expected.snapshotHash == null || typeof input.expected.snapshotHash === 'string', 'expected.snapshotHash');
   need(input.expected.itemId === undefined || typeof input.expected.itemId === 'string', 'expected.itemId');
+  need(input.gameKind === undefined || input.gameKind === 'box_open' || input.gameKind === 'upgrade', 'gameKind');
+  if (input.gameKind === 'upgrade') {
+    need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
+    need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
+  }
   if (input.snapshot !== undefined) {
     need(typeof input.snapshot.editionFingerprint === 'string', 'snapshot.editionFingerprint');
     need(Array.isArray(input.snapshot.slots), 'snapshot.slots');
@@ -1281,4 +1343,248 @@ function requireNonce(nonce: number): void {
   if (!Number.isInteger(nonce) || nonce < 1) {
     throw new Error(`nonce is a positive integer starting at 1, was ${nonce}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Verifying one upgrade step — rng-fairness §4b and §6
+// ---------------------------------------------------------------------------
+
+/** The engine type of an upgrade edition. Its constants are the cap and the minimum chance above. */
+export const UPGRADE_ENGINE_TYPE = 'single_draw_weighted_table_fair_upgrade';
+
+/** Everything needed to verify one upgrade step, won or lost. Assemble it from the published step. */
+export interface UpgradeStepInput {
+  /** The revealed server seed of the step's seed pair, 64 hex characters, or `null` while it is active. */
+  serverSeedHex: string | null;
+  commitmentHex: string;
+  clientSeed: string;
+  /** The nonce the step drew on. */
+  nonce: number;
+  /** The published edition of the box, whose fingerprint binds the two buy-back values the chance comes from. */
+  edition: Edition;
+  /** The edition's engine type, as the step answer gives it. The `0x01` bytes bind the engine id, not the type. */
+  engineType: string;
+  /** What the platform says happened. Every field here is a claim this function tries to refute. */
+  expected: {
+    editionFingerprint: string;
+    stakedSlotIndex: number;
+    targetSlotIndex: number;
+    chancePpm: number;
+    drawnPpmValue: number;
+    outcome: 'won' | 'lost';
+    stepNo: number;
+  };
+}
+
+/** The names of the step checks, in the order a reader should meet them. */
+export const UPGRADE_STEP_CHECK_NAMES = [
+  'commitment',
+  'editionFingerprint',
+  'engineType',
+  'upgradeTarget',
+  'upgradeChance',
+  'stepNo',
+  'drawnPpmValue',
+  'upgradeOutcome',
+] as const;
+
+export type UpgradeStepCheckName = (typeof UPGRADE_STEP_CHECK_NAMES)[number];
+
+/** The step's verdict: the same statuses, `notRun` and caveat rules as {@link VerificationReport}. */
+export interface UpgradeStepReport {
+  ok: boolean;
+  status: VerificationStatus;
+  firstFailure?: { check: UpgradeStepCheckName; field?: string; message: string };
+  invalid?: { message: string; detail?: string };
+  notRun: { check: UpgradeStepCheckName; reason: string }[];
+  checks: Partial<Record<UpgradeStepCheckName, Check>>;
+  trace: Partial<Derivation> & {
+    editionPreimageHex?: string;
+    computedEditionFingerprint?: string;
+    /** The step the edition offers from the staked slot, or absent when it offers none. */
+    computedOffer?: UpgradeOffer;
+    /** The step's two-entry table as a cumulative lookup: slot 0 wins. */
+    cumulative?: CumulativeRow[];
+    computedOutcome?: 'won' | 'lost';
+  };
+  caveats: string[];
+  summary: string;
+}
+
+/**
+ * Verify one upgrade step: the commitment, the odds, that the edition is an upgrade edition, that the
+ * target is the next value up from the staked slot and the chance its fair floor, that the step number
+ * is within the cap, that the seed reproduces the drawn value, and that this value reads as the
+ * recorded outcome over the step's own table. A lost step verifies exactly like a won one.
+ */
+export async function verifyUpgradeStep(input: UpgradeStepInput): Promise<UpgradeStepReport> {
+  try {
+    return await verifyStepChecked(input);
+  } catch (error) {
+    const own = error instanceof Error && error.constructor === Error;
+    const message = own ? error.message : 'the input could not be read: a value has the wrong type';
+    const invalid: { message: string; detail?: string } = { message };
+    if (!own) invalid.detail = messageOf(error);
+    return {
+      ok: false,
+      status: 'invalid',
+      invalid,
+      notRun: UPGRADE_STEP_CHECK_NAMES.map((check) => ({ check, reason: 'the input could not be read' })),
+      checks: {},
+      trace: {},
+      caveats: [],
+      summary: `CANNOT CHECK: ${message}`,
+    };
+  }
+}
+
+async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepReport> {
+  requireStepShape(input);
+  const checks: UpgradeStepReport['checks'] = {};
+  const notRun: UpgradeStepReport['notRun'] = [];
+  const trace: UpgradeStepReport['trace'] = {};
+  const caveats: string[] = [];
+  const skip = (check: UpgradeStepCheckName, reason: string) => notRun.push({ check, reason });
+  const seedRevealed = input.serverSeedHex !== null;
+  const expected = input.expected;
+
+  // The odds, and what they offer from the staked slot. None of this needs the seed.
+  const expectedFingerprint = expected.editionFingerprint.toLowerCase();
+  const preimage = attempt(() => editionBytes(input.edition));
+  let offer: Attempt<UpgradeOffer | null> | undefined;
+  if (preimage.ok) {
+    const computedFingerprint = hexFromBytes(await sha256(preimage.value));
+    trace.editionPreimageHex = hexFromBytes(preimage.value);
+    trace.computedEditionFingerprint = computedFingerprint;
+    checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
+    offer = attempt(() => upgradeTarget(input.edition, expected.stakedSlotIndex));
+  } else {
+    checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);
+  }
+  checks.engineType = check(UPGRADE_ENGINE_TYPE, input.engineType);
+  caveats.push(
+    'The engine type is read from the published engine row. The edition fingerprint binds the engine id, ' +
+      'and an engine row cannot be changed after it is published; this run did not look at that row itself.',
+  );
+
+  let chance: number | undefined;
+  if (offer === undefined) {
+    skip('upgradeTarget', 'it needs the prize table, which is unusable');
+    skip('upgradeChance', 'it needs the prize table, which is unusable');
+  } else if (!offer.ok) {
+    checks.upgradeTarget = unusable(String(expected.targetSlotIndex), 'expected.stakedSlotIndex', offer.error);
+    skip('upgradeChance', 'it needs the target, which could not be computed');
+  } else if (offer.value === null) {
+    checks.upgradeTarget = {
+      ok: false,
+      expected: String(expected.targetSlotIndex),
+      computed: `none: slot ${expected.stakedSlotIndex} is offered no step`,
+    };
+    skip('upgradeChance', 'the edition offers no step from the staked slot');
+  } else {
+    trace.computedOffer = offer.value;
+    chance = offer.value.chancePpm;
+    trace.cumulative = cumulativeTable(stepTable(chance));
+    checks.upgradeTarget = check(String(expected.targetSlotIndex), String(offer.value.targetSlotIndex));
+    checks.upgradeChance = check(String(expected.chancePpm), String(chance));
+  }
+  checks.stepNo =
+    Number.isInteger(expected.stepNo) && expected.stepNo >= 1 && expected.stepNo <= UPGRADE_MAX_STEPS
+      ? check(String(expected.stepNo), String(expected.stepNo))
+      : { ok: false, expected: `1..${UPGRADE_MAX_STEPS}`, computed: String(expected.stepNo) };
+
+  // The commitment and the draw. Both need the revealed seed.
+  let v: number | undefined;
+  const expectedPpm = String(expected.drawnPpmValue);
+  if (!seedRevealed) {
+    if (/^[0-9a-f]{64}$/i.test(input.commitmentHex)) skip('commitment', SEED_NOT_REVEALED);
+    else checks.commitment = unusable(input.commitmentHex, 'commitmentHex', 'the commitment must be 64 hex characters');
+    skip('drawnPpmValue', SEED_NOT_REVEALED);
+  } else {
+    const seedHex = input.serverSeedHex as string;
+    const seed = attempt(() => {
+      const bytes = bytesFromHex(seedHex);
+      requireSeed(bytes);
+      return bytes;
+    });
+    if (!seed.ok) {
+      checks.commitment = unusable(input.commitmentHex.toLowerCase(), 'serverSeedHex', seed.error);
+      skip('drawnPpmValue', 'it needs the revealed server seed, which is unusable');
+    } else {
+      checks.commitment = check(input.commitmentHex.toLowerCase(), await commitment(seed.value));
+      const clientSeed = attempt(() => requireClientSeed(input.clientSeed));
+      const nonce = attempt(() => requireNonce(input.nonce));
+      if (!clientSeed.ok) checks.drawnPpmValue = unusable(expectedPpm, 'clientSeed', clientSeed.error);
+      else if (!nonce.ok) checks.drawnPpmValue = unusable(expectedPpm, 'nonce', nonce.error);
+      else {
+        const derivation = await derive(seed.value, input.clientSeed, input.nonce);
+        Object.assign(trace, derivation);
+        v = derivation.value;
+        checks.drawnPpmValue = check(expectedPpm, String(v));
+      }
+    }
+  }
+
+  // The outcome: the DERIVED value over the table of the COMPUTED chance, never the claimed ones.
+  if (v === undefined) {
+    skip('upgradeOutcome', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+  } else if (chance === undefined) {
+    skip('upgradeOutcome', 'it needs the step chance, which could not be computed');
+  } else {
+    trace.computedOutcome = stepOutcome(v, chance);
+    checks.upgradeOutcome = check(expected.outcome, trace.computedOutcome);
+  }
+
+  if (!seedRevealed) {
+    caveats.push(
+      'NOT VERIFIED: the draw. The server seed of this seed pair has not been revealed yet, so the ' +
+        'commitment, the drawn value and the outcome cannot be recomputed.',
+    );
+  }
+
+  const failed = UPGRADE_STEP_CHECK_NAMES.filter((name) => checks[name]?.ok === false);
+  const coreRan = UPGRADE_STEP_CHECK_NAMES.every((name) => checks[name]?.ok === true);
+  const status: VerificationStatus =
+    failed.length > 0 ? 'failed' : !seedRevealed ? 'pending' : coreRan ? 'verified' : 'failed';
+
+  const report: UpgradeStepReport = {
+    ok: status === 'verified',
+    status,
+    notRun,
+    checks,
+    trace,
+    caveats,
+    summary:
+      status === 'pending'
+        ? 'PENDING: the server seed has not been revealed yet, so the step cannot be checked. Every check that could run matched.'
+        : status === 'failed'
+          ? `FAILED: ${failed.join(', ')} did not match. This step is not verified.`
+          : `Verified: nonce ${input.nonce} draws ppm ${v}, which ${trace.computedOutcome === 'won' ? 'wins' : 'loses'} ` +
+            `at a chance of ${chance} ppm, the fair step from slot ${expected.stakedSlotIndex} to slot ` +
+            `${expected.targetSlotIndex} of an edition whose published odds match its recorded fingerprint.`,
+  };
+  const first = failed[0];
+  if (first !== undefined) {
+    const c = checks[first] as Check;
+    report.firstFailure = { check: first, message: c.error ?? `expected ${c.expected}, computed ${c.computed}` };
+    if (c.field !== undefined) report.firstFailure.field = c.field;
+  }
+  return report;
+}
+
+function requireStepShape(input: UpgradeStepInput): void {
+  const need = (ok: boolean, what: string) => {
+    if (!ok) throw new Error(`${what} is missing or has the wrong type`);
+  };
+  need(typeof input === 'object' && input !== null, 'the input');
+  need(input.serverSeedHex !== undefined, 'serverSeedHex (use null while the seed is not revealed)');
+  need(typeof input.commitmentHex === 'string', 'commitmentHex');
+  need(typeof input.engineType === 'string', 'engineType');
+  need(typeof input.expected === 'object' && input.expected !== null, 'expected');
+  const e = input.expected;
+  need(typeof e.editionFingerprint === 'string', 'expected.editionFingerprint');
+  for (const field of ['stakedSlotIndex', 'targetSlotIndex', 'chancePpm', 'drawnPpmValue', 'stepNo'] as const) {
+    need(typeof e[field] === 'number', `expected.${field}`);
+  }
+  need(e.outcome === 'won' || e.outcome === 'lost', 'expected.outcome');
 }

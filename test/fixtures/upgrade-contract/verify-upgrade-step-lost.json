@@ -1,0 +1,17 @@
+{
+  "stepId": "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e03",
+  "engineType": "single_draw_weighted_table_fair_upgrade",
+  "engineVersion": 1,
+  "seedPairId": "5e0d9c8b-7a6f-4e5d-8c4b-3a2918070605",
+  "nonce": 9,
+  "editionId": "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a11",
+  "editionFingerprint": "3f2a000000000000000000000000000000000000000000000000000000009c1d",
+  "snapshotHash": "a1b200000000000000000000000000000000000000000000000000000000e3f4",
+  "stakedSlotIndex": 1,
+  "targetSlotIndex": 2,
+  "chancePpm": 400000,
+  "drawnPpmValue": 400000,
+  "outcome": "lost",
+  "newWinId": null,
+  "stepNo": 1
+}
