@@ -164,6 +164,8 @@ export const LOOKUP_WORDS = {
     "Your browser could not reach our server. Check your connection and try again. If you saved this proof before, paste it below: the check itself does not need our server.",
   serverFault: (message: string) =>
     `Our server sent a faulty answer, so nothing was checked: ${message}. Try again later. If you saved this proof before, paste it below.`,
+  pageFault:
+    "The page could not finish this lookup, so nothing was checked. Try again. If you saved this proof before, paste it below.",
   found: "We fetched the public data of this open and put it in the proof field below. The check ran in your browser.",
   sharing:
     "Anyone you give this proof or this id to can read this open, and can see how many opens were made with the same secret and when it was retired. It does not say who you are.",
@@ -175,13 +177,30 @@ export const LOOKUP_WORDS = {
  */
 export const FIRST_ROWS = 200
 
-/** The words under a cut table: what is not drawn, and that the check still used it. */
-export const moreRows = (count: number) =>
-  `${count.toLocaleString("en")} rows are not drawn here. Your browser used all of them in the check.`
+const rowRange = (from: number, to: number) =>
+  from === to
+    ? `Row ${from.toLocaleString("en")} is not drawn here.`
+    : `Rows ${from.toLocaleString("en")} to ${to.toLocaleString("en")} are not drawn here.`
+
+/**
+ * The words under a cut table: the rows after the last one drawn (`from` to `to`, none when `from > to`),
+ * and how many are not drawn in all. Gap markers above already named their own rows, so the total is said
+ * once, as the total, and never reads as more rows on top of theirs.
+ */
+export const endRows = (from: number, to: number, total: number) => {
+  const tail = from > to ? 0 : to - from + 1
+  const range = tail === 0 ? "" : rowRange(from, to)
+  if (tail === total) {
+    return tail === 1
+      ? `${range} Your browser used it in the check.`
+      : `${range.slice(0, -1)} (${total.toLocaleString("en")} rows). Your browser used all of them in the check.`
+  }
+  const all = `With the rows skipped above, ${total.toLocaleString("en")} rows are not drawn in all.`
+  return `${range ? `${range} ` : ""}${all} Your browser used all of them in the check.`
+}
 
 /** The marker where a cut table skips rows before a row it keeps (row numbers count from 0). */
-export const skippedRows = (from: number, to: number) =>
-  `Rows ${from.toLocaleString("en")} to ${to.toLocaleString("en")} are not drawn here.`
+export const skippedRows = (from: number, to: number) => rowRange(from, to)
 
 /** Drawing very many rows takes the browser a while; the button says so. */
 export const SLOW_DRAW_ROWS = 20_000

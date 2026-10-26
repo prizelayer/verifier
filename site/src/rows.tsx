@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { FIRST_ROWS, moreRows, SLOW_DRAW_ROWS, skippedRows } from "./words"
+import { endRows, FIRST_ROWS, SLOW_DRAW_ROWS, skippedRows } from "./words"
 
 /**
  * The body rows of a long table: the first {@link FIRST_ROWS}, plus any row `keep` names, then one
@@ -29,6 +29,8 @@ export function Rows<T>({
   }, [all])
   const shown = all ? rows.map((item, index) => ({ item, index })) : firstRows(rows, keep)
   const left = rows.length - shown.length
+  // The rows after the last one drawn; the end line names them, and the total once.
+  const tailFrom = shown.length === 0 ? 0 : shown[shown.length - 1].index + 1
   return (
     <>
       {shown.map(({ item, index }, at) => {
@@ -49,7 +51,7 @@ export function Rows<T>({
       {left > 0 ? (
         <tr data-more-rows={left}>
           <td colSpan={columns} className="py-2">
-            <span className="block">{moreRows(left)}</span>
+            <span className="block">{endRows(tailFrom, rows.length - 1, left)}</span>
             <Button
               variant="outline"
               className="mt-2"

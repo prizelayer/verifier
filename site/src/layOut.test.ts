@@ -23,4 +23,10 @@ describe("layOut", () => {
     expect(layOut('{ "a": 1 }')).toBe('{ "a": 1 }')
     expect(layOut('{"a":"b c"}')).toBe('{\n  "a": "b c"\n}')
   })
+
+  it("gives back a text whose brackets close more than they open, and does not throw", () => {
+    expect(layOut("}}]]")).toBe("}}]]")
+    expect(layOut('{"a":1}}')).toBe('{"a":1}}')
+    expect(layOut('{"a":[1]}')).toBe('{\n  "a": [\n    1\n  ]\n}')
+  })
 })

@@ -131,7 +131,7 @@ describe("lookUp", () => {
     ["the open", `/verify/opens/${WIN}`, "winId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "win id from the one you asked for"],
     ["the seed pair", `/verify/seed-pairs/${seedPair.seedPairId}`, "seedPairId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "seed pair id from the one the open names"],
     ["the box", `/verify/editions/${edition.editionId}`, "editionId", "0a0b0c0d-0e0f-4a1b-8c2d-3e4f5a6b7c8d", "box id from the one the open names"],
-    ["the prize list", `/verify/snapshots/${snapshot.snapshotHash}`, "snapshotHash", "0".repeat(64), "prize list fingerprint from the one the open names"],
+    ["the prize list", `/verify/snapshots/${snapshot.snapshotHash}`, "snapshotHash", "0".repeat(64), "fingerprint from the one the open names"],
   ])("names an answer for %s that is another record as a fault of our server", async (what, path, name, other, differs) => {
     const answers = exampleAnswers()
     answers.set(path, { status: 200, body: JSON.stringify({ ...JSON.parse(answers.get(path)!.body), [name]: other }) })
@@ -149,7 +149,7 @@ describe("lookUp", () => {
     const upper = JSON.stringify({ ...snapshot, snapshotHash: snapshot.snapshotHash.toUpperCase() })
     expect(await lookUp(WIN, null, withAnswer(path, { status: 200, body: upper }).fetchFn)).toEqual({
       kind: "serverFault",
-      message: "the prize list it sent has a different prize list fingerprint from the one the open names",
+      message: "the prize list it sent has a different fingerprint from the one the open names",
     })
   })
 

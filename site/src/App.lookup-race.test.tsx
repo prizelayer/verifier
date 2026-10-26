@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { App } from "./App"
@@ -52,6 +52,36 @@ describe("a lookup in flight", () => {
     await waitFor(() => expect(verdict()).toBe("PASS"))
     expect(idField().readOnly).toBe(false)
     expect(box().readOnly).toBe(false)
+  })
+
+  it("shows Look up as inactive while it runs, and keeps it focusable (aria-disabled, not disabled)", async () => {
+    window.location.hash = `#open=${WIN}`
+    const server = heldServer()
+    const user = userEvent.setup()
+    render(<App fetchFn={server.fetchFn} />)
+    await user.click(button("Look up"))
+    const lookUp = button("Look up")
+    expect(lookUp.getAttribute("aria-disabled")).toBe("true")
+    expect(lookUp.disabled).toBe(false)
+    expect(lookUp.className).toContain("aria-disabled:opacity-50")
+    server.release()
+    await waitFor(() => expect(verdict()).toBe("PASS"))
+    expect(button("Look up").getAttribute("aria-disabled")).toBeNull()
+  })
+
+  // Two submits in one task both ran before React drew the busy state again: two lookups started.
+  it("starts one lookup for two submits in one task", async () => {
+    window.location.hash = `#open=${WIN}`
+    const server = heldServer()
+    render(<App fetchFn={server.fetchFn} />)
+    const form = idField().form as HTMLFormElement
+    act(() => {
+      form.requestSubmit()
+      form.requestSubmit()
+    })
+    server.release()
+    await waitFor(() => expect(verdict()).toBe("PASS"))
+    expect(server.calls.filter((call) => call.url.endsWith(`/verify/opens/${WIN}`))).toHaveLength(1)
   })
 
   // The reviewer's probe: look up A, put B in the field while A is in flight, let A arrive.

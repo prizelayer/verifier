@@ -27,6 +27,8 @@ export type LookupResult =
   | { kind: "unreachable" }
   | { kind: "timedOut" }
   | { kind: "serverFault"; message: string }
+  /** The page itself failed while it looked up: not the network, not our server. */
+  | { kind: "pageFault" }
 
 // Lower case only: an id is lower-cased before this check, so the id fetched and shown is one spelling.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -204,7 +206,9 @@ function sameRecord(json: Record<string, unknown>, name: string, asked: string, 
   const value = json[name]
   const same = typeof value === "string" && (exact ? value === asked : value.toLowerCase() === asked.toLowerCase())
   if (!same) {
-    throw new ServerFault(`${what} it sent has a different ${LABEL[name]} from the one ${name === "winId" ? "you asked for" : "the open names"}`)
+    // The prize list's own fingerprint is named once: "the prize list it sent has a different fingerprint".
+    const label = name === "snapshotHash" ? "fingerprint" : LABEL[name]
+    throw new ServerFault(`${what} it sent has a different ${label} from the one ${name === "winId" ? "you asked for" : "the open names"}`)
   }
 }
 
