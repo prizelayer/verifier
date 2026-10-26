@@ -1,5 +1,5 @@
 diff --git a/site/src/rows.tsx b/site/src/rows.tsx
-index a24bfb4..0b079af 100644
+index a24bfb4..b7a8493 100644
 --- a/site/src/rows.tsx
 +++ b/site/src/rows.tsx
 @@ -51,7 +51,7 @@ export function Rows<T>({
@@ -7,7 +7,7 @@ index a24bfb4..0b079af 100644
          <tr data-more-rows={left}>
            <td colSpan={columns} className="py-2">
 -            <span className="block">{endRows(tailFrom, rows.length - 1, left)}</span>
-+            <span className="block">{endRows(rows.length - left, rows.length - 1, left)}</span>
++            <span className="block">{endRows(tailFrom, rows.length - 1, rows.length - tailFrom)}</span>
              <Button
                variant="outline"
                className="mt-2"
