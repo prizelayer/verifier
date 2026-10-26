@@ -560,6 +560,80 @@ function sortedSlots<T extends Pick<SlotOdds, 'slotIndex' | 'probabilityPpm'>>(s
 }
 
 // ---------------------------------------------------------------------------
+// The upgrade step — rng-fairness §4b
+// ---------------------------------------------------------------------------
+
+/** The lowest chance an upgrade step may be offered at, in ppm (10 %). A constant of the upgrade engine. */
+export const UPGRADE_MIN_CHANCE_PPM = 100_000;
+
+/** The most upgrade steps one box win may climb. A constant of the upgrade engine. */
+export const UPGRADE_MAX_STEPS = 3;
+
+/** The slot an upgrade step is offered for, and its chance. */
+export interface UpgradeOffer {
+  targetSlotIndex: number;
+  chancePpm: number;
+}
+
+/**
+ * The chance of a fair step from a held value to the next one up: `floor(1 000 000 × current / next)`
+ * ppm, so the step's expected value never exceeds the value staked. 12,00 → 30,00 gives 400 000.
+ *
+ * Exact in `bigint`: no float ever touches a chance.
+ */
+export function upgradeChancePpm(currentCents: bigint, nextCents: bigint): number {
+  if (currentCents <= 0n || nextCents <= currentCents) {
+    throw new Error(`a step needs 0 < current < next, was ${currentCents} → ${nextCents}`);
+  }
+  return Number((BigInt(PPM_TOTAL) * currentCents) / nextCents);
+}
+
+/**
+ * The step a win in `slotIndex` is offered, or `null`: the next strictly higher buy-back value of the
+ * same edition, ties broken by the lowest slot index. Never the next slot INDEX, because slot order is
+ * the draw's order, not the value's. No offer from the top value, and none when the next value gives
+ * a chance under {@link UPGRADE_MIN_CHANCE_PPM}, even if a value further up would pass.
+ *
+ * The cap ({@link UPGRADE_MAX_STEPS}) is not checked here: it depends on how the win was made, not on
+ * the edition.
+ */
+export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number): UpgradeOffer | null {
+  const slots = sortedSlots(edition.slots);
+  const held = slots.find((slot) => slot.slotIndex === slotIndex);
+  if (held === undefined) throw new Error(`slot ${slotIndex} is not in the edition`);
+  const current = held.requiredBuyBackValueCents;
+
+  let target: SlotOdds | undefined;
+  for (const slot of slots) {
+    if (slot.requiredBuyBackValueCents <= current) continue;
+    if (target === undefined || slot.requiredBuyBackValueCents < target.requiredBuyBackValueCents) target = slot;
+  }
+  if (target === undefined) return null;
+
+  const chancePpm = upgradeChancePpm(current, target.requiredBuyBackValueCents);
+  return chancePpm < UPGRADE_MIN_CHANCE_PPM ? null : { targetSlotIndex: target.slotIndex, chancePpm };
+}
+
+/** The two-entry table an upgrade step draws over: slot 0 holds the chance and wins, slot 1 loses. */
+export function stepTable(chancePpm: number): Pick<SlotOdds, 'slotIndex' | 'probabilityPpm'>[] {
+  if (!Number.isInteger(chancePpm) || chancePpm < 1 || chancePpm >= PPM_TOTAL) {
+    throw new Error(`a step chance must be an integer in [1, ${PPM_TOTAL - 1}], was ${chancePpm}`);
+  }
+  return [
+    { slotIndex: 0, probabilityPpm: chancePpm },
+    { slotIndex: 1, probabilityPpm: PPM_TOTAL - chancePpm },
+  ];
+}
+
+/**
+ * How a step at `chancePpm` ends for the drawn value `v`: the same cumulative lookup as a box, over
+ * {@link stepTable}. Slot 0 is `won`, so a step is won exactly when `v < chancePpm`.
+ */
+export function stepOutcome(v: number, chancePpm: number): 'won' | 'lost' {
+  return slotFor(v, stepTable(chancePpm)) === 0 ? 'won' : 'lost';
+}
+
+// ---------------------------------------------------------------------------
 // The edition fingerprint — the `0x01` canonical preimage
 // ---------------------------------------------------------------------------
 
