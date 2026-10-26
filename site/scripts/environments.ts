@@ -9,9 +9,8 @@ import type { Plugin } from "vite"
  * The values live in `environments.json`, one copy that the build, the bundle check and the
  * offline test all read.
  *
- * `sums` is where that environment's footer links the list of the published files. Dev's still
- * points at the mirror's root until its copy moves to `/verifier/dev/` (the owner's decision on
- * KAN-956: the move and this value change together).
+ * `sums` is where that environment's footer links the list of the published files: dev's copy is
+ * under the mirror's `/verifier/dev/`, and production will be at the mirror's root.
  */
 export type Environment = { name: string; api: string; sums: string }
 

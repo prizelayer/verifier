@@ -21,7 +21,7 @@ describe("the footer (where this copy comes from)", () => {
       SUMS_URL,
       `${REPO_URL}/actions/runs/18012345678`,
     ])
-    expect(SUMS_URL).toBe("https://prizelayer.github.io/verifier/SHA256SUMS")
+    expect(SUMS_URL).toBe("https://prizelayer.github.io/verifier/dev/SHA256SUMS")
     expect(REPO_URL).toBe("https://github.com/prizelayer/verifier")
   })
 

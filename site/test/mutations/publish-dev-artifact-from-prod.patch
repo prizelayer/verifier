@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
+--- a/.github/workflows/publish.yml
++++ b/.github/workflows/publish.yml
+@@ -84,7 +84,7 @@ jobs:
+       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+         with:
+           name: page-dev
+-          path: site/out/dev/
++          path: site/out/prod/
+           if-no-files-found: error
+ 
+       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

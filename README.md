@@ -20,7 +20,7 @@ npm ci && npm run build
 
 ## Checking an open
 
-The page is built from `site/` in this repository and published at <https://d1c8hkgbfkzbx4.cloudfront.net/>, the address the player page's link opens, with a mirror on GitHub Pages at <https://prizelayer.github.io/verifier/>.
+The page is built from `site/` in this repository, once per environment, and each copy asks only its own environment's server. The dev copy is published at <https://d1c8hkgbfkzbx4.cloudfront.net/>, the address the dev player page's link opens, with a mirror on GitHub Pages at <https://prizelayer.github.io/verifier/dev/>. The production copy will live at the mirror's root, <https://prizelayer.github.io/verifier/>; until it does, that address shows a short page saying the production verifier is not live yet.
 
 In your vault, every card and every History line has a link, "Check this open yourself". It opens this page with that open's id already filled in. Then press "Look up".
 

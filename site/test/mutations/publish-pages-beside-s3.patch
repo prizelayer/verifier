@@ -1,11 +1,10 @@
 diff --git a/.github/workflows/publish.yml b/.github/workflows/publish.yml
-index 6562b15..4c369d2 100644
 --- a/.github/workflows/publish.yml
 +++ b/.github/workflows/publish.yml
-@@ -143,8 +143,7 @@ jobs:
+@@ -165,8 +165,7 @@ jobs:
  
    publish-pages:
-     name: Publish the same build to GitHub Pages
+     name: Publish the mirror to GitHub Pages (the same dev build under /verifier/dev/)
 -    needs: [build, publish-s3]
 -    if: needs.publish-s3.result == 'success'
 +    needs: build

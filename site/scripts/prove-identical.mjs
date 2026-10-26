@@ -20,7 +20,7 @@ import https from "node:https"
 import { join } from "node:path"
 import { sha256 as sha, SUMS_FILE } from "./sha256sums.mjs"
 
-const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
+export const short = (h) => (h.length === 64 ? h.slice(0, 12) : h)
 
 /**
  * Whether this run published anything to compare, and the words when it did not. A publish job that
@@ -104,10 +104,10 @@ export const BASE = "/"
 
 /**
  * Compares both hosts with the build. `hosts` is [[name, baseUrl], …]; the last host is the GitHub
- * Pages one, whose cache may serve the old bytes for a few minutes, so only a DIFFERENT there is
- * read again, every `retryEveryMs`, for at most `retryForMs`, and only when the Pages publish
- * succeeded (`retryLast`): waiting cannot bring a publish that failed. A MISSING or UNKNOWN is
- * never retried into a pass.
+ * Pages one, whose cache may serve the old bytes, or a 404 for a path new to it, for a few minutes,
+ * so only a DIFFERENT or a MISSING there is read again, every `retryEveryMs`, for at most
+ * `retryForMs`, and only when the Pages publish succeeded (`retryLast`): waiting cannot bring a
+ * publish that failed. An UNKNOWN, and anything on the other host, is never retried into a pass.
  */
 export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryEveryMs = 60_000, retryForMs = 900_000, retryLast = true, log = console.log }) {
   const sumsText = readFileSync(join(dist, SUMS_FILE), "utf8")
@@ -127,9 +127,10 @@ export async function compare({ dist, hosts, fetchFn = fetchBytes, sleep, retryE
   const served = new Map()
   for (const [name, base] of hosts) served.set(name, await readHost(name, base, paths, fetchFn))
   const [lastName, lastBase] = hosts[hosts.length - 1]
-  const differsOnLast = () => paths.filter((p) => /^[0-9a-f]{64}$/.test(served.get(lastName).get(p)) && served.get(lastName).get(p) !== build.get(p))
+  const retriable = (h) => /^[0-9a-f]{64}$/.test(h) || h === "MISSING"
+  const differsOnLast = () => paths.filter((p) => retriable(served.get(lastName).get(p)) && served.get(lastName).get(p) !== build.get(p))
   for (let waited = 0; retryLast && differsOnLast().length > 0 && waited < retryForMs; waited += retryEveryMs) {
-    log(`${lastName}: ${differsOnLast().join(", ")} still DIFFERENT after ${waited / 1000} s; reading ${lastName} again in ${retryEveryMs / 1000} s`)
+    log(`${lastName}: ${differsOnLast().join(", ")} still DIFFERENT or MISSING after ${waited / 1000} s; reading ${lastName} again in ${retryEveryMs / 1000} s`)
     await sleep(retryEveryMs)
     served.set(lastName, await readHost(lastName, lastBase, paths, fetchFn))
   }

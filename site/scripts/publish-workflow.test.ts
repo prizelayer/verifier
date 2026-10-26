@@ -116,26 +116,83 @@ describe("the publish workflow", () => {
     const check = job("prove-identical")
     expect(check).toContain("    needs: [build, publish-s3, publish-pages]\n")
     expect(check).toContain("    if: always() && needs.build.result == 'success'\n")
-    expect(check).toContain('--host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/"')
+    expect(check).toContain('--host "cloudfront=$CLOUDFRONT" --host "pages=https://prizelayer.github.io/verifier/dev/"')
   })
 
-  it("builds and checks the dev page only, and names it in both steps (one artefact per environment comes with the publish matrix, KAN-956 PR-3)", () => {
+  it("builds and checks one page per environment, each through the same script, in the build job", () => {
     const steps = job("build").split("\n      - ")
     const step = (name: string) => {
-      const found = steps.filter((s) => s.startsWith(`name: ${name}`))
+      const found = steps.filter((s) => s.startsWith(`name: ${name}\n`))
       expect(found, name).toHaveLength(1)
       return found[0]
     }
-    expect(step("Build, naming this commit and this run in the footer")).toContain("          VERIFIER_ENV: dev\n")
-    expect(step("Bundle check")).toContain("          VERIFIER_ENV: dev\n")
+    for (const env of ["dev", "prod"]) {
+      const build = step(`Build and check the ${env} page`)
+      expect(build).toContain(`          VERIFIER_ENV: ${env}\n`)
+      expect(build).toContain("        run: sh scripts/build-environment.sh")
+    }
     expect(WORKFLOW.match(/VERIFIER_ENV:/g)).toHaveLength(2)
-    expect(WORKFLOW).not.toMatch(/\bprod\b/)
+    expect(step("Lay out the Pages mirror (the not-live page at the root, the dev copy under dev/)")).toContain("run: sh scripts/mirror-layout.sh out/dev out/pages")
+    const script = readFileSync(join(import.meta.dirname, "build-environment.sh"), "utf8")
+    for (const line of ["npm run build", "SCAN_DIST=1 npx vitest run scripts/no-browser-storage.test.ts", "npm run check-bundle", "node scripts/sha256sums.mjs dist", 'mv dist "out/$env"']) {
+      expect(script).toContain(`\n${line}\n`)
+    }
   })
 
-  it("names the commit and the run in the build step only, so the tests see a build that names none", () => {
-    expect(WORKFLOW.match(/VERIFIER_BUILD_RUN_ID/g)).toHaveLength(1)
+  it("publishes the dev page only: to S3 and, under dev/, to Pages, and compares that pair", () => {
+    const downloads = (name: string) => [...job(name).matchAll(/\n {10}name: ([\w-]+)\n {10}path: ([\w-]+)\n/g)].map((m) => `${m[1]}>${m[2]}`)
+    expect(downloads("publish-s3")).toEqual(["page-dev>page"])
+    expect(downloads("publish-pages")).toEqual(["pages>pages"])
+    expect(downloads("prove-identical")).toEqual(["page-dev>page"])
+    expect(job("publish-pages")).toContain("          path: pages/\n")
+    const uploads = [...job("build").matchAll(/upload-artifact@[0-9a-f]{40} # v[\d.]+\n {8}with:\n {10}name: ([\w-]+)\n {10}path: (\S+)\n/g)].map((m) => `${m[1]}<${m[2]}`)
+    expect(uploads).toEqual(["page-dev<site/out/dev/", "page-prod<site/out/prod/", "pages<site/out/pages/"])
+    expect(job("build").match(/upload-artifact@/g)).toHaveLength(3)
+    for (const name of ["publish-s3", "publish-pages", "prove-identical"]) expect(job(name)).not.toContain("page-prod")
+  })
+
+  it("names no prod variable or secret anywhere, reads secrets only by name, and reads only these variables", () => {
+    expect(WORKFLOW).not.toMatch(/VERIFIER_PROD/)
+    expect(WORKFLOW).not.toContain("secrets[")
+    expect(WORKFLOW).not.toMatch(/secrets:\s*inherit/)
+    const vars = [...new Set(WORKFLOW.match(/vars\.[A-Za-z_]+/g))].sort()
+    expect(vars).toEqual([
+      "vars.VERIFIER_AWS_REGION",
+      "vars.VERIFIER_BUCKET",
+      "vars.VERIFIER_CLOUDFRONT_HOST",
+      "vars.VERIFIER_DEPLOYABLE",
+      "vars.VERIFIER_DISTRIBUTION_ID_PARAMETER",
+      "vars.VERIFIER_PUBLISH_ROLE",
+    ])
+  })
+
+  it("ends the prod leg at a named step that publishes nothing: no prod job, role, secret or environment", () => {
+    const steps = job("build").split("\n      - ")
+    const last = steps[steps.length - 1]
+    expect(last).toBe(
+      'name: "publish prod: not available until KAN-933 names the host and the publisher"\n' +
+        '        run: echo "::notice title=publish prod::not available until KAN-933 names the host and the publisher. The prod page was built and checked (artifact page-prod); nothing was published for prod."\n',
+    )
+    const jobs = [...WORKFLOW.slice(WORKFLOW.indexOf("\njobs:\n")).matchAll(/\n {2}([a-z0-9-]+):\n/g)].map((m) => m[1])
+    expect(jobs).toEqual(["build", "publish-s3", "publish-pages", "prove-identical"])
+    for (const name of ["publish-s3", "publish-pages", "prove-identical"]) expect(job(name)).not.toMatch(/prod\b/)
+    expect(WORKFLOW.match(/environment:\n {6}name: [\w-]+/g)).toEqual(["environment:\n      name: publish", "environment:\n      name: github-pages"])
+  })
+
+  it("checks, after the comparison and whatever it found, that the mirror's root serves the not-live page", () => {
+    const check = job("prove-identical")
+    expect(check).toContain("            site/scripts/prove-root.mjs\n")
+    expect(check).toContain("            site/mirror-root/index.html\n")
+    const steps = check.split("\n      - ")
+    const last = steps[steps.length - 1]
+    expect(last).toContain("        if: always()\n")
+    expect(last).toContain("          PAGES_RESULT: ${{ needs.publish-pages.result }}\n")
+    expect(last).toContain('node site/scripts/prove-root.mjs --page site/mirror-root/index.html\n          --url "https://prizelayer.github.io/verifier/" --pages "$PAGES_RESULT"')
+  })
+
+  it("names the commit and the run in the two build steps only, so the tests see a build that names none", () => {
+    expect(WORKFLOW.match(/VERIFIER_BUILD_RUN_ID/g)).toHaveLength(2)
     const build = job("build")
     expect(build.indexOf("VERIFIER_BUILD_RUN_ID")).toBeGreaterThan(build.indexOf("npm test"))
-    expect(build).toContain("node scripts/sha256sums.mjs dist")
   })
 })
