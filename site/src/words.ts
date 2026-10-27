@@ -225,3 +225,142 @@ export const FOOTER = {
   notPublished:
     "This copy was not built by the publish workflow, so it names no build and no list of fingerprints. Its code is in the public repository",
 } as const
+
+// ---------------------------------------------------------------------------
+// Upgrade steps (KAN-1154): a player stakes a win for the next item up, and one pick decides it.
+// ---------------------------------------------------------------------------
+
+/** The four cards of an upgrade step. Steps 1 and 3 are the same as an open's; 2 and 4 are the step's own. */
+export const UPGRADE_STEPS = [
+  {
+    step: 1,
+    title: STEPS[0].title,
+    method: "SHA-256",
+    source: "Read from the seed pair record: `seedPair.serverSeedCommitment` and `seedPair.revealedServerSeed`.",
+    text: STEPS[0].text,
+  },
+  {
+    step: 2,
+    title: "The chance of your upgrade is the fair one.",
+    method: "SHA-256",
+    source:
+      "Read from the box record: `edition` (its prize table and chances) and `edition.engineType`; from the step record: `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm` and `step.stepNo`.",
+    text: [
+      "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
+      "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",
+      "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is the next one up from yours, and that the chance is exactly that value. There is no upgrade below a 10% chance, and at most 3 in a row.",
+    ],
+  },
+  {
+    step: 3,
+    title: STEPS[2].title,
+    method: "HMAC-SHA256",
+    source:
+      "Read from the seed pair record: `seedPair.revealedServerSeed` and `seedPair.clientSeed`; from the step record: `step.nonce` and `step.drawnPpmValue`.",
+    text: STEPS[2].text,
+  },
+  {
+    step: 4,
+    title: "From the number to won or lost.",
+    method: null,
+    source: "Read from the step record: `step.outcome`. The two ranges come from the chance checked in step 2.",
+    text: [
+      "An upgrade has only two ranges. The first is as wide as the chance and wins; the second holds every other number and loses. With a 40% chance, the numbers 0 to 399,999 win.",
+      "Your browser reads your number v against those two ranges, not against the box's prize table, and compares the result with the one we recorded.",
+    ],
+  },
+] as const
+
+export type UpgradeStepName =
+  | "commitment"
+  | "editionFingerprint"
+  | "engineType"
+  | "upgradeTarget"
+  | "upgradeChance"
+  | "stepNo"
+  | "drawnPpmValue"
+  | "upgradeOutcome"
+
+/** The step card each step check belongs to. */
+export const UPGRADE_STEP_OF: Record<UpgradeStepName, StepNumber> = {
+  commitment: 1,
+  editionFingerprint: 2,
+  engineType: 2,
+  upgradeTarget: 2,
+  upgradeChance: 2,
+  stepNo: 2,
+  drawnPpmValue: 3,
+  upgradeOutcome: 4,
+}
+
+export const UPGRADE_CHECK_LABELS: Record<UpgradeStepName, string> = {
+  commitment: CHECK_LABELS.commitment,
+  editionFingerprint: CHECK_LABELS.editionFingerprint,
+  engineType: "The kind of box",
+  upgradeTarget: "The item offered",
+  upgradeChance: "The chance",
+  stepNo: "How many upgrades in a row",
+  drawnPpmValue: CHECK_LABELS.drawnPpmValue,
+  upgradeOutcome: "Won or lost",
+}
+
+/** What each step check means when it matches. */
+export const UPGRADE_CHECK_WORDS: Record<UpgradeStepName, string> = {
+  commitment: "The secret we revealed matches the fingerprint our server published for this pair.",
+  editionFingerprint: "The chances match the fingerprint recorded on your upgrade.",
+  engineType: "The box is an upgrade box.",
+  upgradeTarget: "The item offered is the next one up from the item you gave up.",
+  upgradeChance: "The chance is the value you gave up divided by the value offered, rounded down.",
+  stepNo: "This upgrade is within the 3 a win may take.",
+  drawnPpmValue: "The pick, redone from the secret, the client seed and the counter, gives the number we recorded.",
+  upgradeOutcome: "That number gives the result we recorded.",
+}
+
+/** What each step check means when it does not match. */
+export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
+  commitment: FAIL_WORDS.commitment,
+  editionFingerprint:
+    "The chances shown here do not match the fingerprint recorded on your upgrade. The step below was checked against a table we cannot confirm.",
+  engineType: "This box is not an upgrade box, so it offers no upgrade.",
+  upgradeTarget: "The item offered is not the next one up from the item you gave up.",
+  upgradeChance: "The chance we recorded is not the fair chance of this upgrade.",
+  stepNo: "This would be more upgrades in a row than a win may take.",
+  drawnPpmValue: FAIL_WORDS.drawnPpmValue,
+  upgradeOutcome: "With the fair chance, this number gives a different result than the one we recorded.",
+}
+
+/** The verdict lines of a step. A lost step that checks out is a PASS of the check, never a celebration. */
+export const UPGRADE_VERDICT = {
+  won: "Your browser recomputed this upgrade from the data above and got the same result we recorded: the upgrade was won.",
+  lost: "Your browser recomputed this upgrade from the data above and got the same result we recorded: the upgrade was lost, and the item you gave up is gone.",
+} as const
+
+/** Under the open verdict, when the win was made by an upgrade. */
+export const UPGRADE_WIN = {
+  note: "This win was made by an upgrade. Its number is read against the upgrade's two ranges, not against the box's prize table.",
+  link: "Check the upgrade that made this win",
+} as const
+
+/** Under "Paste a proof": the second kind of proof. */
+export const STEP_PROOF_EXPLAINED =
+  'An upgrade has its own proof: its three public records (the upgrade, its seed pair and its box), saved as one JSON text that starts with {"format": "prizelayer-step-proof/1".'
+
+/** The pending verdict of an upgrade: the same lock as an open's, said of the upgrade. */
+export const STEP_LOCKED = LOCKED.replace("The secret for this open", "The secret for this upgrade")
+
+/** The lookup's words for an upgrade. */
+export const STEP_LOOKUP_WORDS = {
+  kindOpen: "An open",
+  kindStep: "An upgrade",
+  label: "Look up an upgrade by its id",
+  help: 'The id is the part after "step=" in the address of the "Check this upgrade yourself" link. The link fills it in for you.',
+  notAnId: "This is not an upgrade id. An upgrade id looks like 7c9e6679-7425-40de-944b-e07fc1f90ae7.",
+  notFound: "We found no upgrade with this id. An item that was never upgraded has none.",
+  found: "We fetched the public data of this upgrade and put it in the proof field below. The check ran in your browser.",
+} as const
+
+/** A step chance in percent, rounded DOWN to two decimals, so it is never shown above the true chance (cto 24259). */
+export function percentDown(ppm: number): string {
+  const hundredths = Math.floor(ppm / 100)
+  return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, "0")}%`
+}

@@ -1,5 +1,5 @@
-import type { CheckName, VerificationReport } from "@verifier"
-import { FAIL_WORDS, LOCKED, unusableWords } from "./words"
+import type { CheckName, UpgradeStepReport, VerificationReport } from "@verifier"
+import { FAIL_WORDS, LOCKED, STEP_LOCKED, UPGRADE_FAIL_WORDS, UPGRADE_STEP_OF, UPGRADE_VERDICT, type UpgradeStepName, unusableWords } from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
 export const CHECK_WORDS: Record<CheckName, string> = {
@@ -49,4 +49,31 @@ export function caveatOf(report: VerificationReport): string | null {
   if (skipped.has("snapshotHash")) return "The item was not checked: this proof has no prize list, so the page cannot tell which item was in your slot."
   if (skipped.has("drawnItemId") && skipped.size === 1) return "The item was not checked: this page was not told which item you received."
   return `Not checked: ${report.notRun.map((n) => `${n.check} (${n.reason})`).join("; ")}.`
+}
+
+/**
+ * The verdict of an upgrade step (KAN-1154). PASS means the check matched, whatever the step's result;
+ * the line then says plainly whether it was won or lost, and a lost step is never worded as a win.
+ */
+export function stepVerdictOf(report: UpgradeStepReport): { word: string; line: string } {
+  switch (report.status) {
+    case "verified":
+      return { word: "PASS", line: report.trace.computedOutcome === "won" ? UPGRADE_VERDICT.won : UPGRADE_VERDICT.lost }
+    case "failed": {
+      const failure = report.firstFailure
+      if (!failure) return { word: "FAIL", line: report.summary }
+      const step = UPGRADE_STEP_OF[failure.check as UpgradeStepName]
+      return {
+        word: "FAIL",
+        line:
+          failure.field !== undefined
+            ? `Step ${step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
+            : `Step ${step} does not match: ${UPGRADE_FAIL_WORDS[failure.check as UpgradeStepName]}`,
+      }
+    }
+    case "pending":
+      return { word: "CANNOT CHECK YET", line: STEP_LOCKED }
+    case "invalid":
+      return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
+  }
 }
