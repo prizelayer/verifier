@@ -90,7 +90,7 @@ export function LookupBox({
       <fieldset className="flex flex-wrap gap-x-6 gap-y-2" disabled={busy}>
         <legend className="sr-only">What to look up</legend>
         {(["open", "step"] as const).map((k) => (
-          <label key={k} className="flex items-center gap-2">
+          <label key={k} className="flex min-h-11 cursor-pointer items-center gap-2 sm:min-h-9">
             <input
               type="radio"
               name={`${fieldId}-kind`}
