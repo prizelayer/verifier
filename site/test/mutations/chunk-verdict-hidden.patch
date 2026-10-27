@@ -1,13 +1,13 @@
 diff --git a/site/src/bytes.tsx b/site/src/bytes.tsx
-index 550d0c4..9f9b063 100644
+index f711526..ee2079e 100644
 --- a/site/src/bytes.tsx
 +++ b/site/src/bytes.tsx
-@@ -119,7 +119,7 @@ export function Chunks({ chunks, value }: { chunks: readonly ChunkVerdict[]; val
-       </thead>
-       <tbody>
-         {chunks.map((c) => (
--          <tr key={`${c.attempt}-${c.offset}`} data-chunk={c.verdict}>
-+          <tr key={`${c.attempt}-${c.offset}`} data-chunk="not-reached">
-             <td>
-               {c.attempt > 0 ? `try ${c.attempt + 1}, ` : ""}
-               {c.offset}–{c.offset + 3}
+@@ -126,7 +126,7 @@ export function Chunks({ chunks, value }: { chunks: readonly ChunkVerdict[]; val
+         </thead>
+         <tbody>
+           {chunks.map((c) => (
+-            <tr key={`${c.attempt}-${c.offset}`} data-chunk={c.verdict}>
++            <tr key={`${c.attempt}-${c.offset}`} data-chunk="not-reached">
+               <td>
+                 {c.attempt > 0 ? `try ${c.attempt + 1}, ` : ""}
+                 {c.offset}–{c.offset + 3}

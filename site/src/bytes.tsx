@@ -86,7 +86,9 @@ export function ByteGroups({ caption, groups }: { caption: string; groups: ByteG
             <tr key={i} className="align-top">
               <td className="pr-2">{group.name}</td>
               <td className="break-all pr-2 font-mono">{group.hex}</td>
-              <td>{group.meaning}</td>
+              {/* A meaning can be an id or a fingerprint with no space; Firefox will not break it in a
+                  cell unless told, and the table then pushes a 320 px page sideways. */}
+              <td className="wrap-anywhere">{group.meaning}</td>
             </tr>
           )}
         />
@@ -101,40 +103,48 @@ const VERDICT_WORDS: Record<ChunkVerdict["verdict"], string> = {
   "not-reached": "not needed",
 }
 
-/** The 4-byte numbers the pick read, each with what the pick did with it. */
-/** `value` is the library's `v`, shown after the used number; the page does not reduce it itself. */
+/**
+ * The 4-byte numbers the pick read, each with what the pick did with it. `value` is the library's `v`,
+ * shown after the used number; the page does not reduce it itself.
+ *
+ * The used number's "mod" sum makes the table wider than a 320 px phone, so it scrolls in a frame of its
+ * own rather than the page sideways; the frame takes focus, because Safari gives a plain scroll area no
+ * keyboard reach. A number never wraps, so none is cut in two.
+ */
 export function Chunks({ chunks, value }: { chunks: readonly ChunkVerdict[]; value: number | undefined }) {
   return (
-    <table className="w-full text-xs">
-      <caption className="text-left text-sm text-muted-foreground">
-        The 4-byte numbers. A number of {ACCEPTANCE_THRESHOLD.toLocaleString("en")} or more is thrown away.
-      </caption>
-      <thead>
-        <tr className="text-left">
-          <th scope="col">Bytes</th>
-          <th scope="col">Hex</th>
-          <th scope="col">Number</th>
-          <th scope="col">Result</th>
-        </tr>
-      </thead>
-      <tbody>
-        {chunks.map((c) => (
-          <tr key={`${c.attempt}-${c.offset}`} data-chunk={c.verdict}>
-            <td>
-              {c.attempt > 0 ? `try ${c.attempt + 1}, ` : ""}
-              {c.offset}–{c.offset + 3}
-            </td>
-            <td className="font-mono">{c.chunk.toString(16).padStart(8, "0")}</td>
-            <td>{c.chunk.toLocaleString("en")}</td>
-            <td>
-              {VERDICT_WORDS[c.verdict]}
-              {c.verdict === "accepted" && value !== undefined
-                ? `: ${c.chunk.toLocaleString("en")} mod ${PPM_TOTAL.toLocaleString("en")} = ${value.toLocaleString("en")}`
-                : ""}
-            </td>
+    <div role="region" aria-label="The 4-byte numbers" tabIndex={0} data-scroll-frame className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <caption className="text-left text-sm text-muted-foreground">
+          The 4-byte numbers. A number of {ACCEPTANCE_THRESHOLD.toLocaleString("en")} or more is thrown away.
+        </caption>
+        <thead>
+          <tr className="text-left">
+            <th scope="col">Bytes</th>
+            <th scope="col">Hex</th>
+            <th scope="col">Number</th>
+            <th scope="col">Result</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {chunks.map((c) => (
+            <tr key={`${c.attempt}-${c.offset}`} data-chunk={c.verdict}>
+              <td>
+                {c.attempt > 0 ? `try ${c.attempt + 1}, ` : ""}
+                {c.offset}–{c.offset + 3}
+              </td>
+              <td className="whitespace-nowrap font-mono">{c.chunk.toString(16).padStart(8, "0")}</td>
+              <td className="whitespace-nowrap">{c.chunk.toLocaleString("en")}</td>
+              <td>
+                {VERDICT_WORDS[c.verdict]}
+                {c.verdict === "accepted" && value !== undefined
+                  ? `: ${c.chunk.toLocaleString("en")} mod ${PPM_TOTAL.toLocaleString("en")} = ${value.toLocaleString("en")}`
+                  : ""}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

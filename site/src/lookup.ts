@@ -27,6 +27,8 @@ export type LookupResult =
   | { kind: "unreachable" }
   | { kind: "timedOut" }
   | { kind: "serverFault"; message: string }
+  /** The page itself failed while it looked up: not the network, not our server. */
+  | { kind: "pageFault" }
 
 // Lower case only: an id is lower-cased before this check, so the id fetched and shown is one spelling.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -52,7 +54,7 @@ const LABEL: Record<string, string> = {
   winId: "win id",
   seedPairId: "seed pair id",
   editionId: "box id",
-  snapshotHash: "prize list fingerprint",
+  snapshotHash: "fingerprint",
 }
 
 /**
@@ -171,7 +173,14 @@ function decode(decoder: TextDecoder, bytes: Uint8Array | undefined): string {
 function objectOf(text: string, what: string): Record<string, unknown> {
   // A key written twice would be read as its last copy here, and refused later by the check: refuse
   // it now, so the lookup never reports a proof the check will not read.
-  const problem = structureProblem(text)
+  // The check reads every key with JSON.parse, so a key with a bad escape throws there: that is still
+  // an answer that is not JSON, and it is named so, not left to look like a fault of the page.
+  let problem: ReturnType<typeof structureProblem>
+  try {
+    problem = structureProblem(text)
+  } catch {
+    throw new ServerFault(`${what} it sent is not valid JSON`)
+  }
   if (problem !== null) {
     throw new ServerFault(
       "tooDeep" in problem
