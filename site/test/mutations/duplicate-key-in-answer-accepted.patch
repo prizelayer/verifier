@@ -1,13 +1,13 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e67e97d..5da69b4 100644
+index c953896..2cf5600 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -161,7 +161,7 @@ function decode(decoder: TextDecoder, bytes: Uint8Array | undefined): string {
- function objectOf(text: string, what: string): Record<string, unknown> {
-   // A key written twice would be read as its last copy here, and refused later by the check: refuse
-   // it now, so the lookup never reports a proof the check will not read.
--  const problem = structureProblem(text)
-+  const problem = structureProblem("{}")
-   if (problem !== null) {
-     throw new ServerFault(
-       "tooDeep" in problem
+@@ -177,7 +177,7 @@ function objectOf(text: string, what: string): Record<string, unknown> {
+   // an answer that is not JSON, and it is named so, not left to look like a fault of the page.
+   let problem: ReturnType<typeof structureProblem>
+   try {
+-    problem = structureProblem(text)
++    problem = structureProblem("{}")
+   } catch {
+     throw new ServerFault(`${what} it sent is not valid JSON`)
+   }

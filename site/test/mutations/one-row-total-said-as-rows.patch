@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 34df1ff..e5a1da2 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -195,7 +195,7 @@ export const endRows = (from: number, to: number, total: number) => {
+       ? `${range} Your browser used it in the check.`
+       : `${range.slice(0, -1)} (${total.toLocaleString("en")} rows). Your browser used all of them in the check.`
+   }
+-  const all = `With the rows skipped above, ${total === 1 ? "1 row is" : `${total.toLocaleString("en")} rows are`} not drawn in all.`
++  const all = `With the rows skipped above, ${total.toLocaleString("en")} rows are not drawn in all.`
+   const used = total === 1 ? "Your browser used it in the check." : "Your browser used all of them in the check."
+   return `${range ? `${range} ` : ""}${all} ${used}`
+ }
