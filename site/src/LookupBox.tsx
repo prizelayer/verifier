@@ -1,12 +1,16 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { API_BASE, fromFragment, lookUp, normalId, type LookupResult } from "./lookup"
+import { API_BASE, fromFragment, lookUp, lookUpStep, normalId, stepFromFragment, type LookupResult } from "./lookup"
 import { layOut } from "./layOut"
-import { LOOKUP_WORDS } from "./words"
+import { LOOKUP_WORDS, STEP_LOOKUP_WORDS } from "./words"
+
+/** What the box looks up: an open, or an upgrade step (KAN-1154). */
+type Kind = "open" | "step"
 
 /**
- * Look an open up by its id. Nothing is fetched until the reader presses "Look up", also when the
- * id came in the page's address (`#open=<winId>&item=<itemId>`, a fragment no server ever sees).
+ * Look an open or an upgrade up by its id. Nothing is fetched until the reader presses "Look up", also
+ * when the id came in the page's address (`#open=<winId>&item=<itemId>` or `#step=<stepId>`, a fragment
+ * no server ever sees).
  */
 export function LookupBox({
   disabled,
@@ -26,15 +30,18 @@ export function LookupBox({
   const fieldId = useId()
   // The address is read once, when the page opens; nothing is fetched from it.
   const [fromAddress] = useState(() => fromFragment(window.location.hash))
-  const [winId, setWinId] = useState(fromAddress?.winId ?? "")
+  const [stepFromAddress] = useState(() => (fromAddress === null ? stepFromFragment(window.location.hash) : null))
+  const [kind, setKind] = useState<Kind>(stepFromAddress !== null ? "step" : "open")
+  const [winId, setWinId] = useState(fromAddress?.winId ?? stepFromAddress ?? "")
   // The item id in the address belongs to the open in the address, not to an id typed later.
-  const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
+  const itemId =
+    kind === "open" && fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
   const [busy, setBusy] = useState(false)
   // The guard a second press checks. The state above is for the screen, and two presses in one task
   // (a script calling requestSubmit() twice) both read it before React draws again; this ref they do not.
   const pressing = useRef(false)
   // The result, with the id it was looked up for: the saved file is named after that id.
-  const [result, setResult] = useState<{ asked: string; result: LookupResult } | null>(null)
+  const [result, setResult] = useState<{ asked: string; kind: Kind; result: LookupResult } | null>(null)
   // What is on screen now, read when an answer arrives: an answer is kept only for the id and the
   // box it was asked from, so a late answer never lands on another id or over another proof.
   const current = useRef({ winId, shownText })
@@ -57,7 +64,7 @@ export function LookupBox({
       setBusy(true)
       onBusy?.(true)
       setResult(null)
-      found = await lookUp(asked, itemId, fetchFn)
+      found = kind === "step" ? await lookUpStep(asked, fetchFn) : await lookUp(asked, itemId, fetchFn)
     } catch (error) {
       // lookUp returns every fault of the network and of our server as a result, so what reaches here
       // is the page's own: it is named so, and kept in the console for whoever reports it.
@@ -69,7 +76,7 @@ export function LookupBox({
       onBusy?.(false)
     }
     if (normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
-    setResult({ asked, result: found })
+    setResult({ asked, kind, result: found })
     if (found.kind === "found") onFound(found.text)
   }
 
@@ -80,15 +87,33 @@ export function LookupBox({
   const invalid = result?.result.kind === "notAnId" || result?.result.kind === "notFound"
   return (
     <section aria-labelledby={`${fieldId}-label`} aria-busy={busy} className="space-y-3">
+      <fieldset className="flex flex-wrap gap-x-6 gap-y-2" disabled={busy}>
+        <legend className="sr-only">What to look up</legend>
+        {(["open", "step"] as const).map((k) => (
+          <label key={k} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name={`${fieldId}-kind`}
+              value={k}
+              checked={kind === k}
+              onChange={() => {
+                setKind(k)
+                setResult(null)
+              }}
+            />
+            {k === "open" ? STEP_LOOKUP_WORDS.kindOpen : STEP_LOOKUP_WORDS.kindStep}
+          </label>
+        ))}
+      </fieldset>
       <label id={`${fieldId}-label`} htmlFor={fieldId} className="block font-medium">
-        Look up an open by its id
+        {kind === "step" ? STEP_LOOKUP_WORDS.label : "Look up an open by its id"}
       </label>
       <p id={`${fieldId}-help`} className="text-sm text-muted-foreground">
-        {LOOKUP_WORDS.help}
+        {kind === "step" ? STEP_LOOKUP_WORDS.help : LOOKUP_WORDS.help}
       </p>
       <p className="text-sm text-muted-foreground">
         This is the only time the page contacts our server: when you press "Look up", it fetches the public data of
-        that open from {new URL(API_BASE).host}. The check itself still runs in your browser.
+        that {kind === "step" ? "upgrade" : "open"} from {new URL(API_BASE).host}. The check itself still runs in your browser.
       </p>
       <form
         className="flex flex-col gap-2 sm:flex-row"
@@ -133,12 +158,12 @@ export function LookupBox({
         {busy ? (
           <p className="border-l-2 border-muted-foreground pl-3">{LOOKUP_WORDS.busy}</p>
         ) : result ? (
-          <LookupWords result={result.result} />
+          <LookupWords result={result.result} kind={result.kind} />
         ) : null}
       </div>
       {result !== null && fetched !== null && fetched === shownText ? (
         <div className="space-y-2">
-          <Button variant="outline" onClick={() => save(fetched, result.asked)}>
+          <Button variant="outline" onClick={() => save(fetched, result.asked, result.kind)}>
             Save this proof
           </Button>
           <p className="text-sm text-muted-foreground">{LOOKUP_WORDS.sharing}</p>
@@ -161,14 +186,15 @@ export function LookupBox({
 
 const FAULT = "border-l-2 border-fail pl-3 text-fail"
 
-function LookupWords({ result }: { result: LookupResult }) {
+function LookupWords({ result, kind }: { result: LookupResult; kind: Kind }) {
+  const words = kind === "step" ? STEP_LOOKUP_WORDS : LOOKUP_WORDS
   switch (result.kind) {
     case "found":
-      return <p>{LOOKUP_WORDS.found}</p>
+      return <p>{words.found}</p>
     case "notAnId":
-      return <p className={FAULT}>{LOOKUP_WORDS.notAnId}</p>
+      return <p className={FAULT}>{words.notAnId}</p>
     case "notFound":
-      return <p className={FAULT}>{LOOKUP_WORDS.notFound}</p>
+      return <p className={FAULT}>{words.notFound}</p>
     case "unreachable":
       return <p className={FAULT}>{LOOKUP_WORDS.unreachable}</p>
     case "timedOut":
@@ -181,11 +207,11 @@ function LookupWords({ result }: { result: LookupResult }) {
 }
 
 /** Downloads the proof as a file; nothing is stored in the browser. */
-function save(text: string, winId: string) {
+function save(text: string, id: string, kind: Kind) {
   const url = URL.createObjectURL(new Blob([text], { type: "application/json" }))
   const link = document.createElement("a")
   link.href = url
-  link.download = `proof-${winId}.json`
+  link.download = kind === "step" ? `step-proof-${id}.json` : `proof-${id}.json`
   link.click()
   // Released on the next turn: some browsers cancel a download whose URL is released at once.
   setTimeout(() => URL.revokeObjectURL(url), 0)

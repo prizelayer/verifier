@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react"
-import type { VerificationReport } from "@verifier"
+import type { UpgradeStepReport, VerificationInput, VerificationReport } from "@verifier"
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { SourceLine, StepCards } from "./steps"
-import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEPS } from "./words"
-import { caveatOf, verdictOf } from "./verdict"
+import { UpgradeStepCards } from "./upgradeSteps"
+import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_STEP_OF, UPGRADE_WIN, type UpgradeStepName } from "./words"
+import { caveatOf, stepVerdictOf, verdictOf } from "./verdict"
 
 export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const [text, setText] = useState("")
@@ -20,6 +21,17 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const fieldId = useId()
   const report = checked?.kind === "report" ? checked.report : null
   const input = checked?.kind === "report" ? checked.input : null
+  const stepReport = checked?.kind === "stepReport" ? checked.report : null
+  const stepInput = checked?.kind === "stepReport" ? checked.input : null
+  // A new address (the link from an upgraded win to its step) starts the lookup box again, so it reads it.
+  // Only a really different address does: a late event for the address the box already read would
+  // replace the box under the reader's hand.
+  const [address, setAddress] = useState(() => window.location.hash)
+  useEffect(() => {
+    const changed = () => setAddress(window.location.hash)
+    window.addEventListener("hashchange", changed)
+    return () => window.removeEventListener("hashchange", changed)
+  }, [])
 
   function edit(value: string) {
     current.current = value
@@ -45,7 +57,8 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   }
 
   // The failing card is scrolled to; the focus stays on the verdict, which a screen reader reads first.
-  const failingStep = report?.firstFailure?.step
+  const stepFailure = stepReport?.firstFailure?.check as UpgradeStepName | undefined
+  const failingStep = report?.firstFailure?.step ?? (stepFailure === undefined ? undefined : UPGRADE_STEP_OF[stepFailure])
   useEffect(() => {
     if (failingStep !== undefined) document.querySelector(`[data-step="${failingStep}"]`)?.scrollIntoView?.({ block: "nearest" })
   }, [failingStep, checked])
@@ -75,6 +88,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
       </section>
 
       <LookupBox
+        key={address}
         disabled={running}
         shownText={text}
         onBusy={setLookingUp}
@@ -90,7 +104,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
           Paste a proof
         </label>
         <p id={`${fieldId}-what`} className="text-sm text-muted-foreground">
-          {PROOF_EXPLAINED}
+          {PROOF_EXPLAINED} {STEP_PROOF_EXPLAINED}
         </p>
         <textarea
           id={fieldId}
@@ -125,10 +139,22 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
       </section>
 
       <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
-        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
+        {running ? (
+          <p>Computing in your browser…</p>
+        ) : report ? (
+          <Verdict report={report} input={input} />
+        ) : stepReport ? (
+          <StepVerdict report={stepReport} />
+        ) : null}
       </div>
 
-      {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
+      {report && input ? (
+        <StepCards report={report} input={input} />
+      ) : stepReport && stepInput ? (
+        <UpgradeStepCards report={stepReport} input={stepInput} />
+      ) : report || stepReport ? null : (
+        <EmptySteps />
+      )}
 
       <section aria-labelledby="not-proven" className="space-y-3">
         <h2 id="not-proven" className="text-lg font-semibold">
@@ -153,9 +179,10 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   )
 }
 
-function Verdict({ report }: { report: VerificationReport }) {
+function Verdict({ report, input }: { report: VerificationReport; input: VerificationInput | null }) {
   const { word, line } = verdictOf(report)
   const caveat = caveatOf(report)
+  const stepId = input?.gameKind === "upgrade" ? input.expected.upgradeStepId : undefined
   const tone =
     // Pending is not a warning: it is neutral ink, never the colour of a pass or a fail.
     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"
@@ -164,6 +191,23 @@ function Verdict({ report }: { report: VerificationReport }) {
       <p className={`text-3xl font-bold ${tone}`}>{word}</p>
       <p>{line}</p>
       {caveat ? <p data-caveat="yes">{caveat}</p> : null}
+      {stepId !== undefined ? (
+        <p data-upgrade-win>
+          {UPGRADE_WIN.note} <a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/** The verdict of an upgrade step: the same words and colours as an open's, never a celebration. */
+function StepVerdict({ report }: { report: UpgradeStepReport }) {
+  const { word, line } = stepVerdictOf(report)
+  const tone = report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"
+  return (
+    <div className="space-y-1" data-status={report.status} data-outcome={report.trace.computedOutcome ?? "none"}>
+      <p className={`text-3xl font-bold ${tone}`}>{word}</p>
+      <p>{line}</p>
     </div>
   )
 }
