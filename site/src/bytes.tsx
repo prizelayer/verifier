@@ -86,7 +86,9 @@ export function ByteGroups({ caption, groups }: { caption: string; groups: ByteG
             <tr key={i} className="align-top">
               <td className="pr-2">{group.name}</td>
               <td className="break-all pr-2 font-mono">{group.hex}</td>
-              <td>{group.meaning}</td>
+              {/* A meaning can be an id or a fingerprint with no space; Firefox will not break it in a
+                  cell unless told, and the table then pushes a 320 px page sideways. */}
+              <td className="wrap-anywhere">{group.meaning}</td>
             </tr>
           )}
         />
