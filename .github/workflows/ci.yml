@@ -107,6 +107,14 @@ jobs:
   browsers:
     name: Browser conformance (chromium, firefox, webkit)
     runs-on: ubuntu-latest
+    # Playwright's own image holds the OS packages and the three browsers, so the job installs nothing:
+    # `playwright install --with-deps` spent 45-60 min in apt on a slow mirror (KAN-1162). The tag is
+    # the lockfile's Playwright version, pinned by digest; the first step checks the two agree. Not
+    # root: Firefox refuses to start as root here.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --user 1001
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -117,8 +125,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Install browser engines
-        run: npx playwright install --with-deps chromium firefox webkit
+      - name: The image's Playwright is the lockfile's
+        run: node .github/scripts/check-playwright-image.mjs browsers package-lock.json
 
       - name: Reproduce every vector in three independent Web Crypto stacks
         run: npm run test:browser
@@ -134,8 +142,13 @@ jobs:
     name: Verification page (site/)
     # The page a player opens. Its own package, so the library above keeps zero dependencies. Every
     # step reads the page as built, and the offline test opens it from a file with the network
-    # refused, in the same three engines as the library.
+    # refused, in the same three engines as the library. It runs in Playwright's own image, for the
+    # reason given on the browsers job, with its own lockfile's version.
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      options: --user 1001
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: site
@@ -150,6 +163,9 @@ jobs:
 
       - run: npm ci
 
+      - name: The image's Playwright is the lockfile's
+        run: node ../.github/scripts/check-playwright-image.mjs site package-lock.json
+
       - name: Lint
         run: npm run lint -- --deny-warnings
 
@@ -158,9 +174,6 @@ jobs:
 
       - name: Unit, tamper, accessibility and no-storage tests
         run: npm test
-
-      - name: Install browser engines
-        run: npx playwright install --with-deps chromium firefox webkit
 
       # One build per environment (KAN-956): each is built, checked against its own API (and
       # against every other environment's), and opened from file:// with the network refused.
