@@ -195,8 +195,9 @@ export const endRows = (from: number, to: number, total: number) => {
       ? `${range} Your browser used it in the check.`
       : `${range.slice(0, -1)} (${total.toLocaleString("en")} rows). Your browser used all of them in the check.`
   }
-  const all = `With the rows skipped above, ${total.toLocaleString("en")} rows are not drawn in all.`
-  return `${range ? `${range} ` : ""}${all} Your browser used all of them in the check.`
+  const all = `With the rows skipped above, ${total === 1 ? "1 row is" : `${total.toLocaleString("en")} rows are`} not drawn in all.`
+  const used = total === 1 ? "Your browser used it in the check." : "Your browser used all of them in the check."
+  return `${range ? `${range} ` : ""}${all} ${used}`
 }
 
 /** The marker where a cut table skips rows before a row it keeps (row numbers count from 0). */

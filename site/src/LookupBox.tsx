@@ -50,12 +50,13 @@ export function LookupBox({
     if (asked === "") return
     if (asked !== winId) setWinId(asked)
     const boxAtPress = shownText
-    pressing.current = true
-    setBusy(true)
-    onBusy?.(true)
-    setResult(null)
     let found: LookupResult
     try {
+      // Taken inside the try: if anything below throws, finally still frees the button.
+      pressing.current = true
+      setBusy(true)
+      onBusy?.(true)
+      setResult(null)
       found = await lookUp(asked, itemId, fetchFn)
     } catch (error) {
       // lookUp returns every fault of the network and of our server as a result, so what reaches here

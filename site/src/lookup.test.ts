@@ -173,6 +173,14 @@ describe("lookUp", () => {
     expect(server.calls).toHaveLength(1)
   })
 
+  it("names a key with a bad escape as an answer that is not JSON, not as a fault of the page", async () => {
+    const server = withAnswer(`/verify/opens/${WIN}`, { status: 200, body: String.raw`{"winId\q":"x"}` })
+    expect(await lookUp(WIN, null, server.fetchFn)).toEqual({
+      kind: "serverFault",
+      message: "the open it sent is not valid JSON",
+    })
+  })
+
   it("refuses an answer that is not UTF-8", async () => {
     const text = new TextEncoder().encode(JSON.stringify(open))
     const bad = new Uint8Array([...text.slice(0, 20), 0xff, ...text.slice(20)])

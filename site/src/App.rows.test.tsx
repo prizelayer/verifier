@@ -97,6 +97,12 @@ describe("the words of a cut table", () => {
     )
   })
 
+  it("says one row in all as one row", () => {
+    expect(endRows(SLOTS, SLOTS - 1, 1)).toBe(
+      "With the rows skipped above, 1 row is not drawn in all. Your browser used it in the check.",
+    )
+  })
+
   it("says only the total when the kept row is the last one, so every row not drawn is in a gap above", () => {
     expect(endRows(SLOTS, SLOTS - 1, SLOTS - FIRST_ROWS - 1)).toBe(
       `With the rows skipped above, ${(SLOTS - FIRST_ROWS - 1).toLocaleString("en")} rows are not drawn in all. ` +

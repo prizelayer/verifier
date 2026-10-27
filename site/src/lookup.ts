@@ -54,7 +54,7 @@ const LABEL: Record<string, string> = {
   winId: "win id",
   seedPairId: "seed pair id",
   editionId: "box id",
-  snapshotHash: "prize list fingerprint",
+  snapshotHash: "fingerprint",
 }
 
 /**
@@ -173,7 +173,14 @@ function decode(decoder: TextDecoder, bytes: Uint8Array | undefined): string {
 function objectOf(text: string, what: string): Record<string, unknown> {
   // A key written twice would be read as its last copy here, and refused later by the check: refuse
   // it now, so the lookup never reports a proof the check will not read.
-  const problem = structureProblem(text)
+  // The check reads every key with JSON.parse, so a key with a bad escape throws there: that is still
+  // an answer that is not JSON, and it is named so, not left to look like a fault of the page.
+  let problem: ReturnType<typeof structureProblem>
+  try {
+    problem = structureProblem(text)
+  } catch {
+    throw new ServerFault(`${what} it sent is not valid JSON`)
+  }
   if (problem !== null) {
     throw new ServerFault(
       "tooDeep" in problem
@@ -206,9 +213,7 @@ function sameRecord(json: Record<string, unknown>, name: string, asked: string, 
   const value = json[name]
   const same = typeof value === "string" && (exact ? value === asked : value.toLowerCase() === asked.toLowerCase())
   if (!same) {
-    // The prize list's own fingerprint is named once: "the prize list it sent has a different fingerprint".
-    const label = name === "snapshotHash" ? "fingerprint" : LABEL[name]
-    throw new ServerFault(`${what} it sent has a different ${label} from the one ${name === "winId" ? "you asked for" : "the open names"}`)
+    throw new ServerFault(`${what} it sent has a different ${LABEL[name]} from the one ${name === "winId" ? "you asked for" : "the open names"}`)
   }
 }
 
