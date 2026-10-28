@@ -17,8 +17,10 @@ import {
   PPM_TOTAL,
   SERVER_SEED_BYTES,
   UPGRADE_ENGINE_TYPE,
+  UPGRADE_ENGINE_VERSION,
   UPGRADE_MAX_STEPS,
   UPGRADE_MIN_CHANCE_PPM,
+  UPGRADE_STEP_RTP_BPS,
   bigEndianUint32,
   bytesFromHex,
   commitment,
@@ -982,6 +984,8 @@ describe('the upgrade sections of the fixture', () => {
       assert.equal(section.constants.engineType, UPGRADE_ENGINE_TYPE);
       assert.equal(section.constants.maxSteps, UPGRADE_MAX_STEPS);
       assert.equal(section.constants.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
+      assert.equal(section.constants.engineVersion, UPGRADE_ENGINE_VERSION);
+      assert.equal(section.constants.stepRtpBps, UPGRADE_STEP_RTP_BPS);
     }
   });
 

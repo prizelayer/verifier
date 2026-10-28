@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 277af37..e352099 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1541,7 +1541,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+       checks.commitment = unusable(input.commitmentHex.toLowerCase(), 'serverSeedHex', seed.error);
+       skip('drawnPpmValue', 'it needs the revealed server seed, which is unusable');
+     } else {
+-      checks.commitment = check(input.commitmentHex.toLowerCase(), await commitment(seed.value));
++      checks.commitment = check(input.commitmentHex.toLowerCase(), input.commitmentHex.toLowerCase());
+       const clientSeed = attempt(() => requireClientSeed(input.clientSeed));
+       const nonce = attempt(() => requireNonce(input.nonce));
+       if (!clientSeed.ok) checks.drawnPpmValue = unusable(expectedPpm, 'clientSeed', clientSeed.error);

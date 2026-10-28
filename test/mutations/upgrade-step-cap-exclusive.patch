@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 277af37..27eaeb1 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1514,7 +1514,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+   }
+   // A range check, not a recompute: the chain of earlier steps is not part of one step.
+   checks.stepNo = {
+-    ok: Number.isInteger(expected.stepNo) && expected.stepNo >= 1 && expected.stepNo <= UPGRADE_MAX_STEPS,
++    ok: Number.isInteger(expected.stepNo) && expected.stepNo >= 1 && expected.stepNo < UPGRADE_MAX_STEPS,
+     expected: `in range 1..${UPGRADE_MAX_STEPS}`,
+     computed: String(expected.stepNo),
+   };

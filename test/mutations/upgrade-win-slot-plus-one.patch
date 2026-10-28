@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 277af37..56d9c6e 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -668,7 +668,7 @@ function upgradeWinSlot(
+   if (offer.chancePpm !== chancePpm) {
+     return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
+   }
+-  return { outcome, slotIndex: offer.targetSlotIndex, why: '' };
++  return { outcome, slotIndex: stakedSlot + 1, why: '' };
+ }
+ 
+ // ---------------------------------------------------------------------------

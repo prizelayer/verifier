@@ -606,7 +606,8 @@ export function upgradeChancePpm(currentCents: bigint, nextCents: bigint): numbe
  * The step a win in `slotIndex` is offered, or `null`: the next strictly higher buy-back value of the
  * same edition, ties broken by the lowest slot index. Never the next slot INDEX, because slot order is
  * the draw's order, not the value's. No offer from the top value, and none when the next value gives
- * a chance under {@link UPGRADE_MIN_CHANCE_PPM}, even if a value further up would pass.
+ * a chance under {@link UPGRADE_MIN_CHANCE_PPM}, even if a value further up would pass, and none from a
+ * held value of 0.
  *
  * The cap ({@link UPGRADE_MAX_STEPS}) is not checked here: it depends on how the win was made, not on
  * the edition.
@@ -616,6 +617,8 @@ export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number
   const held = slots.find((slot) => slot.slotIndex === slotIndex);
   if (held === undefined) throw new Error(`slot ${slotIndex} is not in the edition`);
   const current = held.requiredBuyBackValueCents;
+  // A held value of 0 has a chance of 0 at any step, which is under the minimum: no offer, as on platform.
+  if (current <= 0n) return null;
 
   let target: SlotOdds | undefined;
   for (const slot of slots) {
@@ -1091,7 +1094,8 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
       `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
         'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
         `${stakedSlot} is shown on the step's own page` +
-        `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}.`,
+        `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
+        'and so are the cap on steps and the engine type and version, which this run does not check.',
     );
   } else {
     computedSlotIndex = slotFor(derivation.value, input.edition.slots);
@@ -1356,6 +1360,19 @@ function requireNonce(nonce: number): void {
 /** The engine type of an upgrade edition. Its constants are the cap and the minimum chance above. */
 export const UPGRADE_ENGINE_TYPE = 'single_draw_weighted_table_fair_upgrade';
 
+/**
+ * The one version of the upgrade engine this library knows. rng-fairness §4b applies to version 1 only,
+ * and the constants above are version 1's; a step on another version is failed, never checked by v1's
+ * rules (§6: version for version, fail closed).
+ */
+export const UPGRADE_ENGINE_VERSION = 1;
+
+/**
+ * The step's return to player in basis points: 10 000, a fair step. {@link upgradeChancePpm} is the
+ * chance at exactly this value; the fixture states it, and the conformance suite compares the two.
+ */
+export const UPGRADE_STEP_RTP_BPS = 10_000;
+
 /** Everything needed to verify one upgrade step, won or lost. Assemble it from the published step. */
 export interface UpgradeStepInput {
   /** The revealed server seed of the step's seed pair, 64 hex characters, or `null` while it is active. */
@@ -1385,6 +1402,7 @@ export const UPGRADE_STEP_CHECK_NAMES = [
   'commitment',
   'editionFingerprint',
   'engineType',
+  'engineVersion',
   'upgradeTarget',
   'upgradeChance',
   'stepNo',
@@ -1466,6 +1484,8 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
     checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);
   }
   checks.engineType = check(UPGRADE_ENGINE_TYPE, input.engineType);
+  // Bound by the fingerprint: engineVersion is inside the `0x01` preimage.
+  checks.engineVersion = check(String(UPGRADE_ENGINE_VERSION), String(input.edition.engineVersion));
   caveats.push(
     'The engine type is read from the published engine row. The edition fingerprint binds the engine id, ' +
       'and an engine row cannot be changed after it is published; this run did not look at that row itself.',
@@ -1492,10 +1512,16 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
     checks.upgradeTarget = check(String(expected.targetSlotIndex), String(offer.value.targetSlotIndex));
     checks.upgradeChance = check(String(expected.chancePpm), String(chance));
   }
-  checks.stepNo =
-    Number.isInteger(expected.stepNo) && expected.stepNo >= 1 && expected.stepNo <= UPGRADE_MAX_STEPS
-      ? check(String(expected.stepNo), String(expected.stepNo))
-      : { ok: false, expected: `1..${UPGRADE_MAX_STEPS}`, computed: String(expected.stepNo) };
+  // A range check, not a recompute: the chain of earlier steps is not part of one step.
+  checks.stepNo = {
+    ok: Number.isInteger(expected.stepNo) && expected.stepNo >= 1 && expected.stepNo <= UPGRADE_MAX_STEPS,
+    expected: `in range 1..${UPGRADE_MAX_STEPS}`,
+    computed: String(expected.stepNo),
+  };
+  caveats.push(
+    `The step number is the platform's claim. This run checks only that it is in range 1..${UPGRADE_MAX_STEPS} ` +
+      '(the cap); which earlier steps led to this one is shown on their own pages.',
+  );
 
   // The commitment and the draw. Both need the revealed seed.
   let v: number | undefined;

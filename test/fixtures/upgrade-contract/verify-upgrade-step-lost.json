@@ -10,6 +10,7 @@
   "stakedSlotIndex": 1,
   "targetSlotIndex": 2,
   "chancePpm": 400000,
+  "chanceCompact": "40.00%",
   "drawnPpmValue": 400000,
   "outcome": "lost",
   "newWinId": null,

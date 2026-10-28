@@ -70,8 +70,8 @@ describe('verifyUpgradeStep', () => {
     const report = await verifyUpgradeStep(wonStep);
     assert.equal(report.status, 'verified', report.summary);
     assert.deepEqual(Object.keys(report.checks).sort(), [
-      'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'stepNo', 'upgradeChance', 'upgradeOutcome',
-      'upgradeTarget',
+      'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion', 'stepNo', 'upgradeChance',
+      'upgradeOutcome', 'upgradeTarget',
     ]);
     assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 400_000 });
     assert.deepEqual(report.trace.cumulative, [
@@ -114,6 +114,59 @@ describe('verifyUpgradeStep', () => {
     assert.equal(box.firstFailure?.check, 'engineType');
     const fourth = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, stepNo: 4 } });
     assert.equal(fourth.firstFailure?.check, 'stepNo');
+    assert.equal(fourth.checks.stepNo?.expected, 'in range 1..3');
+  });
+
+  it('verifies a fair third step: the cap allows step 1 to 3', async () => {
+    const third = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, stepNo: 3 } });
+    assert.equal(third.status, 'verified', third.summary);
+    assert.ok(third.caveats.some((c) => c.includes("The step number is the platform's claim")));
+  });
+
+  it('fails an edition on another version of the upgrade engine, even with its own true fingerprint', async () => {
+    const v2: Edition = { ...EDITION, engineVersion: 2 };
+    const report = await verifyUpgradeStep({
+      ...wonStep,
+      edition: v2,
+      expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v2) },
+    });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'engineVersion');
+    assert.equal(report.checks.editionFingerprint?.ok, true);
+    assert.equal(report.checks.engineVersion?.computed, '2');
+  });
+
+  // MUST-1 of the review of #15: each core check fails on its own forged input.
+  it('fails a revealed seed that is not the committed one', async () => {
+    const report = await verifyUpgradeStep({ ...wonStep, commitmentHex: 'ab'.repeat(32) });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'commitment');
+  });
+
+  it('fails a claimed fingerprint that is not the edition\'s', async () => {
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, editionFingerprint: 'cd'.repeat(32) } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'editionFingerprint');
+  });
+
+  it('fails an edition whose buy-back values changed after its fingerprint was published', async () => {
+    // Slot 2 worth 2 400 instead of 3 000: the chance from slot 1 would be 500 000 ppm, under a published
+    // fingerprint that binds 3 000.
+    const changed: Edition = {
+      ...EDITION,
+      slots: EDITION.slots.map((slot) => (slot.slotIndex === 2 ? { ...slot, requiredBuyBackValueCents: 2400n } : slot)),
+    };
+    const report = await verifyUpgradeStep({ ...wonStep, edition: changed });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'editionFingerprint');
+  });
+
+  it('fails a misreported drawn value even when its outcome is right', async () => {
+    // 186 670 still wins at 400 000 ppm: only the value itself is wrong.
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, drawnPpmValue: 186_670 } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'drawnPpmValue');
+    assert.equal(report.checks.upgradeOutcome?.ok, true);
   });
 
   it('is pending while the seed is not revealed, and checks the odds anyway', async () => {
@@ -185,6 +238,37 @@ describe('verify on an upgrade win', () => {
     assert.match(fromTop.checks.drawnSlotIndex?.computed ?? '', /slot 3 is offered no step/);
   });
 
+  it('reads the target by value order, never slot + 1', async () => {
+    // Slot order is not value order: from slot 1 (5 EUR) the next value up is slot 3 (12 EUR), 416 666 ppm.
+    const shuffled: Edition = {
+      ...EDITION,
+      slots: [
+        { slotIndex: 0, probabilityPpm: 300_000, requiredBuyBackValueCents: 3000n, requiredMarketValueCents: 3500n },
+        { slotIndex: 1, probabilityPpm: 400_000, requiredBuyBackValueCents: 500n, requiredMarketValueCents: 600n },
+        { slotIndex: 2, probabilityPpm: 100_000, requiredBuyBackValueCents: 8000n, requiredMarketValueCents: 9000n },
+        { slotIndex: 3, probabilityPpm: 200_000, requiredBuyBackValueCents: 1200n, requiredMarketValueCents: 1400n },
+      ],
+    };
+    const report = await verify({
+      ...upgradeWin,
+      edition: shuffled,
+      expected: {
+        ...upgradeWin.expected,
+        editionFingerprint: await editionFingerprint(shuffled),
+        drawnSlotIndex: 3,
+        stakedSlotIndex: 1,
+        stepChancePpm: 416_666,
+      },
+    });
+    assert.equal(report.status, 'verified', report.summary);
+    assert.equal(report.trace.computedSlotIndex, 3);
+  });
+
+  it('says the cap and the engine are checked on the step page', async () => {
+    const report = await verify(upgradeWin);
+    assert.ok(report.caveats.some((c) => c.includes('the cap on steps and the engine type and version')));
+  });
+
   it('refuses an upgrade win without its step facts', async () => {
     const { stepChancePpm: _chance, ...withoutChance } = upgradeWin.expected;
     const report = await verify({ ...upgradeWin, expected: withoutChance });
@@ -197,7 +281,7 @@ describe('the field names are the published contract (PR-0 draft)', () => {
   it('the step answer carries every field the step input reads', () => {
     for (const name of ['verify-upgrade-step-won', 'verify-upgrade-step-lost']) {
       const answer = contract(name);
-      for (const key of ['engineType', 'nonce', 'editionFingerprint', ...Object.keys(wonStep.expected)]) {
+      for (const key of ['engineType', 'nonce', 'editionFingerprint', 'chanceCompact', ...Object.keys(wonStep.expected)]) {
         assert.ok(key in answer, `${name} has no ${key}`);
       }
     }
@@ -206,7 +290,7 @@ describe('the field names are the published contract (PR-0 draft)', () => {
   it('the upgraded open answer carries the mark and the step facts', () => {
     const answer = contract('verify-open-upgrade-win');
     assert.equal(answer.gameKind, 'upgrade');
-    for (const key of ['upgradeStepId', 'stakedSlotIndex', 'stepChancePpm', 'stepOutcome', 'drawnPpmValue', 'drawnSlotIndex']) {
+    for (const key of ['upgradeStepId', 'stakedSlotIndex', 'stepChancePpm', 'stepChanceCompact', 'stepOutcome', 'drawnPpmValue', 'drawnSlotIndex']) {
       assert.ok(key in answer, `the open answer has no ${key}`);
     }
   });

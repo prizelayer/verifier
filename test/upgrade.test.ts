@@ -12,7 +12,9 @@ import {
   stepTable,
   upgradeChancePpm,
   upgradeTarget,
+  UPGRADE_ENGINE_VERSION,
   UPGRADE_MAX_STEPS,
+  UPGRADE_STEP_RTP_BPS,
   UPGRADE_MIN_CHANCE_PPM,
 } from '../src/verifier.js';
 
@@ -46,6 +48,8 @@ describe('upgrade chance', () => {
   it('pins the engine constants', () => {
     assert.equal(UPGRADE_MIN_CHANCE_PPM, 100_000);
     assert.equal(UPGRADE_MAX_STEPS, 3);
+    assert.equal(UPGRADE_ENGINE_VERSION, 1);
+    assert.equal(UPGRADE_STEP_RTP_BPS, 10_000);
   });
 });
 
@@ -55,6 +59,10 @@ describe('upgrade target', () => {
     assert.deepEqual(upgradeTarget(WORKED, 1), { targetSlotIndex: 2, chancePpm: 400_000 });
     assert.deepEqual(upgradeTarget(WORKED, 2), { targetSlotIndex: 3, chancePpm: 375_000 });
     assert.equal(upgradeTarget(WORKED, 3), null);
+  });
+
+  it('offers no step from a held value of 0, as platform answers (its chance is 0, under the minimum)', () => {
+    assert.equal(upgradeTarget(edition([0, 1200], [500_000, 500_000]), 0), null);
   });
 
   it('follows value order, never slot order', () => {

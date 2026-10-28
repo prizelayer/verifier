@@ -14,8 +14,10 @@ import {
   PPM_TOTAL,
   SERVER_SEED_BYTES,
   UPGRADE_ENGINE_TYPE,
+  UPGRADE_ENGINE_VERSION,
   UPGRADE_MAX_STEPS,
   UPGRADE_MIN_CHANCE_PPM,
+  UPGRADE_STEP_RTP_BPS,
   bytesFromHex,
   commitment,
   derive,
@@ -192,6 +194,8 @@ export async function runConformance(fixture) {
     eq('upgrade.constants.engineType', section.constants.engineType, UPGRADE_ENGINE_TYPE);
     eq('upgrade.constants.maxSteps', section.constants.maxSteps, UPGRADE_MAX_STEPS);
     eq('upgrade.constants.minChancePpm', section.constants.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
+    eq('upgrade.constants.engineVersion', section.constants.engineVersion, UPGRADE_ENGINE_VERSION);
+    eq('upgrade.constants.stepRtpBps', section.constants.stepRtpBps, UPGRADE_STEP_RTP_BPS);
   }
   const stepSeed = bytesFromHex(step.serverSeedHex);
   eq('upgradeStep.commitment', await commitment(stepSeed), step.commitmentHex);

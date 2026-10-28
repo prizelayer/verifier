@@ -12,5 +12,6 @@
   "upgradeStepId": "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01",
   "stakedSlotIndex": 1,
   "stepChancePpm": 400000,
+  "stepChanceCompact": "40.00%",
   "stepOutcome": "won"
 }
