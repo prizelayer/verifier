@@ -28,7 +28,7 @@ interface Props {
  * and every value shown is the library's: the page compares nothing itself.
  */
 export function UpgradeStepCards({ report, input }: Props) {
-  const names = UPGRADE_STEP_CHECK_NAMES as readonly UpgradeStepName[]
+  const names: readonly UpgradeStepName[] = UPGRADE_STEP_CHECK_NAMES
   const failedSteps = new Set(names.filter((n) => report.checks[n]?.ok === false).map((n) => UPGRADE_STEP_OF[n]))
   const pending = input.serverSeedHex === null
   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))

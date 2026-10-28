@@ -2,6 +2,8 @@
  * The upgrade pages (KAN-1154): looking up a step by `#step=`, its proof format, its verdict and cards,
  * and an upgraded win checked over the step's two ranges with a link to its step.
  */
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it } from "vitest"
@@ -164,6 +166,22 @@ describe("the words", () => {
     expect(percentDown(375_000)).toBe("37.50%")
     expect(percentDown(100_000)).toBe("10.00%")
     expect(percentDown(99_999)).toBe("9.99%")
+    expect(percentDown(100)).toBe("0.01%")
+    expect(percentDown(99)).toBe("< 0.01%")
+  })
+
+  it("writes every chance of the golden vectors exactly as the server's chanceCompact", () => {
+    // The fixture's strings are platform DisplayRounding.renderFloor output (KAN-1154 A2), so the page and the
+    // server cannot show one chance two ways.
+    const fixture = JSON.parse(readFileSync(join(import.meta.dirname, "../../fixtures/golden-vectors-v1.json"), "utf8"))
+    const pairs: [number, string][] = [
+      ...fixture.upgradeStep.vectors.map((v: { chancePpm: number; chanceCompact: string }) => [v.chancePpm, v.chanceCompact]),
+      ...fixture.upgradeOffer.vectors.flatMap((v: { queries: { chancePpm?: number; chanceCompact?: string }[] }) =>
+        v.queries.filter((q) => q.chanceCompact !== undefined).map((q) => [q.chancePpm, q.chanceCompact]),
+      ),
+    ]
+    expect(pairs.length).toBeGreaterThanOrEqual(10)
+    for (const [ppm, shown] of pairs) expect(percentDown(ppm)).toBe(shown)
   })
 
   it("says 'this upgrade' while its secret is locked", () => {
