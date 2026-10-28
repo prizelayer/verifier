@@ -235,6 +235,23 @@ describe('verifyUpgradeStep', () => {
     assert.deepEqual(report.notRun.map((n) => n.check).sort(), ['commitment', 'drawnPpmValue', 'upgradeOutcome']);
   });
 
+  it('refuses a missing or non-string chanceCompact as invalid, by name', async () => {
+    for (const bad of [undefined, null, 40]) {
+      const input = { ...wonStep, expected: { ...wonStep.expected, chanceCompact: bad } } as unknown as UpgradeStepInput;
+      const report = await verifyUpgradeStep(input);
+      assert.equal(report.status, 'invalid', `chanceCompact ${String(bad)}`);
+      assert.match(report.invalid?.message ?? '', /expected\.chanceCompact/);
+    }
+  });
+
+  it('compares chanceCompact exactly: a space before or after the right string fails', async () => {
+    for (const spaced of [' 40.00%', '40.00% ']) {
+      const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, chanceCompact: spaced } });
+      assert.equal(report.status, 'failed', JSON.stringify(spaced));
+      assert.equal(report.firstFailure?.check, 'chanceCompact');
+    }
+  });
+
   it('reports a missing field as invalid, by name', async () => {
     const broken = { ...wonStep, expected: { ...wonStep.expected, outcome: undefined } } as unknown as UpgradeStepInput;
     const report = await verifyUpgradeStep(broken);
@@ -260,6 +277,7 @@ describe('verify on an upgrade win', () => {
         upgradeStepId: '9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01',
         stakedSlotIndex: 1,
         stepChancePpm: 400_000,
+        stepChanceCompact: '40.00%',
         stepOutcome: 'won',
       },
     };
@@ -317,6 +335,7 @@ describe('verify on an upgrade win', () => {
         drawnSlotIndex: 3,
         stakedSlotIndex: 1,
         stepChancePpm: 416_666,
+        stepChanceCompact: '41.66%',
       },
     });
     assert.equal(report.status, 'verified', report.summary);
@@ -333,6 +352,32 @@ describe('verify on an upgrade win', () => {
     const report = await verify({ ...upgradeWin, expected: withoutChance });
     assert.equal(report.status, 'invalid');
     assert.match(report.invalid?.message ?? '', /expected\.stepChancePpm/);
+  });
+
+  // E1b, SHOULD-2 of the review of #17 (eleonora 24614, A): the chance text shown with an upgrade win is
+  // checked inside drawnSlotIndex, against the text of the FAIR chance.
+  it('refuses an upgrade win whose shown chance text is missing or not a string', async () => {
+    for (const bad of [undefined, null, 40]) {
+      const input = { ...upgradeWin, expected: { ...upgradeWin.expected, stepChanceCompact: bad } } as unknown as VerificationInput;
+      const report = await verify(input);
+      assert.equal(report.status, 'invalid', `stepChanceCompact ${String(bad)}`);
+      assert.match(report.invalid?.message ?? '', /expected\.stepChanceCompact/);
+    }
+  });
+
+  it('fails an upgrade win shown at a chance text that is not the fair one, naming both texts', async () => {
+    for (const shown of ['41.00%', '40%', ' 40.00%']) {
+      const report = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stepChanceCompact: shown } });
+      assert.equal(report.status, 'failed', JSON.stringify(shown));
+      assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
+      assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `chance shown ${shown}`, computed: 'fair chance 40.00%' });
+    }
+  });
+
+  it('a box open needs no shown step chance', async () => {
+    const { stepChanceCompact: _text, ...withoutText } = upgradeWin.expected;
+    const report = await verify({ ...upgradeWin, gameKind: 'box_open', expected: withoutText });
+    assert.notEqual(report.status, 'invalid', report.summary);
   });
 });
 

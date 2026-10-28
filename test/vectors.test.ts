@@ -1047,8 +1047,12 @@ describe('every upgrade offer vector', () => {
     it(vector.id, () => {
       record('upgradeOffer', vector.id);
       for (const query of vector.queries) {
-        const { chanceCompact: _shown, ...expected } = query as OfferQuery & { chanceCompact?: string };
+        const { chanceCompact: shown, ...expected } = query as OfferQuery & { chanceCompact?: string };
         assert.deepEqual(offerFor(vector, query), expected, `held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+        // The platform's rendered string of an offer is checked against the library's own format too.
+        if (expected.chancePpm !== undefined) {
+          assert.equal(stepChanceText(expected.chancePpm), shown, `chanceCompact, held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+        } else assert.equal(shown, undefined, `no offer, no chanceCompact: held slot ${query.heldSlotIndex}`);
       }
     });
   }

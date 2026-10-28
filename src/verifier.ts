@@ -204,6 +204,11 @@ export interface VerificationInput {
     stakedSlotIndex?: number;
     /** On an upgrade win: the chance of the step that made it, in ppm. Required when `gameKind` is `upgrade`. */
     stepChancePpm?: number;
+    /**
+     * On an upgrade win: that chance as the player was shown it (contract §7 `stepChanceCompact`). It must be
+     * the contract's text of the fair chance. Required when `gameKind` is `upgrade`.
+     */
+    stepChanceCompact?: string;
     /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
     stepOutcome?: 'won' | 'lost';
   };
@@ -632,7 +637,7 @@ export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number
 }
 
 /**
- * A step chance as the contract's `chanceCompact` writes it (upgrade-step contract §6, the perimeter's
+ * A step chance as the contract's `chanceCompact` writes it (upgrade-step contract §4, the perimeter's
  * DisplayRounding.renderFloor): percent with 2 decimals, a "." and a "%", rounded DOWN to 0.01 %, so it is
  * never above the true chance; a chance from 1 to 99 ppm is "< 0.01%", never "0.00%"; 1 000 000 ppm is
  * "100.00%"; 0 is not a chance and is refused. 416 666 ppm is "41.66%".
@@ -1104,10 +1109,18 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
         computedSlotIndex = step.value.slotIndex;
         trace.computedSlotIndex = computedSlotIndex;
       }
-      checks.drawnSlotIndex =
+      const slotCheck =
         step.value.outcome !== input.expected.stepOutcome
           ? { ok: false, expected: `step ${input.expected.stepOutcome}`, computed: `step ${step.value.outcome}` }
           : check(expectedSlot, step.value.slotIndex === undefined ? step.value.why : String(step.value.slotIndex));
+      // A slot reached only when the claimed chance is the fair one (upgradeWinSlot), so the shown text is
+      // compared with the text of the FAIR chance: one rule for every chance (contract §7, eleonora 24614, A).
+      const shown = input.expected.stepChanceCompact as string;
+      const fairText = slotCheck.ok ? stepChanceText(chancePpm) : undefined;
+      checks.drawnSlotIndex =
+        fairText !== undefined && shown !== fairText
+          ? { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` }
+          : slotCheck;
     }
     caveats.push(
       `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
@@ -1335,6 +1348,7 @@ function requireShape(input: VerificationInput): void {
   need(input.gameKind === undefined || input.gameKind === 'box_open' || input.gameKind === 'upgrade', 'gameKind');
   if (input.gameKind === 'upgrade') {
     need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
+    need(typeof input.expected.stepChanceCompact === 'string', 'expected.stepChanceCompact (required on an upgrade win)');
     need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }

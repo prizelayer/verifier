@@ -245,6 +245,7 @@ export async function runConformance(fixture) {
         ? `none:${query.noOfferReason}`
         : `${query.targetSlotIndex}@${query.chancePpm}`;
       eq(label, actual, expected);
+      eq(`${label}.chanceCompact`, query.chancePpm === undefined ? undefined : stepChanceText(query.chancePpm), query.chanceCompact);
     }
   }
 
