@@ -1,13 +1,13 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index a2e9c79..c4fa6cb 100644
+index 3b2bf9c..b65b501 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -129,7 +129,7 @@ export function LookupBox({
-           <details className="text-sm">
-             <summary className="cursor-pointer">Show this proof laid out</summary>
-             <pre data-laid-out className="mt-2 max-h-96 overflow-auto rounded-lg border border-border p-3 font-mono text-xs">
--              {layOut(fetched)}
-+              {layOut(JSON.stringify(JSON.parse(fetched)))}
-             </pre>
-           </details>
-         </div>
+@@ -74,7 +74,7 @@ export function LookupBox({
+ 
+   const fetched = result?.result.kind === "found" ? result.result.text : null
+   // Laid out once per proof, not on every render: the text can be megabytes.
+-  const laidOut = useMemo(() => (fetched === null ? "" : layOut(fetched)), [fetched])
++  const laidOut = useMemo(() => (fetched === null ? "" : layOut(JSON.stringify(JSON.parse(fetched)))), [fetched])
+   const resultId = `${fieldId}-result`
+   const invalid = result?.result.kind === "notAnId" || result?.result.kind === "notFound"
+   return (

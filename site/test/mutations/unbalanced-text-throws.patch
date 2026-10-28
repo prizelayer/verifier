@@ -1,0 +1,12 @@
+diff --git a/site/src/layOut.ts b/site/src/layOut.ts
+index e33e221..50bddf2 100644
+--- a/site/src/layOut.ts
++++ b/site/src/layOut.ts
+@@ -29,7 +29,6 @@ export function layOutParts(text: string): { text: string; added: boolean }[] |
+     if (c === '"') inString = true
+     // A closing bracket with nothing open is not JSON: the text comes back as it is, never a thrown
+     // RangeError from a negative indent, which would blank the page.
+-    if ((c === "}" || c === "]") && depth === 0) return null
+     if ((c === "}" || c === "]") && !(text[i - 1] === "{" || text[i - 1] === "[")) add(--depth)
+     else if (c === "}" || c === "]") depth--
+     own(c)

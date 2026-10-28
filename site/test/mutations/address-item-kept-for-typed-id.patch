@@ -1,5 +1,5 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index 87f927a..58de613 100644
+index 3b2bf9c..5c6c51b 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
 @@ -28,7 +28,7 @@ export function LookupBox({
@@ -9,5 +9,5 @@ index 87f927a..58de613 100644
 -  const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
 +  const itemId = fromAddress !== null && true ? fromAddress.itemId : null
    const [busy, setBusy] = useState(false)
-   // The result, with the id it was looked up for: the saved file is named after that id.
-   const [result, setResult] = useState<{ asked: string; result: LookupResult } | null>(null)
+   // The guard a second press checks. The state above is for the screen, and two presses in one task
+   // (a script calling requestSubmit() twice) both read it before React draws again; this ref they do not.

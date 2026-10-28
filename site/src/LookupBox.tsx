@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { API_BASE, fromFragment, lookUp, normalId, type LookupResult } from "./lookup"
 import { layOut } from "./layOut"
@@ -30,6 +30,9 @@ export function LookupBox({
   // The item id in the address belongs to the open in the address, not to an id typed later.
   const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
   const [busy, setBusy] = useState(false)
+  // The guard a second press checks. The state above is for the screen, and two presses in one task
+  // (a script calling requestSubmit() twice) both read it before React draws again; this ref they do not.
+  const pressing = useRef(false)
   // The result, with the id it was looked up for: the saved file is named after that id.
   const [result, setResult] = useState<{ asked: string; result: LookupResult } | null>(null)
   // What is on screen now, read when an answer arrives: an answer is kept only for the id and the
@@ -41,21 +44,27 @@ export function LookupBox({
 
   async function press() {
     // While busy the button keeps its focus (aria-disabled, not disabled), so a press is ignored here.
-    if (busy || disabled) return
+    if (pressing.current || disabled) return
     // The id is fetched, shown and named in the saved file in lower case.
     const asked = normalId(winId)
     if (asked === "") return
     if (asked !== winId) setWinId(asked)
     const boxAtPress = shownText
-    setBusy(true)
-    onBusy?.(true)
-    setResult(null)
     let found: LookupResult
     try {
+      // Taken inside the try: if anything below throws, finally still frees the button.
+      pressing.current = true
+      setBusy(true)
+      onBusy?.(true)
+      setResult(null)
       found = await lookUp(asked, itemId, fetchFn)
-    } catch {
-      found = { kind: "serverFault", message: "its answer could not be read" }
+    } catch (error) {
+      // lookUp returns every fault of the network and of our server as a result, so what reaches here
+      // is the page's own: it is named so, and kept in the console for whoever reports it.
+      console.error("lookup failed in the page", error)
+      found = { kind: "pageFault" }
     } finally {
+      pressing.current = false
       setBusy(false)
       onBusy?.(false)
     }
@@ -65,6 +74,8 @@ export function LookupBox({
   }
 
   const fetched = result?.result.kind === "found" ? result.result.text : null
+  // Laid out once per proof, not on every render: the text can be megabytes.
+  const laidOut = useMemo(() => (fetched === null ? "" : layOut(fetched)), [fetched])
   const resultId = `${fieldId}-result`
   const invalid = result?.result.kind === "notAnId" || result?.result.kind === "notFound"
   return (
@@ -111,7 +122,7 @@ export function LookupBox({
         />
         <Button
           type="submit"
-          className="self-start"
+          className="self-start aria-disabled:opacity-50"
           disabled={disabled || winId.trim() === ""}
           aria-disabled={busy || undefined}
         >
@@ -134,8 +145,12 @@ export function LookupBox({
           {/* For reading only: the field, the check and the saved file keep the exact text. */}
           <details className="text-sm">
             <summary className="cursor-pointer">Show this proof laid out</summary>
-            <pre data-laid-out className="mt-2 max-h-96 overflow-auto rounded-lg border border-border p-3 font-mono text-xs">
-              {layOut(fetched)}
+            {/* Wrapped, so a phone shows every value; a soft wrap adds no character to the text. */}
+            <pre
+              data-laid-out
+              className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border p-3 font-mono text-xs"
+            >
+              {laidOut}
             </pre>
           </details>
         </div>
@@ -160,6 +175,8 @@ function LookupWords({ result }: { result: LookupResult }) {
       return <p className={FAULT}>{LOOKUP_WORDS.timedOut}</p>
     case "serverFault":
       return <p className={FAULT}>{LOOKUP_WORDS.serverFault(result.message)}</p>
+    case "pageFault":
+      return <p className={FAULT}>{LOOKUP_WORDS.pageFault}</p>
   }
 }
 

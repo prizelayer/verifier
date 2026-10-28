@@ -1,8 +1,8 @@
 diff --git a/site/src/lookup.ts b/site/src/lookup.ts
-index e67e97d..15bd01b 100644
+index c953896..08608cc 100644
 --- a/site/src/lookup.ts
 +++ b/site/src/lookup.ts
-@@ -192,7 +192,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
+@@ -211,7 +211,7 @@ function field(json: Record<string, unknown>, name: string, what: string): strin
  /** Ids are compared without letter case, as UUIDs are; a hash is compared exactly. */
  function sameRecord(json: Record<string, unknown>, name: string, asked: string, what: string, exact = false) {
    const value = json[name]

@@ -103,6 +103,30 @@ describe("the lookup", () => {
     expect(box().value).toBe("")
   })
 
+  it("names the prize list once when its fingerprint differs from the one the open names", async () => {
+    const answers = exampleAnswers()
+    const path = `/verify/snapshots/${EXAMPLE_PROOF.snapshot.snapshotHash}`
+    const other = "0".repeat(64)
+    answers.set(path, { status: 200, body: JSON.stringify({ ...EXAMPLE_PROOF.snapshot, snapshotHash: other }) })
+    const { user } = openWithHash(`#open=${WIN}`, fakeServer(answers))
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    expect(
+      await screen.findByText(
+        LOOKUP_WORDS.serverFault("the prize list it sent has a different fingerprint from the one the open names"),
+      ),
+    ).toBeTruthy()
+  })
+
+  it("wraps the laid-out proof, so a phone shows every value; the text itself is unchanged", async () => {
+    const { user } = openWithHash(`#open=${WIN}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdict()).toBe("PASS"))
+    const pre = document.querySelector("pre[data-laid-out]") as HTMLPreElement
+    expect(pre.className).toContain("whitespace-pre-wrap")
+    expect(pre.className).toContain("break-all")
+    expect(pre.textContent?.replace(/\s+/g, "")).toBe(box().value.replace(/\s+/g, ""))
+  })
+
   it.each([
     ["the client seed", `/verify/seed-pairs/${EXAMPLE_PROOF.seedPair.seedPairId}`, (body: Record<string, unknown>) => ({ ...body, clientSeed: MARKUP })],
     [
