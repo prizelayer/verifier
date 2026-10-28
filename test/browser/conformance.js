@@ -13,6 +13,9 @@ import {
   ACCEPTANCE_THRESHOLD,
   PPM_TOTAL,
   SERVER_SEED_BYTES,
+  UPGRADE_ENGINE_TYPE,
+  UPGRADE_MAX_STEPS,
+  UPGRADE_MIN_CHANCE_PPM,
   bytesFromHex,
   commitment,
   derive,
@@ -25,6 +28,10 @@ import {
   slotFor,
   snapshotBytes,
   snapshotHash,
+  stepOutcome,
+  stepTable,
+  upgradeChancePpm,
+  upgradeTarget,
   verify,
 } from '../../dist/verifier.js';
 
@@ -178,6 +185,62 @@ export async function runConformance(fixture) {
   eq('verifyPending.status', pending.status, 'pending');
   eq('verifyPending.ok', pending.ok, false);
   eq('verifyPending.fingerprint', pending.checks.editionFingerprint.ok, true);
+
+  // --- the upgrade step (KAN-1154 A2): every value recomputed from the section's own inputs ---
+  const step = fixture.upgradeStep;
+  for (const section of [step, fixture.upgradeOffer]) {
+    eq('upgrade.constants.engineType', section.constants.engineType, UPGRADE_ENGINE_TYPE);
+    eq('upgrade.constants.maxSteps', section.constants.maxSteps, UPGRADE_MAX_STEPS);
+    eq('upgrade.constants.minChancePpm', section.constants.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
+  }
+  const stepSeed = bytesFromHex(step.serverSeedHex);
+  eq('upgradeStep.commitment', await commitment(stepSeed), step.commitmentHex);
+  for (const vector of step.vectors) {
+    asserted.add(`upgradeStep/${vector.id}`);
+    const chance = upgradeChancePpm(
+      BigInt(vector.stakedBuyBackValueCents),
+      BigInt(vector.targetBuyBackValueCents),
+    );
+    eq(`upgradeStep:${vector.id}.chance`, chance, vector.chancePpm);
+    eq(`upgradeStep:${vector.id}.table`, stepTable(chance).map((row) => row.probabilityPpm).join(','),
+      vector.stepTablePpm.join(','));
+    const v = (await derive(stepSeed, vector.clientSeed, vector.nonce)).value;
+    eq(`upgradeStep:${vector.id}.v`, v, vector.v);
+    const outcome = stepOutcome(v, chance);
+    eq(`upgradeStep:${vector.id}.outcome`, outcome, vector.outcome);
+    eq(`upgradeStep:${vector.id}.slotIndex`, outcome === 'won' ? 0 : 1, vector.slotIndex);
+  }
+
+  // --- the upgrade offer: the library's target, plus the cap and the engine type ---
+  for (const vector of fixture.upgradeOffer.vectors) {
+    asserted.add(`upgradeOffer/${vector.id}`);
+    // Only the buy-back values take part in an offer; the odds must still be a valid table.
+    const slots = vector.slotsAsGiven.map((slot, i) => ({
+      slotIndex: slot.slotIndex,
+      probabilityPpm: i === 0 ? PPM_TOTAL : 0,
+      requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+      requiredMarketValueCents: 0n,
+    }));
+    for (const query of vector.queries) {
+      const label = `upgradeOffer:${vector.id}[held ${query.heldSlotIndex}, step ${query.stepNo}]`;
+      let actual;
+      if (vector.engineType !== UPGRADE_ENGINE_TYPE) actual = 'none:not_upgrade_engine';
+      else if (query.stepNo >= UPGRADE_MAX_STEPS) actual = 'none:cap_reached';
+      else {
+        const offer = upgradeTarget({ slots }, query.heldSlotIndex);
+        if (offer !== null) actual = `${offer.targetSlotIndex}@${offer.chancePpm}`;
+        else {
+          const held = slots.find((slot) => slot.slotIndex === query.heldSlotIndex);
+          const higher = slots.some((slot) => slot.requiredBuyBackValueCents > held.requiredBuyBackValueCents);
+          actual = higher ? 'none:under_minimum' : 'none:top_value';
+        }
+      }
+      const expected = query.noOfferReason
+        ? `none:${query.noOfferReason}`
+        : `${query.targetSlotIndex}@${query.chancePpm}`;
+      eq(label, actual, expected);
+    }
+  }
 
   // --- the same fail-closed completeness check the Node suite makes ---
   // Without it the guarantee would hold in Node only: a family added on the platform side would
