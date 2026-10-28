@@ -1,13 +1,13 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 2ce6d4c..e9e6a66 100644
+index 7fc73c8..2ed8b20 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -113,7 +113,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
-       </section>
+@@ -140,7 +140,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
  
        <div ref={verdictRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
--        {running ? <p>Computing in your browser…</p> : report ? <Verdict report={report} /> : null}
-+        {running ? null : report ? <Verdict report={report} /> : null}
-       </div>
- 
-       {report && input ? <StepCards report={report} input={input} /> : report ? null : <EmptySteps />}
+         {running ? (
+-          <p>Computing in your browser…</p>
++          null
+         ) : report ? (
+           <Verdict report={report} input={input} />
+         ) : stepReport ? (

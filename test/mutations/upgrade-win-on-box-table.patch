@@ -1,9 +1,9 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 5a06c3a..3d09f90 100644
+index 2614c59..4e456c3 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1067,7 +1067,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
-     skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+@@ -1099,7 +1099,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+     else skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
    } else if (!preimage.ok) {
      skip('drawnSlotIndex', 'it needs the prize table, which is unusable');
 -  } else if (input.gameKind === 'upgrade') {
