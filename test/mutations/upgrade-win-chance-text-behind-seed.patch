@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 2614c59..1b536db 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1094,7 +1094,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+   if (derivation === undefined) {
+     // The chance shown with an upgrade win needs no seed: its fair text comes from the edition and the staked
+     // slot alone, so a wrong text fails now instead of reading pending until the reveal (eleonora, E2 N-1 A).
+-    const shownWrong = input.gameKind === 'upgrade' && preimage.ok ? wrongChanceText(input) : undefined;
++    const shownWrong = input.gameKind === 'upgrade' && preimage.ok && seedRevealed ? wrongChanceText(input) : undefined;
+     if (shownWrong !== undefined) checks.drawnSlotIndex = shownWrong;
+     else skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+   } else if (!preimage.ok) {

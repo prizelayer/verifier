@@ -61,6 +61,8 @@ export function proofInput(text: string): VerificationInput {
     input.expected.upgradeStepId = text_(open.upgradeStepId, "open.upgradeStepId")
     input.expected.stakedSlotIndex = number_(open.stakedSlotIndex, "open.stakedSlotIndex")
     input.expected.stepChancePpm = number_(open.stepChancePpm, "open.stepChancePpm")
+    // The chance as the player was shown it: the library checks it against the fair chance (KAN-1154 E1b).
+    input.expected.stepChanceCompact = text_(open.stepChanceCompact, "open.stepChanceCompact")
     input.expected.stepOutcome = outcome_(open.stepOutcome, "open.stepOutcome")
   }
   return input
@@ -86,6 +88,7 @@ export function stepProofInput(text: string): UpgradeStepInput {
       stakedSlotIndex: number_(step.stakedSlotIndex, "step.stakedSlotIndex"),
       targetSlotIndex: number_(step.targetSlotIndex, "step.targetSlotIndex"),
       chancePpm: number_(step.chancePpm, "step.chancePpm"),
+      chanceCompact: text_(step.chanceCompact, "step.chanceCompact"),
       drawnPpmValue: number_(step.drawnPpmValue, "step.drawnPpmValue"),
       outcome: outcome_(step.outcome, "step.outcome"),
       stepNo: number_(step.stepNo, "step.stepNo"),

@@ -1092,7 +1092,11 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
   // Step 4 — the slot. Needs the draw and a usable table.
   let computedSlotIndex: number | undefined;
   if (derivation === undefined) {
-    skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+    // The chance shown with an upgrade win needs no seed: its fair text comes from the edition and the staked
+    // slot alone, so a wrong text fails now instead of reading pending until the reveal (eleonora, E2 N-1 A).
+    const shownWrong = input.gameKind === 'upgrade' && preimage.ok ? wrongChanceText(input) : undefined;
+    if (shownWrong !== undefined) checks.drawnSlotIndex = shownWrong;
+    else skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
   } else if (!preimage.ok) {
     skip('drawnSlotIndex', 'it needs the prize table, which is unusable');
   } else if (input.gameKind === 'upgrade') {
@@ -1333,6 +1337,19 @@ function uuidKey(uuid: string): string {
  * sees which input is wrong instead of a runtime error. `serverSeedHex` must be present: `null`
  * means "not revealed yet", while a missing key is a broken input, never a pending one.
  */
+/**
+ * The failed check when an upgrade win's shown chance text is not the text of its FAIR chance, or undefined
+ * when it is, or when no fair chance exists (the slot check then says why, once the draw is known). The fair
+ * chance comes only from the edition and the staked slot, never from a number in the claim.
+ */
+function wrongChanceText(input: VerificationInput): Check | undefined {
+  const offer = attempt(() => upgradeTarget(input.edition, input.expected.stakedSlotIndex as number));
+  if (!offer.ok || offer.value === null) return undefined;
+  const fairText = stepChanceText(offer.value.chancePpm);
+  const shown = input.expected.stepChanceCompact as string;
+  return shown === fairText ? undefined : { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
+}
+
 function requireShape(input: VerificationInput): void {
   const need = (ok: boolean, what: string) => {
     if (!ok) throw new Error(`${what} is missing or has the wrong type`);
@@ -1349,6 +1366,8 @@ function requireShape(input: VerificationInput): void {
   if (input.gameKind === 'upgrade') {
     need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
     need(typeof input.expected.stepChanceCompact === 'string', 'expected.stepChanceCompact (required on an upgrade win)');
+    // The fair chance is read from the edition even while the seed is locked, so it must be there to read.
+    need(typeof input.edition === 'object' && input.edition !== null && Array.isArray(input.edition.slots), 'edition (required on an upgrade win)');
     need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }

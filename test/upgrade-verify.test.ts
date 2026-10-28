@@ -374,6 +374,42 @@ describe('verify on an upgrade win', () => {
     }
   });
 
+  // E2 N-1 (eleonora, A): the shown chance needs no seed, so it is checked while the seed is still locked.
+  it('fails a wrong shown chance while the seed is locked, naming both texts', async () => {
+    const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '41.00%' } });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.00%', computed: 'fair chance 40.00%' });
+  });
+
+  it('stays pending with the right shown chance while the seed is locked', async () => {
+    const report = await verify({ ...upgradeWin, serverSeedHex: null });
+    assert.equal(report.status, 'pending', report.summary);
+    assert.equal(report.checks.drawnSlotIndex, undefined);
+    assert.ok(report.notRun.some((n) => n.check === 'drawnSlotIndex'));
+  });
+
+  it('takes the fair chance from the edition and the staked slot, never from the claimed ppm', async () => {
+    // The claim says 416 666 ppm and shows its text "41.66%"; the edition says 400 000 from slot 1.
+    const report = await verify({
+      ...upgradeWin,
+      serverSeedHex: null,
+      expected: { ...upgradeWin.expected, stepChancePpm: 416_666, stepChanceCompact: '41.66%' },
+    });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.66%', computed: 'fair chance 40.00%' });
+  });
+
+  it('refuses a locked upgrade win without its edition or its staked slot, never pending', async () => {
+    const { stakedSlotIndex: _slot, ...withoutSlot } = upgradeWin.expected;
+    const noSlot = await verify({ ...upgradeWin, serverSeedHex: null, expected: withoutSlot });
+    assert.equal(noSlot.status, 'invalid');
+    assert.match(noSlot.invalid?.message ?? '', /expected\.stakedSlotIndex/);
+    const noEdition = await verify({ ...upgradeWin, serverSeedHex: null, edition: undefined } as unknown as VerificationInput);
+    assert.equal(noEdition.status, 'invalid');
+    assert.match(noEdition.invalid?.message ?? '', /edition/);
+  });
+
   it('a box open needs no shown step chance', async () => {
     const { stepChanceCompact: _text, ...withoutText } = upgradeWin.expected;
     const report = await verify({ ...upgradeWin, gameKind: 'box_open', expected: withoutText });

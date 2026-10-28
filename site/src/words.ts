@@ -1,4 +1,4 @@
-import type { CheckName, UpgradeStepCheckName } from "@verifier"
+import type { Check, CheckName, UpgradeStepCheckName } from "@verifier"
 
 /** The four steps, in the words a player reads. Step 1 and step 2 never say when a value was published. */
 export const STEPS = [
@@ -271,6 +271,21 @@ export const UPGRADE_STEPS = [
   },
 ] as const
 
+/**
+ * An upgraded win whose slot check failed because the chance shown to the player is not its fair chance
+ * (the library writes that cause as "chance shown <text>" / "fair chance <text>"), or null for any other
+ * cause. The slot's own words would then be false: no slot was compared, and the seed may still be locked.
+ */
+export function wrongChanceShown(check: Check | undefined): { shown: string; fair: string } | null {
+  const shown = "chance shown "
+  const fair = "fair chance "
+  if (!check || check.ok || !check.expected?.startsWith(shown) || !check.computed?.startsWith(fair)) return null
+  return { shown: check.expected.slice(shown.length), fair: check.computed.slice(fair.length) }
+}
+
+export const wrongChanceWords = ({ shown, fair }: { shown: string; fair: string }) =>
+  `The chance shown with this upgraded win, ${shown}, is not its fair chance rounded down to 0.01 %, which is ${fair}.`
+
 /** The library's own list, so a check it adds cannot reach the page without its words (each Record below). */
 export type UpgradeStepName = UpgradeStepCheckName
 
@@ -282,6 +297,7 @@ export const UPGRADE_STEP_OF: Record<UpgradeStepName, StepNumber> = {
   engineVersion: 2,
   upgradeTarget: 2,
   upgradeChance: 2,
+  chanceCompact: 2,
   stepNo: 2,
   drawnPpmValue: 3,
   upgradeOutcome: 4,
@@ -294,6 +310,7 @@ export const UPGRADE_CHECK_LABELS: Record<UpgradeStepName, string> = {
   engineVersion: "The version of the upgrade rules",
   upgradeTarget: "The item offered",
   upgradeChance: "The chance",
+  chanceCompact: "The chance shown to you",
   stepNo: "How many upgrades in a row",
   drawnPpmValue: CHECK_LABELS.drawnPpmValue,
   upgradeOutcome: "Won or lost",
@@ -307,6 +324,7 @@ export const UPGRADE_CHECK_WORDS: Record<UpgradeStepName, string> = {
   engineVersion: "The box uses version 1 of the upgrade rules, the version this page checks.",
   upgradeTarget: "The item offered is the next one up from the item you gave up.",
   upgradeChance: "The chance is the value you gave up divided by the value offered, rounded down.",
+  chanceCompact: "The percent you were shown is this fair chance, rounded down to 0.01 %.",
   stepNo: "This upgrade is within the 3 a win may take.",
   drawnPpmValue: "The pick, redone from the secret, the client seed and the counter, gives the number we recorded.",
   upgradeOutcome: "That number gives the result we recorded.",
@@ -322,6 +340,7 @@ export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
     "This box uses another version of the upgrade rules. This page checks version 1 only, so it cannot confirm this upgrade.",
   upgradeTarget: "The item offered is not the next one up from the item you gave up.",
   upgradeChance: "The chance we recorded is not the fair chance of this upgrade.",
+  chanceCompact: "The percent you were shown is not this fair chance, rounded down to 0.01 %.",
   stepNo: "This would be more upgrades in a row than a win may take.",
   drawnPpmValue: FAIL_WORDS.drawnPpmValue,
   upgradeOutcome: "With the fair chance, this number gives a different result than the one we recorded.",

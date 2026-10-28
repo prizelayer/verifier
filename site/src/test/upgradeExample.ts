@@ -39,6 +39,7 @@ export const WON_STEP = {
   stakedSlotIndex: 1,
   targetSlotIndex: 2,
   chancePpm: 400000,
+  chanceCompact: "40.00%",
   drawnPpmValue: 186669,
   outcome: "won",
   newWinId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e02",
@@ -70,6 +71,7 @@ export const UPGRADED_OPEN = {
   upgradeStepId: WON_STEP.stepId,
   stakedSlotIndex: 1,
   stepChancePpm: 400000,
+  stepChanceCompact: "40.00%",
   stepOutcome: "won",
 }
 

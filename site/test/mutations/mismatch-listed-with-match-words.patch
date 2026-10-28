@@ -1,13 +1,13 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 2913da3..a86a463 100644
+index 37f5df5..f242cf3 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -96,7 +96,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
-             ? CHECK_WORDS[name]
-             : check.error !== undefined
+@@ -101,7 +101,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
                ? inputWords(check.field, check.error, input)
--              : FAIL_WORDS[name]
-+              : CHECK_WORDS[name] ?? FAIL_WORDS[name]
+               : name === "drawnSlotIndex" && wrongChanceShown(check)
+                 ? wrongChanceWords(wrongChanceShown(check)!)
+-                : FAIL_WORDS[name]
++                : CHECK_WORDS[name] ?? FAIL_WORDS[name]
          return (
            <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
              <span className="font-medium">{CHECK_LABELS[name]}:</span> <span className="font-semibold">{state}</span>
