@@ -1,13 +1,13 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index 3b2bf9c..5c6c51b 100644
+index be5d6a0..5456e67 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -28,7 +28,7 @@ export function LookupBox({
-   const [fromAddress] = useState(() => fromFragment(window.location.hash))
-   const [winId, setWinId] = useState(fromAddress?.winId ?? "")
+@@ -35,7 +35,7 @@ export function LookupBox({
+   const [winId, setWinId] = useState(fromAddress?.winId ?? stepFromAddress ?? "")
    // The item id in the address belongs to the open in the address, not to an id typed later.
--  const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
-+  const itemId = fromAddress !== null && true ? fromAddress.itemId : null
+   const itemId =
+-    kind === "open" && fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
++    kind === "open" && fromAddress !== null && true ? fromAddress.itemId : null
    const [busy, setBusy] = useState(false)
    // The guard a second press checks. The state above is for the screen, and two presses in one task
    // (a script calling requestSubmit() twice) both read it before React draws again; this ref they do not.
