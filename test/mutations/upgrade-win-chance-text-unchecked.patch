@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 3498a6a..2b19ee8 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1118,7 +1118,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+       const shown = input.expected.stepChanceCompact as string;
+       const fairText = slotCheck.ok ? stepChanceText(chancePpm) : undefined;
+       checks.drawnSlotIndex =
+-        fairText !== undefined && shown !== fairText
++        fairText !== undefined && shown !== shown
+           ? { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` }
+           : slotCheck;
+     }

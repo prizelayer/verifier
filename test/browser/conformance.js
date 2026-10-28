@@ -30,6 +30,7 @@ import {
   slotFor,
   snapshotBytes,
   snapshotHash,
+  stepChanceText,
   stepOutcome,
   stepTable,
   upgradeChancePpm,
@@ -213,6 +214,7 @@ export async function runConformance(fixture) {
     const outcome = stepOutcome(v, chance);
     eq(`upgradeStep:${vector.id}.outcome`, outcome, vector.outcome);
     eq(`upgradeStep:${vector.id}.slotIndex`, outcome === 'won' ? 0 : 1, vector.slotIndex);
+    eq(`upgradeStep:${vector.id}.chanceCompact`, stepChanceText(chance), vector.chanceCompact);
   }
 
   // --- the upgrade offer: the library's target, plus the cap and the engine type ---
@@ -243,6 +245,7 @@ export async function runConformance(fixture) {
         ? `none:${query.noOfferReason}`
         : `${query.targetSlotIndex}@${query.chancePpm}`;
       eq(label, actual, expected);
+      eq(`${label}.chanceCompact`, query.chancePpm === undefined ? undefined : stepChanceText(query.chancePpm), query.chanceCompact);
     }
   }
 

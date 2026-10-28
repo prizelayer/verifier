@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 7ad1aa4..6047be8 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -645,7 +645,7 @@ export function stepChanceText(ppm: number): string {
+     throw new Error(`a shown chance is an integer in [1, ${PPM_TOTAL}] ppm, was ${ppm}`);
+   }
+   if (ppm < 100) return '< 0.01%';
+-  const hundredthsOfPercent = (ppm - (ppm % 100)) / 100;
++  const hundredthsOfPercent = Math.ceil(ppm / 100);
+   const whole = (hundredthsOfPercent - (hundredthsOfPercent % 100)) / 100;
+   return `${whole}.${String(hundredthsOfPercent % 100).padStart(2, '0')}%`;
+ }

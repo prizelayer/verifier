@@ -204,6 +204,11 @@ export interface VerificationInput {
     stakedSlotIndex?: number;
     /** On an upgrade win: the chance of the step that made it, in ppm. Required when `gameKind` is `upgrade`. */
     stepChancePpm?: number;
+    /**
+     * On an upgrade win: that chance as the player was shown it (contract §7 `stepChanceCompact`). It must be
+     * the contract's text of the fair chance. Required when `gameKind` is `upgrade`.
+     */
+    stepChanceCompact?: string;
     /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
     stepOutcome?: 'won' | 'lost';
   };
@@ -629,6 +634,25 @@ export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number
 
   const chancePpm = upgradeChancePpm(current, target.requiredBuyBackValueCents);
   return chancePpm < UPGRADE_MIN_CHANCE_PPM ? null : { targetSlotIndex: target.slotIndex, chancePpm };
+}
+
+/**
+ * A step chance as the contract's `chanceCompact` writes it (upgrade-step contract §4, the perimeter's
+ * DisplayRounding.renderFloor): percent with 2 decimals, a "." and a "%", rounded DOWN to 0.01 %, so it is
+ * never above the true chance; a chance from 1 to 99 ppm is "< 0.01%", never "0.00%"; 1 000 000 ppm is
+ * "100.00%"; 0 is not a chance and is refused. 416 666 ppm is "41.66%".
+ *
+ * Written here on its own, in integers, and never shared with the page's display code: a check that
+ * reused the page's function would let one rounding bug pass on both sides (KAN-1154 E1b review rule).
+ */
+export function stepChanceText(ppm: number): string {
+  if (!Number.isInteger(ppm) || ppm < 1 || ppm > PPM_TOTAL) {
+    throw new Error(`a shown chance is an integer in [1, ${PPM_TOTAL}] ppm, was ${ppm}`);
+  }
+  if (ppm < 100) return '< 0.01%';
+  const hundredthsOfPercent = (ppm - (ppm % 100)) / 100;
+  const whole = (hundredthsOfPercent - (hundredthsOfPercent % 100)) / 100;
+  return `${whole}.${String(hundredthsOfPercent % 100).padStart(2, '0')}%`;
 }
 
 /** The two-entry table an upgrade step draws over: slot 0 holds the chance and wins, slot 1 loses. */
@@ -1085,10 +1109,18 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
         computedSlotIndex = step.value.slotIndex;
         trace.computedSlotIndex = computedSlotIndex;
       }
-      checks.drawnSlotIndex =
+      const slotCheck =
         step.value.outcome !== input.expected.stepOutcome
           ? { ok: false, expected: `step ${input.expected.stepOutcome}`, computed: `step ${step.value.outcome}` }
           : check(expectedSlot, step.value.slotIndex === undefined ? step.value.why : String(step.value.slotIndex));
+      // A slot reached only when the claimed chance is the fair one (upgradeWinSlot), so the shown text is
+      // compared with the text of the FAIR chance: one rule for every chance (contract §7, eleonora 24614, A).
+      const shown = input.expected.stepChanceCompact as string;
+      const fairText = slotCheck.ok ? stepChanceText(chancePpm) : undefined;
+      checks.drawnSlotIndex =
+        fairText !== undefined && shown !== fairText
+          ? { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` }
+          : slotCheck;
     }
     caveats.push(
       `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
@@ -1316,6 +1348,7 @@ function requireShape(input: VerificationInput): void {
   need(input.gameKind === undefined || input.gameKind === 'box_open' || input.gameKind === 'upgrade', 'gameKind');
   if (input.gameKind === 'upgrade') {
     need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
+    need(typeof input.expected.stepChanceCompact === 'string', 'expected.stepChanceCompact (required on an upgrade win)');
     need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }
@@ -1391,6 +1424,8 @@ export interface UpgradeStepInput {
     stakedSlotIndex: number;
     targetSlotIndex: number;
     chancePpm: number;
+    /** The chance as the step answer writes it for a player (contract §6). Checked against the fair chance. */
+    chanceCompact: string;
     drawnPpmValue: number;
     outcome: 'won' | 'lost';
     stepNo: number;
@@ -1405,6 +1440,7 @@ export const UPGRADE_STEP_CHECK_NAMES = [
   'engineVersion',
   'upgradeTarget',
   'upgradeChance',
+  'chanceCompact',
   'stepNo',
   'drawnPpmValue',
   'upgradeOutcome',
@@ -1495,9 +1531,11 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
   if (offer === undefined) {
     skip('upgradeTarget', 'it needs the prize table, which is unusable');
     skip('upgradeChance', 'it needs the prize table, which is unusable');
+    skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (!offer.ok) {
     checks.upgradeTarget = unusable(String(expected.targetSlotIndex), 'expected.stakedSlotIndex', offer.error);
     skip('upgradeChance', 'it needs the target, which could not be computed');
+    skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (offer.value === null) {
     checks.upgradeTarget = {
       ok: false,
@@ -1505,12 +1543,15 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
       computed: `none: slot ${expected.stakedSlotIndex} is offered no step`,
     };
     skip('upgradeChance', 'the edition offers no step from the staked slot');
+    skip('chanceCompact', 'the edition offers no step from the staked slot');
   } else {
     trace.computedOffer = offer.value;
     chance = offer.value.chancePpm;
     trace.cumulative = cumulativeTable(stepTable(chance));
     checks.upgradeTarget = check(String(expected.targetSlotIndex), String(offer.value.targetSlotIndex));
     checks.upgradeChance = check(String(expected.chancePpm), String(chance));
+    // The string a player reads, against the FAIR chance: a right number with a rounded-up string fails here.
+    checks.chanceCompact = check(expected.chanceCompact, stepChanceText(chance));
   }
   // A range check, not a recompute: the chain of earlier steps is not part of one step.
   checks.stepNo = {
@@ -1617,4 +1658,5 @@ function requireStepShape(input: UpgradeStepInput): void {
     need(typeof e[field] === 'number', `expected.${field}`);
   }
   need(e.outcome === 'won' || e.outcome === 'lost', 'expected.outcome');
+  need(typeof e.chanceCompact === 'string', 'expected.chanceCompact');
 }

@@ -34,6 +34,7 @@ import {
   slotFor,
   snapshotBytes,
   snapshotHash,
+  stepChanceText,
   stepOutcome,
   stepTable,
   upgradeChancePpm,
@@ -937,6 +938,7 @@ interface StepVector {
   stakedBuyBackValueCents: number;
   targetBuyBackValueCents: number;
   chancePpm: number;
+  chanceCompact: string;
   stepTablePpm: number[];
   v: number;
   slotIndex: number;
@@ -1035,6 +1037,7 @@ describe('every upgrade step vector, from its inputs', () => {
       const outcome = stepOutcome(v, chance);
       assert.equal(outcome, vector.outcome, 'outcome');
       assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+      assert.equal(stepChanceText(chance), vector.chanceCompact, 'chanceCompact');
     });
   }
 });
@@ -1044,8 +1047,12 @@ describe('every upgrade offer vector', () => {
     it(vector.id, () => {
       record('upgradeOffer', vector.id);
       for (const query of vector.queries) {
-        const { chanceCompact: _shown, ...expected } = query as OfferQuery & { chanceCompact?: string };
+        const { chanceCompact: shown, ...expected } = query as OfferQuery & { chanceCompact?: string };
         assert.deepEqual(offerFor(vector, query), expected, `held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+        // The platform's rendered string of an offer is checked against the library's own format too.
+        if (expected.chancePpm !== undefined) {
+          assert.equal(stepChanceText(expected.chancePpm), shown, `chanceCompact, held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+        } else assert.equal(shown, undefined, `no offer, no chanceCompact: held slot ${query.heldSlotIndex}`);
       }
     });
   }

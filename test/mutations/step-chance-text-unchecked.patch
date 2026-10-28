@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 7ad1aa4..b6e2694 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1537,7 +1537,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+     checks.upgradeTarget = check(String(expected.targetSlotIndex), String(offer.value.targetSlotIndex));
+     checks.upgradeChance = check(String(expected.chancePpm), String(chance));
+     // The string a player reads, against the FAIR chance: a right number with a rounded-up string fails here.
+-    checks.chanceCompact = check(expected.chanceCompact, stepChanceText(chance));
++    checks.chanceCompact = check(expected.chanceCompact, expected.chanceCompact);
+   }
+   // A range check, not a recompute: the chain of earlier steps is not part of one step.
+   checks.stepNo = {
