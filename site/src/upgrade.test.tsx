@@ -24,6 +24,7 @@ import {
   UPGRADE_VERDICT,
   UPGRADE_WIN,
   type UpgradeStepName,
+  wrongChanceWords,
 } from "./words"
 
 afterEach(() => {
@@ -169,6 +170,7 @@ describe("the step page", () => {
     ],
     ["upgradeTarget", (a) => void (a.step = { ...a.step, targetSlotIndex: 3 })],
     ["upgradeChance", (a) => void (a.step = { ...a.step, chancePpm: 500000 })],
+    ["chanceCompact", (a) => void (a.step = { ...a.step, chanceCompact: "41.00%" })],
     ["stepNo", (a) => void (a.step = { ...a.step, stepNo: 4 })],
     ["drawnPpmValue", (a) => void (a.step = { ...a.step, drawnPpmValue: 186670 })],
     ["upgradeOutcome", (a) => void (a.step = { ...a.step, outcome: "lost" })],
@@ -205,6 +207,41 @@ describe("the step page", () => {
     const note = document.querySelector("[data-upgrade-win]")
     expect(note?.textContent).toContain(UPGRADE_WIN.note)
     expect(screen.getByRole("link", { name: UPGRADE_WIN.link }).getAttribute("href")).toBe(`#step=${WON_STEP.stepId}`)
+  })
+
+  // E2, eleonora's MUSTs from 24616: an upgraded win shown at a wrong chance fails on the chance's own words,
+  // never on the slot's, and also while the secret is still locked (the fair chance needs no seed).
+  function openWrongChance(locked: boolean) {
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/opens/${UPGRADED_OPEN.winId}`, ok({ ...UPGRADED_OPEN, stepChanceCompact: "41.00%" }))
+    if (locked) answers.set(`/verify/seed-pairs/${SEED.seedPairId}`, ok({ ...SEED, revealedServerSeed: null }))
+    window.location.hash = `#open=${UPGRADED_OPEN.winId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    return user
+  }
+  const chanceWords = wrongChanceWords({ shown: "41.00%", fair: "40.00%" })
+
+  it("fails an upgraded win shown at a wrong chance, on the chance's words and not the slot's", async () => {
+    const user = openWrongChance(false)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("FAIL"))
+    expect(verdictLine()).toBe(`Step 4 does not match: ${chanceWords}`)
+    const card = document.querySelector("[data-check='drawnSlotIndex']")
+    expect(card?.getAttribute("data-state")).toBe("mismatch")
+    expect(card?.textContent).toContain(chanceWords)
+    expect(document.body.textContent).toContain("Chance shown to you")
+    expect(document.body.textContent).not.toContain("Slot we recorded")
+  })
+
+  it("fails it the same way while the secret is still locked, and says the draw waits", async () => {
+    const user = openWrongChance(true)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("FAIL"))
+    expect(verdictLine()).toBe(`Step 4 does not match: ${chanceWords}`)
+    expect(document.querySelector("[data-check='drawnPpmValue']")?.getAttribute("data-state")).toBe("not-run")
+    expect(document.body.textContent).not.toContain("lands on a different slot")
   })
 
   it("follows the link to the step without a reload, and looks the step up", async () => {

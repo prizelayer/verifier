@@ -15,6 +15,8 @@ import {
   STEPS,
   type StepNumber,
   unusableWords,
+  wrongChanceShown,
+  wrongChanceWords,
 } from "./words"
 
 interface Props {
@@ -97,7 +99,9 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
             ? CHECK_WORDS[name]
             : check.error !== undefined
               ? inputWords(check.field, check.error, input)
-              : FAIL_WORDS[name]
+              : name === "drawnSlotIndex" && wrongChanceShown(check)
+                ? wrongChanceWords(wrongChanceShown(check)!)
+                : FAIL_WORDS[name]
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
             <span className="font-medium">{CHECK_LABELS[name]}:</span> <span className="font-semibold">{state}</span>
@@ -247,7 +251,11 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             </table>
           ) : null}
           {checks.drawnSlotIndex ? (
-            <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
+            wrongChanceShown(checks.drawnSlotIndex) ? (
+              <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel="Fair chance, rounded down" check={checks.drawnSlotIndex} />
+            ) : (
+              <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
+            )
           ) : null}
           {input.snapshot ? (
             <>

@@ -1,10 +1,10 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 2913da3..ab2c2f5 100644
+index 37f5df5..c53637f 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -98,7 +98,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
-               ? inputWords(check.field, check.error, input)
-               : FAIL_WORDS[name]
+@@ -103,7 +103,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
+                 ? wrongChanceWords(wrongChanceShown(check)!)
+                 : FAIL_WORDS[name]
          return (
 -          <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
 +          <li key={name} data-check={name} data-state={check ? "match" : "not-run"}>
