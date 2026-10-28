@@ -13,7 +13,18 @@ import { checkProof, joinStepProof, NOT_A_PROOF, PROOF_FORMAT, STEP_PROOF_FORMAT
 import { fakeServer } from "./test/fakeServer"
 import { LOST_STEP, UPGRADE_EDITION, UPGRADED_OPEN, upgradeAnswers, WON_STEP } from "./test/upgradeExample"
 import { EXAMPLE_PROOF } from "./example"
-import { LOCKED, percentDown, STEP_LOCKED, STEP_LOOKUP_WORDS, UPGRADE_VERDICT, UPGRADE_WIN } from "./words"
+import { editionFingerprint, parseEdition } from "@verifier"
+import {
+  LOCKED,
+  percentDown,
+  STEP_LOCKED,
+  STEP_LOOKUP_WORDS,
+  UPGRADE_FAIL_WORDS,
+  UPGRADE_STEP_OF,
+  UPGRADE_VERDICT,
+  UPGRADE_WIN,
+  type UpgradeStepName,
+} from "./words"
 
 afterEach(() => {
   cleanup()
@@ -138,6 +149,54 @@ describe("the step page", () => {
     expect(verdictLine()).toMatch(/^Step 4 does not match: With the fair chance/)
     expect(document.querySelector("[data-step='4']")?.getAttribute("data-failed")).toBe("yes")
   })
+
+  // Every check of a step fails on its own forged answer, with its own card and words (cto, KAN-1154 E2 brief).
+  // The answers are tampered where the page reads them: the step, its seed pair or its box.
+  const SEED = EXAMPLE_PROOF.seedPair
+  const forged: [UpgradeStepName, (a: { step: object; seedPair: object; edition: object }) => Promise<void> | void][] = [
+    ["commitment", (a) => void (a.seedPair = { ...SEED, serverSeedCommitment: "ab".repeat(32) })],
+    ["editionFingerprint", (a) => void (a.step = { ...a.step, editionFingerprint: "cd".repeat(32) })],
+    ["engineType", (a) => void (a.step = { ...a.step, engineType: "single_draw_weighted_table" })],
+    [
+      "engineVersion",
+      async (a) => {
+        // A version-2 box whose fingerprint is its own true one: only the version can fail.
+        const v2 = { ...UPGRADE_EDITION, engineVersion: 2 }
+        const fp = await editionFingerprint(parseEdition(v2))
+        a.edition = { ...v2, editionFingerprint: fp }
+        a.step = { ...a.step, editionFingerprint: fp }
+      },
+    ],
+    ["upgradeTarget", (a) => void (a.step = { ...a.step, targetSlotIndex: 3 })],
+    ["upgradeChance", (a) => void (a.step = { ...a.step, chancePpm: 500000 })],
+    ["stepNo", (a) => void (a.step = { ...a.step, stepNo: 4 })],
+    ["drawnPpmValue", (a) => void (a.step = { ...a.step, drawnPpmValue: 186670 })],
+    ["upgradeOutcome", (a) => void (a.step = { ...a.step, outcome: "lost" })],
+  ]
+
+  it("has a forged case for every step check the library makes", () => {
+    expect(forged.map(([name]) => name).sort()).toEqual(Object.keys(UPGRADE_STEP_OF).sort())
+  })
+
+  for (const [check, forge] of forged) {
+    it(`fails a step whose ${check} is forged, on that check's card and words`, async () => {
+      const a = { step: WON_STEP as object, seedPair: SEED as object, edition: UPGRADE_EDITION as object }
+      await forge(a)
+      const answers = upgradeAnswers()
+      const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+      answers.set(`/verify/upgrade-steps/${WON_STEP.stepId}`, ok(a.step))
+      answers.set(`/verify/seed-pairs/${SEED.seedPairId}`, ok(a.seedPair))
+      answers.set(`/verify/editions/${UPGRADE_EDITION.editionId}`, ok(a.edition))
+      window.location.hash = `#step=${WON_STEP.stepId}`
+      const user = userEvent.setup()
+      render(<App fetchFn={fakeServer(answers).fetchFn} />)
+      await user.click(screen.getByRole("button", { name: "Look up" }))
+      await waitFor(() => expect(verdictWord()).toBe("FAIL"))
+      expect(verdictLine()).toBe(`Step ${UPGRADE_STEP_OF[check]} does not match: ${UPGRADE_FAIL_WORDS[check]}`)
+      expect(document.querySelector(`[data-check='${check}']`)?.getAttribute("data-state")).toBe("mismatch")
+      expect(document.querySelector(`[data-step='${UPGRADE_STEP_OF[check]}']`)?.getAttribute("data-failed")).toBe("yes")
+    })
+  }
 
   it("checks an upgraded win over the step's two ranges and links to its step", async () => {
     const { user } = openWithHash(`#open=${UPGRADED_OPEN.winId}`)

@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 76c791c..d3f500b 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -364,6 +364,6 @@ export const STEP_LOOKUP_WORDS = {
+  */
+ export function percentDown(ppm: number): string {
+   if (ppm < 100) return "< 0.01%"
+-  const hundredths = Math.floor(ppm / 100)
++  const hundredths = Math.ceil(ppm / 100)
+   return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, "0")}%`
+ }
