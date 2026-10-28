@@ -10,6 +10,7 @@ import {
   type Edition,
   stepOutcome,
   stepTable,
+  stepChanceText,
   upgradeChancePpm,
   upgradeTarget,
   UPGRADE_ENGINE_VERSION,
@@ -50,6 +51,30 @@ describe('upgrade chance', () => {
     assert.equal(UPGRADE_MAX_STEPS, 3);
     assert.equal(UPGRADE_ENGINE_VERSION, 1);
     assert.equal(UPGRADE_STEP_RTP_BPS, 10_000);
+  });
+});
+
+describe('the chance a player reads (stepChanceText, contract §6)', () => {
+  // Literal pins, never computed by another formatter: the check must not share code with the page.
+  it('is the floor to 0.01 %, with two decimals and a percent sign', () => {
+    assert.equal(stepChanceText(333_333), '33.33%');
+    assert.equal(stepChanceText(416_666), '41.66%');
+    assert.equal(stepChanceText(400_000), '40.00%');
+    assert.equal(stepChanceText(100_000), '10.00%');
+    assert.equal(stepChanceText(999_999), '99.99%');
+    assert.equal(stepChanceText(1_000_000), '100.00%');
+    assert.equal(stepChanceText(100), '0.01%');
+  });
+
+  it('writes "< 0.01%" from 1 to 99 ppm, never "0.00%"', () => {
+    assert.equal(stepChanceText(1), '< 0.01%');
+    assert.equal(stepChanceText(99), '< 0.01%');
+  });
+
+  it('refuses 0 and anything that is not a chance', () => {
+    for (const bad of [0, -1, 1_000_001, 1.5, Number.NaN]) {
+      assert.throws(() => stepChanceText(bad), /an integer in \[1, 1000000\] ppm/);
+    }
   });
 });
 

@@ -12,8 +12,10 @@ import { before, describe, it } from 'node:test';
 
 import {
   type Edition,
+  type UpgradeStepCheckName,
   type UpgradeStepInput,
   type VerificationInput,
+  UPGRADE_STEP_CHECK_NAMES,
   editionFingerprint,
   UPGRADE_ENGINE_TYPE,
   verify,
@@ -40,6 +42,15 @@ function contract(name: string): Record<string, unknown> {
 }
 
 let fingerprint: string;
+/** From slot 0 (5 EUR) to slot 1 (12 EUR): 416 666 ppm, a chance with a remainder. Nonce 1 (186 669) wins. */
+const REMAINDER = {
+  stakedSlotIndex: 0,
+  targetSlotIndex: 1,
+  chancePpm: 416_666,
+  drawnPpmValue: 186_669,
+  outcome: 'won' as const,
+  stepNo: 1,
+};
 let wonStep: UpgradeStepInput;
 let lostStep: UpgradeStepInput;
 
@@ -57,6 +68,7 @@ before(async () => {
       stakedSlotIndex: 1,
       targetSlotIndex: 2,
       chancePpm: 400_000,
+      chanceCompact: '40.00%',
       drawnPpmValue: 186_669,
       outcome: 'won',
       stepNo: 1,
@@ -70,8 +82,8 @@ describe('verifyUpgradeStep', () => {
     const report = await verifyUpgradeStep(wonStep);
     assert.equal(report.status, 'verified', report.summary);
     assert.deepEqual(Object.keys(report.checks).sort(), [
-      'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion', 'stepNo', 'upgradeChance',
-      'upgradeOutcome', 'upgradeTarget',
+      'chanceCompact', 'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion', 'stepNo',
+      'upgradeChance', 'upgradeOutcome', 'upgradeTarget',
     ]);
     assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 400_000 });
     assert.deepEqual(report.trace.cumulative, [
@@ -168,6 +180,53 @@ describe('verifyUpgradeStep', () => {
     assert.equal(report.firstFailure?.check, 'drawnPpmValue');
     assert.equal(report.checks.upgradeOutcome?.ok, true);
   });
+
+  // E1b (cto 24607 ruling): the string a player reads must be the contract's floor of the FAIR chance.
+  it('verifies the string a player reads when it is the floor of a chance with a remainder', async () => {
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '41.66%' } });
+    assert.equal(report.status, 'verified', report.summary);
+    assert.deepEqual(report.checks.chanceCompact, { ok: true, expected: '41.66%', computed: '41.66%' });
+  });
+
+  it('fails a rounded-up string on the right chance: chanceCompact fails, upgradeChance still matches', async () => {
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '41.67%' } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'chanceCompact');
+    assert.equal(report.checks.upgradeChance?.ok, true);
+    assert.equal(report.checks.chanceCompact?.computed, '41.66%');
+  });
+
+  // Every check the library makes fails on its own forged input, first. The guard test below reddens when
+  // the library gains a check this table does not forge (cto 24607 ruling, condition 2).
+  const FORGED: Record<UpgradeStepCheckName, () => Promise<UpgradeStepInput>> = {
+    commitment: async () => ({ ...wonStep, commitmentHex: 'ab'.repeat(32) }),
+    editionFingerprint: async () => ({ ...wonStep, expected: { ...wonStep.expected, editionFingerprint: 'cd'.repeat(32) } }),
+    engineType: async () => ({ ...wonStep, engineType: 'single_draw_weighted_table' }),
+    engineVersion: async () => {
+      const v2: Edition = { ...EDITION, engineVersion: 2 };
+      return { ...wonStep, edition: v2, expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v2) } };
+    },
+    upgradeTarget: async () => ({ ...wonStep, expected: { ...wonStep.expected, targetSlotIndex: 3 } }),
+    upgradeChance: async () => ({ ...wonStep, expected: { ...wonStep.expected, chancePpm: 500_000 } }),
+    chanceCompact: async () => ({ ...wonStep, expected: { ...wonStep.expected, chanceCompact: '41.00%' } }),
+    stepNo: async () => ({ ...wonStep, expected: { ...wonStep.expected, stepNo: 4 } }),
+    drawnPpmValue: async () => ({ ...wonStep, expected: { ...wonStep.expected, drawnPpmValue: 186_670 } }),
+    upgradeOutcome: async () => ({ ...wonStep, expected: { ...wonStep.expected, outcome: 'lost' } }),
+  };
+
+  it('has a forged input for every step check the library makes', () => {
+    assert.deepEqual(Object.keys(FORGED).sort(), [...UPGRADE_STEP_CHECK_NAMES].sort());
+  });
+
+  for (const name of UPGRADE_STEP_CHECK_NAMES) {
+    it(`fails first on ${name} when only ${name} is forged`, async () => {
+      const forge = FORGED[name];
+      assert.ok(forge, `no forged input for ${name}`);
+      const report = await verifyUpgradeStep(await forge());
+      assert.equal(report.status, 'failed', report.summary);
+      assert.equal(report.firstFailure?.check, name);
+    });
+  }
 
   it('is pending while the seed is not revealed, and checks the odds anyway', async () => {
     const report = await verifyUpgradeStep({ ...wonStep, serverSeedHex: null });

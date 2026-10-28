@@ -34,6 +34,7 @@ import {
   slotFor,
   snapshotBytes,
   snapshotHash,
+  stepChanceText,
   stepOutcome,
   stepTable,
   upgradeChancePpm,
@@ -937,6 +938,7 @@ interface StepVector {
   stakedBuyBackValueCents: number;
   targetBuyBackValueCents: number;
   chancePpm: number;
+  chanceCompact: string;
   stepTablePpm: number[];
   v: number;
   slotIndex: number;
@@ -1035,6 +1037,7 @@ describe('every upgrade step vector, from its inputs', () => {
       const outcome = stepOutcome(v, chance);
       assert.equal(outcome, vector.outcome, 'outcome');
       assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+      assert.equal(stepChanceText(chance), vector.chanceCompact, 'chanceCompact');
     });
   }
 });
