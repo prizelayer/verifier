@@ -16,6 +16,11 @@ import {
   CHUNK_OFFSETS,
   PPM_TOTAL,
   SERVER_SEED_BYTES,
+  UPGRADE_ENGINE_TYPE,
+  UPGRADE_ENGINE_VERSION,
+  UPGRADE_MAX_STEPS,
+  UPGRADE_MIN_CHANCE_PPM,
+  UPGRADE_STEP_RTP_BPS,
   bigEndianUint32,
   bytesFromHex,
   commitment,
@@ -29,8 +34,13 @@ import {
   slotFor,
   snapshotBytes,
   snapshotHash,
+  stepOutcome,
+  stepTable,
+  upgradeChancePpm,
+  upgradeTarget,
   verify,
   verifyFrom,
+  type SlotOdds,
 } from '../src/verifier.js';
 
 const FIXTURE = JSON.parse(
@@ -910,6 +920,135 @@ describe('verify() end to end', () => {
     assert.equal(report.ok, false);
     assert.equal(report.invalid?.message, 'edition.slots must be an array');
   });
+});
+
+/**
+ * The upgrade families (`upgradeStep`, `upgradeOffer`, KAN-1154 A2), reproduced from their own
+ * sections alone. Every value a step vector states is recomputed from its inputs, the drawn `v`
+ * included, so no vector can pass by reading its own answer back. rng-fairness §4b.
+ */
+const STEP = FIXTURE.upgradeStep;
+const OFFER = FIXTURE.upgradeOffer;
+
+interface StepVector {
+  id: string;
+  clientSeed: string;
+  nonce: number;
+  stakedBuyBackValueCents: number;
+  targetBuyBackValueCents: number;
+  chancePpm: number;
+  stepTablePpm: number[];
+  v: number;
+  slotIndex: number;
+  outcome: 'won' | 'lost';
+}
+
+interface OfferQuery {
+  heldSlotIndex: number;
+  stepNo: number;
+  targetSlotIndex?: number;
+  chancePpm?: number;
+  noOfferReason?: string;
+}
+
+interface OfferVector {
+  id: string;
+  engineType: string;
+  slotsAsGiven: { slotIndex: number; buyBackValueCents: number }[];
+  queries: OfferQuery[];
+}
+
+/** The offer for one query, with the reason when there is none, built from this library's parts. */
+function offerFor(vector: OfferVector, query: OfferQuery): OfferQuery {
+  const base = { heldSlotIndex: query.heldSlotIndex, stepNo: query.stepNo };
+  if (vector.engineType !== UPGRADE_ENGINE_TYPE) return { ...base, noOfferReason: 'not_upgrade_engine' };
+  if (query.stepNo >= UPGRADE_MAX_STEPS) return { ...base, noOfferReason: 'cap_reached' };
+  // Only the buy-back values take part in an offer; the other slot fields are not in these vectors.
+  // The odds must still be a valid table, so the whole million sits on the first slot as given.
+  const slots: SlotOdds[] = vector.slotsAsGiven.map((slot, i) => ({
+    slotIndex: slot.slotIndex,
+    probabilityPpm: i === 0 ? PPM_TOTAL : 0,
+    requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+    requiredMarketValueCents: 0n,
+  }));
+  const offer = upgradeTarget({ slots }, query.heldSlotIndex);
+  if (offer !== null) return { ...base, targetSlotIndex: offer.targetSlotIndex, chancePpm: offer.chancePpm };
+  const held = slots.find((slot) => slot.slotIndex === query.heldSlotIndex)!;
+  const higher = slots.some((slot) => slot.requiredBuyBackValueCents > held.requiredBuyBackValueCents);
+  return { ...base, noOfferReason: higher ? 'under_minimum' : 'top_value' };
+}
+
+describe('the upgrade sections of the fixture', () => {
+  it('state the constants this library uses', () => {
+    for (const section of [STEP, OFFER]) {
+      assert.equal(section.constants.engineType, UPGRADE_ENGINE_TYPE);
+      assert.equal(section.constants.maxSteps, UPGRADE_MAX_STEPS);
+      assert.equal(section.constants.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
+      assert.equal(section.constants.engineVersion, UPGRADE_ENGINE_VERSION);
+      assert.equal(section.constants.stepRtpBps, UPGRADE_STEP_RTP_BPS);
+    }
+  });
+
+  it('carry a commitment that is the digest of their own server seed', async () => {
+    assert.equal(await commitment(bytesFromHex(STEP.serverSeedHex)), STEP.commitmentHex);
+  });
+
+  it('have the step vectors the plan named, and offer vectors for every no-offer reason', () => {
+    // Names, not a count: a silently dropped vector shows here by its id.
+    assert.deepEqual(
+      (STEP.vectors as StepVector[]).map((v) => v.id),
+      [
+        'boundary-v-equals-p',
+        'boundary-v-below-p',
+        'worked-12-to-30',
+        'worked-5-to-12-remainder',
+        'worked-30-to-80',
+        'minimum-chance-8-to-80',
+      ],
+    );
+    const reasons = new Set(
+      (OFFER.vectors as OfferVector[]).flatMap((v) => v.queries.map((q) => q.noOfferReason)).filter(Boolean),
+    );
+    assert.deepEqual([...reasons].sort(), ['cap_reached', 'not_upgrade_engine', 'top_value', 'under_minimum']);
+  });
+});
+
+describe('every upgrade step vector, from its inputs', () => {
+  const seed = bytesFromHex(STEP.serverSeedHex);
+  for (const vector of STEP.vectors as StepVector[]) {
+    it(vector.id, async () => {
+      record('upgradeStep', vector.id);
+      const chance = upgradeChancePpm(
+        BigInt(vector.stakedBuyBackValueCents),
+        BigInt(vector.targetBuyBackValueCents),
+      );
+      assert.equal(chance, vector.chancePpm, 'chance');
+      assert.deepEqual(
+        stepTable(chance).map((row) => row.probabilityPpm),
+        vector.stepTablePpm,
+        'step table',
+      );
+      assert.equal(vector.stepTablePpm[0] + vector.stepTablePpm[1], PPM_TOTAL);
+
+      const v = (await derive(seed, vector.clientSeed, vector.nonce)).value;
+      assert.equal(v, vector.v, 'drawn v');
+      const outcome = stepOutcome(v, chance);
+      assert.equal(outcome, vector.outcome, 'outcome');
+      assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+    });
+  }
+});
+
+describe('every upgrade offer vector', () => {
+  for (const vector of OFFER.vectors as OfferVector[]) {
+    it(vector.id, () => {
+      record('upgradeOffer', vector.id);
+      for (const query of vector.queries) {
+        const { chanceCompact: _shown, ...expected } = query as OfferQuery & { chanceCompact?: string };
+        assert.deepEqual(offerFor(vector, query), expected, `held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+      }
+    });
+  }
 });
 
 /**

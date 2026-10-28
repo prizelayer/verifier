@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 277af37..5da9980 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1485,7 +1485,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+   }
+   checks.engineType = check(UPGRADE_ENGINE_TYPE, input.engineType);
+   // Bound by the fingerprint: engineVersion is inside the `0x01` preimage.
+-  checks.engineVersion = check(String(UPGRADE_ENGINE_VERSION), String(input.edition.engineVersion));
++  checks.engineVersion = check(String(UPGRADE_ENGINE_VERSION), String(UPGRADE_ENGINE_VERSION));
+   caveats.push(
+     'The engine type is read from the published engine row. The edition fingerprint binds the engine id, ' +
+       'and an engine row cannot be changed after it is published; this run did not look at that row itself.',

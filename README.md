@@ -183,6 +183,19 @@ zero probability can never be selected. Both are pinned by golden vectors, becau
 invisible in `v` itself — an implementation can get every HMAC right and still hand you the wrong
 prize.
 
+### 3b. An upgrade step
+
+A player who holds a win of an upgrade edition (engine type `single_draw_weighted_table_fair_upgrade`)
+may stake it for the next strictly higher buy-back value of the same edition (ties: the lowest slot
+index). The chance is `p = floor(1 000 000 × staked / target)` ppm, computed from the two values the
+edition fingerprint binds; there is no offer below 100 000 ppm (10 %), from the top value, or past the
+third step. The step draws one `v` on the player's next nonce, exactly as in section 2, and reads it
+over the two-entry table `[p, 1 000 000 − p]` with the lookup of section 3: slot 0 is **won**, so a
+step is won exactly when `v < p`. A won step makes a new win in the target slot; a lost step makes
+nothing, and is verified the same way. `verifyUpgradeStep()` checks all of this from the published
+step; `verify()` with `gameKind: 'upgrade'` checks an upgrade win over the step's table, never over
+the box table.
+
 ### 4. The edition fingerprint
 
 `SHA-256` over these bytes, in this exact order:
@@ -242,6 +255,10 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `parseSnapshotBody(body)` | The published `snapshot.body` JSON (or its text) → typed snapshot. |
 | `parseSnapshot(json)` | The camelCase, decimal-string form → typed snapshot. |
 | `bytesFromHex` / `hexFromBytes` | Hex helpers. |
+| `verifyUpgradeStep(input)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`). Never throws. |
+| `upgradeTarget(edition, slotIndex)` | The step a win in that slot is offered, `{ targetSlotIndex, chancePpm }`, or `null`. |
+| `upgradeChancePpm(current, next)` | `floor(1 000 000 × current / next)`, exact in `BigInt`. |
+| `stepTable(p)` / `stepOutcome(v, p)` | The step's two-entry table, and `won` or `lost` for `v` over it. |
 
 Everything is `async`, because Web Crypto is. There's no synchronous variant on purpose: a second
 code path would be a second thing to audit.

@@ -4,6 +4,8 @@
   "specification": {
     "draw": "specs/rng-fairness.md §1–§4, §7",
     "slotMapping": "specs/rng-fairness.md §4 (cumulative lookup)",
+    "upgradeStep": "specs/rng-fairness.md §4b (upgrade step)",
+    "upgradeOffer": "specs/rng-fairness.md §4b (upgrade offer)",
     "editionFingerprint": "specs/domain-model.md §B · ADR-KAN-14 (0x01 preimage)",
     "snapshot": "specs/domain-model.md §B · ADR-TD-16 (0x03 preimage)"
   },
@@ -854,6 +856,388 @@
         },
         "preimageHex": "01ffffffffffffffffffffffffffffffff7fffffffffffffffffffffff000000020000000000061a80ffffffffffffcfc7ffffffffffffffff00000001000927c080000000000000017fffffffffffffff",
         "editionFingerprint": "e58b220e552235eb7d15a2123ec2432cc291e446f90d4743cfe0417956ec8c50"
+      }
+    ]
+  },
+  "upgradeStep": {
+    "specification": "specs/rng-fairness.md §4b — the upgrade step",
+    "note": "p = floor(1,000,000 · staked / target), the only integer with 10000·p·target <= STEP_RTP_BPS·1,000,000·staked < 10000·(p+1)·target. The step draws §3 over the two-entry table [p, 1,000,000 − p] and maps it by §4: slotIndex 0 is won, slotIndex 1 is lost, so won ⇔ v < p. slotIndex here is the step table's index, not an edition slot. chanceCompact is p shown floored to 0.01%, never above the true chance. The boundary cases use values chosen to land p on a v that nonce 1 already produces; they are not real prices.",
+    "serverSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "commitmentHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+    "constants": {
+      "engineType": "single_draw_weighted_table_fair_upgrade",
+      "engineVersion": 1,
+      "maxSteps": 3,
+      "minChancePpm": 100000,
+      "stepRtpBps": 10000
+    },
+    "vectors": [
+      {
+        "id": "boundary-v-equals-p",
+        "note": "v is EXACTLY p (186669): it belongs to slotIndex 1, so the step is LOST. An implementation that reads won as v <= p wins it. The single most likely §4b defect.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "stakedBuyBackValueCents": 186669,
+        "targetBuyBackValueCents": 1000000,
+        "chancePpm": 186669,
+        "chanceCompact": "18.66%",
+        "stepTablePpm": [
+          186669,
+          813331
+        ],
+        "v": 186669,
+        "slotIndex": 1,
+        "outcome": "lost"
+      },
+      {
+        "id": "boundary-v-below-p",
+        "note": "The other side of the same edge: the identical v (186669) against p = 186670 is WON. Paired with the case above, the bound is pinned from both directions.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "stakedBuyBackValueCents": 186670,
+        "targetBuyBackValueCents": 1000000,
+        "chancePpm": 186670,
+        "chanceCompact": "18.66%",
+        "stepTablePpm": [
+          186670,
+          813330
+        ],
+        "v": 186669,
+        "slotIndex": 0,
+        "outcome": "won"
+      },
+      {
+        "id": "worked-12-to-30",
+        "note": "The worked box's 12 → 30 EUR step: p = 400000 exactly, no remainder.",
+        "clientSeed": "alice-seed",
+        "nonce": 1,
+        "stakedBuyBackValueCents": 1200,
+        "targetBuyBackValueCents": 3000,
+        "chancePpm": 400000,
+        "chanceCompact": "40.00%",
+        "stepTablePpm": [
+          400000,
+          600000
+        ],
+        "v": 186669,
+        "slotIndex": 0,
+        "outcome": "won"
+      },
+      {
+        "id": "worked-5-to-12-remainder",
+        "note": "The worked box's 5 → 12 EUR step: 1,000,000 · 500 / 1200 leaves a remainder, so p is the floor 416666 and the shown chance is 41.66%, not 41.67%.",
+        "clientSeed": "alice-seed",
+        "nonce": 2,
+        "stakedBuyBackValueCents": 500,
+        "targetBuyBackValueCents": 1200,
+        "chancePpm": 416666,
+        "chanceCompact": "41.66%",
+        "stepTablePpm": [
+          416666,
+          583334
+        ],
+        "v": 459796,
+        "slotIndex": 1,
+        "outcome": "lost"
+      },
+      {
+        "id": "worked-30-to-80",
+        "note": "The worked box's 30 → 80 EUR step: p = 375000.",
+        "clientSeed": "alice-seed",
+        "nonce": 3,
+        "stakedBuyBackValueCents": 3000,
+        "targetBuyBackValueCents": 8000,
+        "chancePpm": 375000,
+        "chanceCompact": "37.50%",
+        "stepTablePpm": [
+          375000,
+          625000
+        ],
+        "v": 261902,
+        "slotIndex": 0,
+        "outcome": "won"
+      },
+      {
+        "id": "minimum-chance-8-to-80",
+        "note": "8 → 80 EUR: p is exactly MIN_CHANCE_PPM (100000), the smallest chance that is offered (upgradeOffer minimum-is-offered).",
+        "clientSeed": "alice-seed",
+        "nonce": 2,
+        "stakedBuyBackValueCents": 800,
+        "targetBuyBackValueCents": 8000,
+        "chancePpm": 100000,
+        "chanceCompact": "10.00%",
+        "stepTablePpm": [
+          100000,
+          900000
+        ],
+        "v": 459796,
+        "slotIndex": 1,
+        "outcome": "lost"
+      }
+    ]
+  },
+  "upgradeOffer": {
+    "specification": "specs/rng-fairness.md §4b — target, chance and offer",
+    "note": "The target is the slot with the smallest buy-back value strictly greater than the held one; among equal values, the lowest slotIndex. It is never slotIndex + 1. There is no offer under MIN_CHANCE_PPM, at the top value, or at stepNo >= MAX_STEPS. noOfferReason is one of a closed list: top_value, under_minimum, cap_reached, not_upgrade_engine. slotsAsGiven is deliberately not in slotIndex or value order.",
+    "constants": {
+      "engineType": "single_draw_weighted_table_fair_upgrade",
+      "engineVersion": 1,
+      "maxSteps": 3,
+      "minChancePpm": 100000,
+      "stepRtpBps": 10000
+    },
+    "vectors": [
+      {
+        "id": "worked-box",
+        "note": "The worked box (5 / 12 / 30 / 80 EUR): each value offers the next one; 80 EUR is the top.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 2,
+            "buyBackValueCents": 3000
+          },
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 3,
+            "buyBackValueCents": 8000
+          },
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 1200
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
+          },
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
+          },
+          {
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%"
+          },
+          {
+            "heldSlotIndex": 3,
+            "stepNo": 0,
+            "noOfferReason": "top_value"
+          }
+        ]
+      },
+      {
+        "id": "value-order-is-not-slot-order",
+        "note": "Slot order is draw order, not value order: slotIndex 2 follows 1 but holds 80 EUR; the next value above 5 EUR is slotIndex 3. An implementation using slotIndex + 1 fails here.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 3000
+          },
+          {
+            "slotIndex": 3,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "buyBackValueCents": 8000
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
+          },
+          {
+            "heldSlotIndex": 3,
+            "stepNo": 0,
+            "targetSlotIndex": 0,
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
+          },
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%"
+          },
+          {
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "noOfferReason": "top_value"
+          }
+        ]
+      },
+      {
+        "id": "tie-goes-to-lowest-slot-index",
+        "note": "slotIndex 1 and 2 both hold 12 EUR: from 5 EUR the target is 1, the lowest index; a held 12 EUR targets 30 EUR, never the other 12 EUR.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 2,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 3,
+            "buyBackValueCents": 3000
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
+          },
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
+          },
+          {
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
+          }
+        ]
+      },
+      {
+        "id": "under-minimum",
+        "note": "7.99 → 80 EUR is 99875 ppm, under the minimum: no offer.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 8000
+          },
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 799
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "noOfferReason": "under_minimum"
+          }
+        ]
+      },
+      {
+        "id": "minimum-is-offered",
+        "note": "8 → 80 EUR is exactly MIN_CHANCE_PPM (100000): offered. With under-minimum, the minimum is pinned from both sides; an implementation that refuses p <= 100000 fails here.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 8000
+          },
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 800
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "chancePpm": 100000,
+            "chanceCompact": "10.00%"
+          }
+        ]
+      },
+      {
+        "id": "cap",
+        "note": "A win made by step 2 still has an offer; a win made by step 3 (MAX_STEPS) has none.",
+        "engineType": "single_draw_weighted_table_fair_upgrade",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 1200
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 2,
+            "targetSlotIndex": 1,
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
+          },
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 3,
+            "noOfferReason": "cap_reached"
+          }
+        ]
+      },
+      {
+        "id": "box-engine-has-no-offer",
+        "note": "The same values on the plain box engine: no edition on another engine type has an offer.",
+        "engineType": "single_draw_weighted_table",
+        "engineVersion": 1,
+        "slotsAsGiven": [
+          {
+            "slotIndex": 0,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "buyBackValueCents": 1200
+          }
+        ],
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "noOfferReason": "not_upgrade_engine"
+          }
+        ]
       }
     ]
   },

@@ -1,0 +1,15 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 5a06c3a..d976795 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -617,8 +617,8 @@ export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number
+ 
+   let target: SlotOdds | undefined;
+   for (const slot of slots) {
+-    if (slot.requiredBuyBackValueCents <= current) continue;
+-    if (target === undefined || slot.requiredBuyBackValueCents < target.requiredBuyBackValueCents) target = slot;
++    if (slot.slotIndex <= slotIndex) continue;
++    if (target === undefined) target = slot;
+   }
+   if (target === undefined) return null;
+ 

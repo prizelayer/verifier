@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 5a06c3a..e580f73 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -642,7 +642,7 @@ export function stepTable(chancePpm: number): Pick<SlotOdds, 'slotIndex' | 'prob
+  * {@link stepTable}. Slot 0 is `won`, so a step is won exactly when `v < chancePpm`.
+  */
+ export function stepOutcome(v: number, chancePpm: number): 'won' | 'lost' {
+-  return slotFor(v, stepTable(chancePpm)) === 0 ? 'won' : 'lost';
++  return v <= chancePpm ? 'won' : 'lost';
+ }
+ 
+ /**
