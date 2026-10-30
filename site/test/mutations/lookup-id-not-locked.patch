@@ -1,9 +1,9 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index a2e9c79..72ea658 100644
+index 2d285f6..cdea236 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -96,7 +96,7 @@ export function LookupBox({
-               event.currentTarget.form?.requestSubmit()
+@@ -108,7 +108,7 @@ export function LookupBox({
+               void press()
              }
            }}
 -          readOnly={busy}

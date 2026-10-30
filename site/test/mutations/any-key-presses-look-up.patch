@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index 2d285f6..9999d68 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -102,7 +102,7 @@ export function LookupBox({
+             setResult(null)
+           }}
+           onKeyDown={(event) => {
+-            if (event.key === "Enter") {
++            if (event.key !== "") {
+               // Enter in the field presses "Look up"; nothing is ever submitted to a server.
+               event.preventDefault()
+               void press()

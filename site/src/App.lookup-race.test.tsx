@@ -69,15 +69,17 @@ describe("a lookup in flight", () => {
     expect(button("Look up").getAttribute("aria-disabled")).toBeNull()
   })
 
-  // Two submits in one task both ran before React drew the busy state again: two lookups started.
-  it("starts one lookup for two submits in one task", async () => {
+  // Two presses in one task both ran before React drew the busy state again: two lookups started.
+  it.each([
+    ["clicks on Look up", () => button("Look up").click()],
+    ["Enters in the field", () => fireEvent.keyDown(idField(), { key: "Enter" })],
+  ])("starts one lookup for two %s in one task", async (_, pressOnce) => {
     window.location.hash = `#open=${WIN}`
     const server = heldServer()
     render(<App fetchFn={server.fetchFn} />)
-    const form = idField().form as HTMLFormElement
     act(() => {
-      form.requestSubmit()
-      form.requestSubmit()
+      pressOnce()
+      pressOnce()
     })
     server.release()
     await waitFor(() => expect(verdict()).toBe("PASS"))
