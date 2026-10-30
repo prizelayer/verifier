@@ -1,0 +1,48 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index 2d285f6..4f7c2e1 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -92,7 +92,15 @@ export function LookupBox({
+       </p>
+       {/* No form: a submit does nothing in a frame sandboxed without allow-forms, as in the player's
+           overlay. The search landmark the form gave is kept, named by the label above. */}
+-      <div role="search" aria-labelledby={`${fieldId}-label`} className="flex flex-col gap-2 sm:flex-row">
++      <form
++        role="search"
++        aria-labelledby={`${fieldId}-label`}
++        className="flex flex-col gap-2 sm:flex-row"
++        onSubmit={(event) => {
++          event.preventDefault()
++          void press()
++        }}
++      >
+         {/* A wrapping field: an id is 36 characters and must be readable in full on a phone. */}
+         <textarea
+           id={fieldId}
+@@ -105,7 +113,7 @@ export function LookupBox({
+             if (event.key === "Enter") {
+               // Enter in the field presses "Look up"; nothing is ever submitted to a server.
+               event.preventDefault()
+-              void press()
++              event.currentTarget.form?.requestSubmit()
+             }
+           }}
+           readOnly={busy}
+@@ -117,15 +125,14 @@ export function LookupBox({
+           className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-base break-all sm:h-9 sm:py-1.5 sm:text-sm"
+         />
+         <Button
+-          type="button"
+-          onClick={() => void press()}
++          type="submit"
+           className="self-start aria-disabled:opacity-50"
+           disabled={disabled || winId.trim() === ""}
+           aria-disabled={busy || undefined}
+         >
+           Look up
+         </Button>
+-      </div>
++      </form>
+       <div id={resultId} aria-live="polite" data-lookup={busy ? "busy" : (result?.result.kind ?? "idle")}>
+         {busy ? (
+           <p className="border-l-2 border-muted-foreground pl-3">{LOOKUP_WORDS.busy}</p>

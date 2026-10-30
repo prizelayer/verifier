@@ -1,0 +1,12 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index 2d285f6..3eb5bc8 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -118,7 +118,6 @@ export function LookupBox({
+         />
+         <Button
+           type="button"
+-          onClick={() => void press()}
+           className="self-start aria-disabled:opacity-50"
+           disabled={disabled || winId.trim() === ""}
+           aria-disabled={busy || undefined}

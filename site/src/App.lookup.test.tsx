@@ -26,6 +26,37 @@ function openWithHash(hash: string, server = fakeServer(exampleAnswers())) {
   return { user, server }
 }
 
+// A form submit does nothing in a frame sandboxed without allow-forms, as in the player's overlay.
+function expectNoFormAndTheSearchLandmark() {
+  expect(document.querySelector("form")).toBeNull()
+  expect(screen.getByRole("search", { name: "Look up an open by its id" }).contains(idField())).toBe(true)
+}
+
+describe("the page in a frame without allow-forms", () => {
+  it("has no form and keeps the lookup's search landmark, idle, busy, found and failed", async () => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const server = fakeServer(exampleAnswers())
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      await held
+      return server.fetchFn(url, init)
+    }) as typeof fetch
+    const { user } = openWithHash(`#open=${WIN}`, { fetchFn, calls: server.calls })
+    expectNoFormAndTheSearchLandmark()
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    expect(screen.getByText(LOOKUP_WORDS.busy)).toBeTruthy()
+    expectNoFormAndTheSearchLandmark()
+    release()
+    await waitFor(() => expect(verdict()).toBe("PASS"))
+    expectNoFormAndTheSearchLandmark()
+    await user.clear(idField())
+    await user.type(idField(), "not an id")
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    expect(await screen.findByText(LOOKUP_WORDS.notAnId)).toBeTruthy()
+    expectNoFormAndTheSearchLandmark()
+  })
+})
+
 describe("the lookup", () => {
   it("fetches nothing before the button is pressed, also when the id came in the address", async () => {
     const { user, server } = openWithHash(`#open=${WIN}&item=${ITEM}`)

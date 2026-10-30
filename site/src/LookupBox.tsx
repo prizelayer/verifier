@@ -31,7 +31,7 @@ export function LookupBox({
   const itemId = fromAddress !== null && normalId(winId) === normalId(fromAddress.winId) ? fromAddress.itemId : null
   const [busy, setBusy] = useState(false)
   // The guard a second press checks. The state above is for the screen, and two presses in one task
-  // (a script calling requestSubmit() twice) both read it before React draws again; this ref they do not.
+  // (a script clicking "Look up" twice) both read it before React draws again; this ref they do not.
   const pressing = useRef(false)
   // The result, with the id it was looked up for: the saved file is named after that id.
   const [result, setResult] = useState<{ asked: string; result: LookupResult } | null>(null)
@@ -90,14 +90,9 @@ export function LookupBox({
         This is the only time the page contacts our server: when you press "Look up", it fetches the public data of
         that open from {new URL(API_BASE).host}. The check itself still runs in your browser.
       </p>
-      <form
-        className="flex flex-col gap-2 sm:flex-row"
-        onSubmit={(event) => {
-          // Enter in the field presses "Look up"; nothing is ever submitted to a server.
-          event.preventDefault()
-          void press()
-        }}
-      >
+      {/* No form: a submit does nothing in a frame sandboxed without allow-forms, as in the player's
+          overlay. The search landmark the form gave is kept, named by the label above. */}
+      <div role="search" aria-labelledby={`${fieldId}-label`} className="flex flex-col gap-2 sm:flex-row">
         {/* A wrapping field: an id is 36 characters and must be readable in full on a phone. */}
         <textarea
           id={fieldId}
@@ -108,8 +103,9 @@ export function LookupBox({
           }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
+              // Enter in the field presses "Look up"; nothing is ever submitted to a server.
               event.preventDefault()
-              event.currentTarget.form?.requestSubmit()
+              void press()
             }
           }}
           readOnly={busy}
@@ -121,14 +117,15 @@ export function LookupBox({
           className="min-w-0 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-base break-all sm:h-9 sm:py-1.5 sm:text-sm"
         />
         <Button
-          type="submit"
+          type="button"
+          onClick={() => void press()}
           className="self-start aria-disabled:opacity-50"
           disabled={disabled || winId.trim() === ""}
           aria-disabled={busy || undefined}
         >
           Look up
         </Button>
-      </form>
+      </div>
       <div id={resultId} aria-live="polite" data-lookup={busy ? "busy" : (result?.result.kind ?? "idle")}>
         {busy ? (
           <p className="border-l-2 border-muted-foreground pl-3">{LOOKUP_WORDS.busy}</p>
