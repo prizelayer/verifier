@@ -474,6 +474,181 @@
       }
     },
     {
+      "name": "top medium, share high",
+      "why": "the higher half wins: 5.00 x is medium, 90 in 100 is high, so the label is high, not the top half's",
+      "priceCents": 1000,
+      "prizes": [
+        {
+          "buyBackCents": 900,
+          "ppm": 900000
+        },
+        {
+          "buyBackCents": 5000,
+          "ppm": 100000
+        }
+      ],
+      "expected": {
+        "band": "high",
+        "topHalf": "medium",
+        "shareHalf": "high",
+        "topMultipleX100": 500,
+        "topMultipleText": "5.00",
+        "belowPricePpm": 900000,
+        "belowPriceIn100": 90,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "top high, share high",
+      "why": "both halves high",
+      "priceCents": 1000,
+      "prizes": [
+        {
+          "buyBackCents": 900,
+          "ppm": 900000
+        },
+        {
+          "buyBackCents": 30000,
+          "ppm": 100000
+        }
+      ],
+      "expected": {
+        "band": "high",
+        "topHalf": "high",
+        "shareHalf": "high",
+        "topMultipleX100": 3000,
+        "topMultipleText": "30.00",
+        "belowPricePpm": 900000,
+        "belowPriceIn100": 90,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "top at 3p on 3.33",
+      "why": "an odd price: 999 is exactly 3p, low",
+      "priceCents": 333,
+      "prizes": [
+        {
+          "buyBackCents": 300,
+          "ppm": 500000
+        },
+        {
+          "buyBackCents": 999,
+          "ppm": 500000
+        }
+      ],
+      "expected": {
+        "band": "low",
+        "topHalf": "low",
+        "shareHalf": "low",
+        "topMultipleX100": 300,
+        "topMultipleText": "3.00",
+        "belowPricePpm": 500000,
+        "belowPriceIn100": 50,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "top at 3p + 1 on 3.33",
+      "why": "an odd price: 1,000 is one cent over 3p, medium",
+      "priceCents": 333,
+      "prizes": [
+        {
+          "buyBackCents": 300,
+          "ppm": 500000
+        },
+        {
+          "buyBackCents": 1000,
+          "ppm": 500000
+        }
+      ],
+      "expected": {
+        "band": "medium",
+        "topHalf": "medium",
+        "shareHalf": "low",
+        "topMultipleX100": 300,
+        "topMultipleText": "3.00",
+        "belowPricePpm": 500000,
+        "belowPriceIn100": 50,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "top at 25p on 3.33",
+      "why": "an odd price: 8,325 is exactly 25p, medium",
+      "priceCents": 333,
+      "prizes": [
+        {
+          "buyBackCents": 300,
+          "ppm": 500000
+        },
+        {
+          "buyBackCents": 8325,
+          "ppm": 500000
+        }
+      ],
+      "expected": {
+        "band": "medium",
+        "topHalf": "medium",
+        "shareHalf": "low",
+        "topMultipleX100": 2500,
+        "topMultipleText": "25.00",
+        "belowPricePpm": 500000,
+        "belowPriceIn100": 50,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "top at 25p + 1 on 3.33",
+      "why": "an odd price: 8,326 is one cent over 25p, high",
+      "priceCents": 333,
+      "prizes": [
+        {
+          "buyBackCents": 300,
+          "ppm": 500000
+        },
+        {
+          "buyBackCents": 8326,
+          "ppm": 500000
+        }
+      ],
+      "expected": {
+        "band": "high",
+        "topHalf": "high",
+        "shareHalf": "low",
+        "topMultipleX100": 2500,
+        "topMultipleText": "25.00",
+        "belowPricePpm": 500000,
+        "belowPriceIn100": 50,
+        "ruleVersion": 1
+      }
+    },
+    {
+      "name": "a prize one cent under the price",
+      "why": "v = p - 1 is below the price, so B is 600,001: medium",
+      "priceCents": 1000,
+      "prizes": [
+        {
+          "buyBackCents": 999,
+          "ppm": 600001
+        },
+        {
+          "buyBackCents": 1000,
+          "ppm": 399999
+        }
+      ],
+      "expected": {
+        "band": "medium",
+        "topHalf": "low",
+        "shareHalf": "medium",
+        "topMultipleX100": 100,
+        "topMultipleText": "1.00",
+        "belowPricePpm": 600001,
+        "belowPriceIn100": 60,
+        "ruleVersion": 1
+      }
+    },
+    {
       "name": "a 2.50 EUR box",
       "why": "another price: 30.40 x the price, high by the top half",
       "priceCents": 250,
