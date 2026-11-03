@@ -370,6 +370,24 @@ describe("the step page", () => {
     expect(document.body.textContent).not.toContain("Chance shown to you")
   })
 
+  // A hand-made proof may carry numbers our server never sends; the FAIL still speaks of the chance (NIT-N1).
+  it("words a fractional recorded chance of a locked upgraded win as the chance's fault", async () => {
+    await lockedOpen({ stepChancePpm: 400000.5 })
+    expect(verdictLine()).toBe(
+      "Step 4 does not match: The chance recorded with this upgraded win, 400,000.5 in 1,000,000, is not its fair chance, 400,000 in 1,000,000.",
+    )
+    expect(document.body.textContent).not.toContain("Slot we recorded")
+  })
+
+  for (const slot of [-1, 1.5]) {
+    it(`words a staked slot of ${slot} of a locked upgraded win as a slot the box does not have`, async () => {
+      await lockedOpen({ stakedSlotIndex: slot })
+      expect(verdictLine()).toBe(
+        `Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be a fair chance: the item given up names slot ${slot}, and this box has no slot ${slot}.`,
+      )
+    })
+  }
+
   it("follows the link to the step without a reload, and looks the step up", async () => {
     const { user } = openWithHash(`#open=${UPGRADED_OPEN.winId}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))

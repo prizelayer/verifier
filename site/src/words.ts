@@ -276,7 +276,8 @@ export const UPGRADE_STEPS = [
  * other cause. The slot's own words would then be false: no slot was compared, and the seed may still be
  * locked. The library writes "chance shown <text>" / "fair chance <text>" for a wrong text, "fair chance
  * none, slot <n> <why>" when no fair chance exists, and "chance recorded <n> ppm" / "fair chance <n> ppm"
- * for a recorded chance that is not the fair one.
+ * for a recorded chance that is not the fair one. A number is read in any form a hand-made proof can carry
+ * (negative, fractional), so a FAIL never falls back to the slot's words.
  */
 export type WrongChance =
   | { kind: "shown"; shown: string; fair: string }
@@ -286,12 +287,12 @@ export type WrongChance =
 export function wrongChanceShown(check: Check | undefined): WrongChance | null {
   if (!check || check.ok || check.expected === undefined || check.computed === undefined) return null
   const { expected, computed } = check
-  const recorded = /^chance recorded (\d+) ppm$/.exec(expected)
-  const fairPpm = /^fair chance (\d+) ppm$/.exec(computed)
+  const recorded = /^chance recorded (-?\d+(?:\.\d+)?(?:e[+-]?\d+)?) ppm$/.exec(expected)
+  const fairPpm = /^fair chance (-?\d+(?:\.\d+)?(?:e[+-]?\d+)?) ppm$/.exec(computed)
   if (recorded && fairPpm) return { kind: "recorded", recorded: Number(recorded[1]), fair: Number(fairPpm[1]) }
   if (!expected.startsWith("chance shown ")) return null
   const shown = expected.slice("chance shown ".length)
-  const none = /^fair chance none, slot (\d+) is (offered no step|not in the box)$/.exec(computed)
+  const none = /^fair chance none, slot (-?\d+(?:\.\d+)?(?:e[+-]?\d+)?) is (offered no step|not in the box)$/.exec(computed)
   if (none) return { kind: "none", shown, slot: none[1], why: none[2] as "offered no step" | "not in the box" }
   if (!computed.startsWith("fair chance ")) return null
   return { kind: "shown", shown, fair: computed.slice("fair chance ".length) }

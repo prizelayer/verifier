@@ -1341,21 +1341,11 @@ function uuidKey(uuid: string): string {
 }
 
 /**
- * The fields every check reads, refused by name when missing or of the wrong type, so a reader
- * sees which input is wrong instead of a runtime error. `serverSeedHex` must be present: `null`
- * means "not revealed yet", while a missing key is a broken input, never a pending one.
- */
-/**
- * The failed check when an upgrade win's shown chance text is not the text of its FAIR chance, or undefined
- * when it is, or when no fair chance exists (the slot check then says why, once the draw is known). The fair
- * chance comes only from the edition and the staked slot, never from a number in the claim.
- */
-/**
  * The seed-free facts of a locked upgrade win, or undefined when they all hold. Each needs only the edition
  * and the staked slot, so it fails before the reveal (owner ruling, KAN-1154): a slot the box does not hold
  * or offers no step has no fair chance, so no shown chance can be fair; a recorded chance that is not the
- * fair one is wrong whatever v is (the shown text is compared first). The causes keep the two prefixes the page reads ("chance shown" or
- * "chance recorded", then "fair chance").
+ * fair one is wrong whatever v is (the shown text is compared first). The causes keep the two prefixes the
+ * page reads ("chance shown" or "chance recorded", then "fair chance").
  */
 function wrongChanceText(input: VerificationInput): Check | undefined {
   const stakedSlot = input.expected.stakedSlotIndex as number;
@@ -1375,6 +1365,11 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
     : { ok: false, expected: `chance recorded ${recorded} ppm`, computed: `fair chance ${offer.value.chancePpm} ppm` };
 }
 
+/**
+ * The fields every check reads, refused by name when missing or of the wrong type, so a reader
+ * sees which input is wrong instead of a runtime error. `serverSeedHex` must be present: `null`
+ * means "not revealed yet", while a missing key is a broken input, never a pending one.
+ */
 function requireShape(input: VerificationInput): void {
   const need = (ok: boolean, what: string) => {
     if (!ok) throw new Error(`${what} is missing or has the wrong type`);
