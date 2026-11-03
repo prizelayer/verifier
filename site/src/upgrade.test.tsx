@@ -261,6 +261,10 @@ describe("the step page", () => {
     expect(note?.textContent).toContain(UPGRADE_WIN.note)
     // A PASS says what the open's check left to the upgrade's own (S4 of the review of #16).
     expect(note?.textContent).toContain(UPGRADE_WIN.passCaveat)
+    // The owner's words, one idea per sentence (owner ruling, KAN-1154).
+    expect(UPGRADE_WIN.passCaveat).toBe(
+      "This page did not check the item given up for this upgrade, the kind of box, or how many upgrades came in a row. The upgrade's own check covers those.",
+    )
     expect(screen.getByRole("link", { name: UPGRADE_WIN.link }).getAttribute("href")).toBe(`#step=${WON_STEP.stepId}`)
   })
 

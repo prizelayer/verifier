@@ -392,7 +392,7 @@ export const UPGRADE_WIN = {
   note: "This win was made by an upgrade. Its number is read against the upgrade's two ranges, not against the box's prize table.",
   /** Under a PASS only: what the open's check leaves to the upgrade's own check (the library's caveat). */
   passCaveat:
-    "This check did not look at the item given up for it, at the kind of box, or at the number of upgrades in a row; the upgrade's own check does.",
+    "This page did not check the item given up for this upgrade, the kind of box, or how many upgrades came in a row. The upgrade's own check covers those.",
   link: "Check the upgrade that made this win",
 } as const
 
