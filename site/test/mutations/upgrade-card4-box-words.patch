@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 7c69064..7ee2002 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -42,7 +42,7 @@ export function StepCards({ report, input }: Props) {
+       {STEPS.map((card) => {
+         // An upgraded win's number is read over the step's two ranges, so its card 4 is the step's.
+         const { step, method } = card
+-        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? UPGRADE_WIN_STEP4 : card
++        const { title: stepTitle, text: stepText, source } = false && step === 4 ? UPGRADE_WIN_STEP4 : card
+         const failed = failedSteps.has(step)
+         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
+         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle

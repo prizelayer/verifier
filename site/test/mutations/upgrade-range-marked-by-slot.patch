@@ -1,0 +1,13 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+index 7c69064..046b338 100644
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -223,7 +223,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+         <div className="space-y-2">
+           {input.gameKind === "upgrade" ? (
+             // The step's two ranges, marked by the library's step outcome; while locked the library leaves none.
+-            trace.cumulative ? <TwoRanges ranges={trace.cumulative} value={trace.value} outcome={trace.computedStepOutcome} /> : null
++            trace.cumulative ? <TwoRanges ranges={trace.cumulative} value={trace.value} outcome={trace.computedSlotIndex === 0 ? "won" : "lost"} /> : null
+           ) : trace.cumulative ? (
+             <table className="w-full text-xs">
+               <caption className="text-left text-sm text-muted-foreground">

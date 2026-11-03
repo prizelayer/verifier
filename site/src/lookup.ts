@@ -1,4 +1,4 @@
-import { joinProof } from "./proof"
+import { joinProof, joinStepProof } from "./proof"
 import { structureProblem } from "./rawText"
 
 declare const __VERIFIER_API__: string
@@ -52,6 +52,7 @@ const HASH = /^[0-9a-f]{64}$/
 /** How a reader sees the fields a fault names: in words, not as the API spells them. */
 const LABEL: Record<string, string> = {
   winId: "win id",
+  stepId: "upgrade id",
   seedPairId: "seed pair id",
   editionId: "box id",
   snapshotHash: "fingerprint",
@@ -116,6 +117,46 @@ export async function lookUp(
   }
 }
 
+/**
+ * Fetches the three public answers of one upgrade step (KAN-1154) and joins them, unchanged, into one
+ * step proof: the step, its seed pair and its box. The same rules as {@link lookUp}: nothing fetched
+ * before the id has the shape of one, every value checked before it is put in a path, every answer the
+ * record that was asked for. A 404 for the step is "no upgrade with this id": a win never staked has none.
+ */
+export async function lookUpStep(stepId: string, fetchFn: typeof fetch = fetch): Promise<LookupResult> {
+  const id = normalId(stepId)
+  if (!UUID.test(id)) return { kind: "notAnId" }
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), LOOKUP_TIMEOUT_MS)
+  const get = (path: string) => answer(fetchFn, path, abort.signal)
+  try {
+    const step = await get(`/verify/upgrade-steps/${id}`)
+    if (step === null) return { kind: "notFound" }
+    const stepJson = objectOf(step, "the upgrade")
+    sameRecord(stepJson, "stepId", id, "the upgrade")
+    const seedPairId = field(stepJson, "seedPairId", "the upgrade")
+    const editionId = field(stepJson, "editionId", "the upgrade")
+    const [seedPair, edition] = await Promise.all([
+      required(get, `/verify/seed-pairs/${seedPairId}`, "the seed pair", "this upgrade"),
+      required(get, `/verify/editions/${editionId}`, "the box", "this upgrade"),
+    ])
+    const seedPairJson = objectOf(seedPair, "the seed pair")
+    sameRecord(seedPairJson, "seedPairId", seedPairId, "the seed pair")
+    sameRecord(objectOf(edition, "the box"), "editionId", editionId, "the box")
+    if (!("revealedServerSeed" in seedPairJson)) {
+      throw new ServerFault("the seed pair it sent leaves out its revealed secret")
+    }
+    return { kind: "found", text: joinStepProof({ step, seedPair, edition }) }
+  } catch (error) {
+    if (error instanceof TimedOut) return { kind: "timedOut" }
+    if (error instanceof Unreachable) return { kind: "unreachable" }
+    if (error instanceof ServerFault) return { kind: "serverFault", message: error.message }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** One GET; its body as text, or `null` for a 404. */
 async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal): Promise<string | null> {
   let response: Response
@@ -134,9 +175,14 @@ async function answer(fetchFn: typeof fetch, path: string, signal: AbortSignal):
   }
 }
 
-async function required(get: (path: string) => Promise<string | null>, path: string, what: string): Promise<string> {
+async function required(
+  get: (path: string) => Promise<string | null>,
+  path: string,
+  what: string,
+  namedBy = "this open",
+): Promise<string> {
   const text = await get(path)
-  if (text === null) throw new ServerFault(`it has no record of ${what} this open names`)
+  if (text === null) throw new ServerFault(`it has no record of ${what} ${namedBy} names`)
   return text
 }
 
@@ -213,8 +259,14 @@ function sameRecord(json: Record<string, unknown>, name: string, asked: string, 
   const value = json[name]
   const same = typeof value === "string" && (exact ? value === asked : value.toLowerCase() === asked.toLowerCase())
   if (!same) {
-    throw new ServerFault(`${what} it sent has a different ${LABEL[name]} from the one ${name === "winId" ? "you asked for" : "the open names"}`)
+    const asked = name === "winId" || name === "stepId"
+    throw new ServerFault(`${what} it sent has a different ${LABEL[name]} from the one ${asked ? "you asked for" : "the open names"}`)
   }
+}
+
+/** The upgrade id in the page's address: `#step=<stepId>` (KAN-1154). Never sent anywhere. */
+export function stepFromFragment(hash: string): string | null {
+  return new URLSearchParams(hash.replace(/^#/, "")).get("step")
 }
 
 /** The win id and item id in the page's address: `#open=<winId>&item=<itemId>`. Never sent anywhere. */

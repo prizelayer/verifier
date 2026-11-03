@@ -336,6 +336,11 @@ export interface VerificationReport {
     /** The cumulative lookup table, one row per slot in ascending `slotIndex` order. */
     cumulative?: CumulativeRow[];
     computedSlotIndex?: number;
+    /**
+     * An upgraded win only: how the library read v over the step's two ranges. With it, `cumulative` is the
+     * step's table (row 0 wins, row 1 loses), never the box's; while the seed is locked neither is set.
+     */
+    computedStepOutcome?: 'won' | 'lost';
     /** The canonical `0x03` snapshot preimage, lowercase hex. Absent if no snapshot was given. */
     snapshotPreimageHex?: string;
     computedSnapshotHash?: string;
@@ -1090,9 +1095,15 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
   }
 
   // Step 4 — the slot. Needs the draw and a usable table.
+  // An upgraded win is never read over the box's ranges: its table is the step's, set below once v is known.
+  if (input.gameKind === 'upgrade') delete trace.cumulative;
   let computedSlotIndex: number | undefined;
   if (derivation === undefined) {
-    skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
+    // The chance shown with an upgrade win needs no seed: its fair text comes from the edition and the staked
+    // slot alone, so a wrong text fails now instead of reading pending until the reveal (owner ruling, KAN-1154).
+    const shownWrong = input.gameKind === 'upgrade' && preimage.ok ? wrongChanceText(input) : undefined;
+    if (shownWrong !== undefined) checks.drawnSlotIndex = shownWrong;
+    else skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
   } else if (!preimage.ok) {
     skip('drawnSlotIndex', 'it needs the prize table, which is unusable');
   } else if (input.gameKind === 'upgrade') {
@@ -1105,6 +1116,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
       checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);
     } else {
       trace.cumulative = cumulativeTable(stepTable(chancePpm));
+      trace.computedStepOutcome = step.value.outcome;
       if (step.value.slotIndex !== undefined) {
         computedSlotIndex = step.value.slotIndex;
         trace.computedSlotIndex = computedSlotIndex;
@@ -1329,6 +1341,31 @@ function uuidKey(uuid: string): string {
 }
 
 /**
+ * The seed-free facts of a locked upgrade win, or undefined when they all hold. Each needs only the edition
+ * and the staked slot, so it fails before the reveal (owner ruling, KAN-1154): a slot the box does not hold
+ * or offers no step has no fair chance, so no shown chance can be fair; a recorded chance that is not the
+ * fair one is wrong whatever v is (the shown text is compared first). The causes keep the two prefixes the
+ * page reads ("chance shown" or "chance recorded", then "fair chance").
+ */
+function wrongChanceText(input: VerificationInput): Check | undefined {
+  const stakedSlot = input.expected.stakedSlotIndex as number;
+  const shown = input.expected.stepChanceCompact as string;
+  const offer = attempt(() => upgradeTarget(input.edition, stakedSlot));
+  if (!offer.ok) {
+    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is not in the box` };
+  }
+  if (offer.value === null) {
+    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is offered no step` };
+  }
+  const fairText = stepChanceText(offer.value.chancePpm);
+  if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
+  const recorded = input.expected.stepChancePpm as number;
+  return recorded === offer.value.chancePpm
+    ? undefined
+    : { ok: false, expected: `chance recorded ${recorded} ppm`, computed: `fair chance ${offer.value.chancePpm} ppm` };
+}
+
+/**
  * The fields every check reads, refused by name when missing or of the wrong type, so a reader
  * sees which input is wrong instead of a runtime error. `serverSeedHex` must be present: `null`
  * means "not revealed yet", while a missing key is a broken input, never a pending one.
@@ -1349,6 +1386,8 @@ function requireShape(input: VerificationInput): void {
   if (input.gameKind === 'upgrade') {
     need(typeof input.expected.stepChancePpm === 'number', 'expected.stepChancePpm (required on an upgrade win)');
     need(typeof input.expected.stepChanceCompact === 'string', 'expected.stepChanceCompact (required on an upgrade win)');
+    // The fair chance is read from the edition even while the seed is locked, so it must be there to read.
+    need(typeof input.edition === 'object' && input.edition !== null && Array.isArray(input.edition.slots), 'edition (required on an upgrade win)');
     need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }

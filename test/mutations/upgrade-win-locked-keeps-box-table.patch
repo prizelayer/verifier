@@ -1,0 +1,12 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9c50a6f..ce5fc58 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1096,7 +1096,6 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+ 
+   // Step 4 — the slot. Needs the draw and a usable table.
+   // An upgraded win is never read over the box's ranges: its table is the step's, set below once v is known.
+-  if (input.gameKind === 'upgrade') delete trace.cumulative;
+   let computedSlotIndex: number | undefined;
+   if (derivation === undefined) {
+     // The chance shown with an upgrade win needs no seed: its fair text comes from the edition and the staked

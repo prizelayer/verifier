@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 0698a5e..8316c22 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -244,7 +244,7 @@ export const UPGRADE_STEPS = [
+     title: "The chance of your upgrade is the fair one.",
+     method: "SHA-256",
+     source:
+-      "Read from the box record: `edition` (its prize table and chances); from the step record: `step.engineType`, `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm`, `step.chanceCompact` and `step.stepNo`.",
++      "Read from the box record: `edition` (its prize table and chances); and `edition.engineType`; from the step record: `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm`, `step.chanceCompact` and `step.stepNo`.",
+     text: [
+       "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
+       "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",

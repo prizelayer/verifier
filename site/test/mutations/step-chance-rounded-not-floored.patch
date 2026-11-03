@@ -1,0 +1,13 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+index 3d40cce..1f8194a 100644
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -150,7 +150,7 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
+               </tr>
+               <tr>
+                 <th scope="row" className="text-left font-medium">Fair chance</th>
+-                <td>{offered ? `${offered.chancePpm.toLocaleString("en")} in 1,000,000 (${percentDown(offered.chancePpm)})` : "none"}</td>
++                <td>{offered ? `${offered.chancePpm.toLocaleString("en")} in 1,000,000 (${percentDown(Math.round(offered.chancePpm / 100) * 100)})` : "none"}</td>
+               </tr>
+             </tbody>
+           </table>

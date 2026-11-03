@@ -2,6 +2,7 @@ import { CHECK_NAMES, STEP_OF, type Check, type CheckName, type VerificationInpu
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups, snapshotGroups } from "./preimage"
 import { Rows } from "./rows"
+import { TwoRanges } from "./upgradeSteps"
 import { CHECK_WORDS } from "./verdict"
 import {
   CHECK_LABELS,
@@ -14,7 +15,10 @@ import {
   STEP1_PENDING,
   STEPS,
   type StepNumber,
+  UPGRADE_WIN_STEP4,
   unusableWords,
+  wrongChanceShown,
+  wrongChanceWords,
 } from "./words"
 
 interface Props {
@@ -35,7 +39,10 @@ export function StepCards({ report, input }: Props) {
 
   return (
     <div className="space-y-6">
-      {STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
+      {STEPS.map((card) => {
+        // An upgraded win's number is read over the step's two ranges, so its card 4 is the step's.
+        const { step, method } = card
+        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? UPGRADE_WIN_STEP4 : card
         const failed = failedSteps.has(step)
         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
@@ -97,7 +104,9 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
             ? CHECK_WORDS[name]
             : check.error !== undefined
               ? inputWords(check.field, check.error, input)
-              : FAIL_WORDS[name]
+              : name === "drawnSlotIndex" && wrongChanceShown(check)
+                ? wrongChanceWords(wrongChanceShown(check)!)
+                : FAIL_WORDS[name]
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
             <span className="font-medium">{CHECK_LABELS[name]}:</span> <span className="font-semibold">{state}</span>
@@ -212,7 +221,10 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
     case 4:
       return (
         <div className="space-y-2">
-          {trace.cumulative ? (
+          {input.gameKind === "upgrade" ? (
+            // The step's two ranges, marked by the library's step outcome; while locked the library leaves none.
+            trace.cumulative ? <TwoRanges ranges={trace.cumulative} value={trace.value} outcome={trace.computedStepOutcome} /> : null
+          ) : trace.cumulative ? (
             <table className="w-full text-xs">
               <caption className="text-left text-sm text-muted-foreground">
                 The ranges{trace.value === undefined ? "" : `; v = ${trace.value.toLocaleString("en")}`}
@@ -247,7 +259,13 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             </table>
           ) : null}
           {checks.drawnSlotIndex ? (
-            <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
+            wrongChanceShown(checks.drawnSlotIndex)?.kind === "recorded" ? (
+              <Compare label="drawnSlotIndex" expectedLabel="Chance we recorded" computedLabel="Fair chance" check={checks.drawnSlotIndex} />
+            ) : wrongChanceShown(checks.drawnSlotIndex) ? (
+              <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel="Fair chance, rounded down" check={checks.drawnSlotIndex} />
+            ) : (
+              <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
+            )
           ) : null}
           {input.snapshot ? (
             <>
