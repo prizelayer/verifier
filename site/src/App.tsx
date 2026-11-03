@@ -193,7 +193,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
       {caveat ? <p data-caveat="yes">{caveat}</p> : null}
       {stepId !== undefined ? (
         <p data-upgrade-win>
-          {UPGRADE_WIN.note} <a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
+          {UPGRADE_WIN.note} {report.status === "verified" ? `${UPGRADE_WIN.passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
         </p>
       ) : null}
     </div>

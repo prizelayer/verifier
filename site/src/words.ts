@@ -244,7 +244,7 @@ export const UPGRADE_STEPS = [
     title: "The chance of your upgrade is the fair one.",
     method: "SHA-256",
     source:
-      "Read from the box record: `edition` (its prize table and chances) and `edition.engineType`; from the step record: `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm` and `step.stepNo`.",
+      "Read from the box record: `edition` (its prize table and chances); from the step record: `step.engineType`, `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm`, `step.chanceCompact` and `step.stepNo`.",
     text: [
       "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
       "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",
@@ -272,19 +272,43 @@ export const UPGRADE_STEPS = [
 ] as const
 
 /**
- * An upgraded win whose slot check failed because the chance shown to the player is not its fair chance
- * (the library writes that cause as "chance shown <text>" / "fair chance <text>"), or null for any other
- * cause. The slot's own words would then be false: no slot was compared, and the seed may still be locked.
+ * Why an upgraded win's slot check failed on its chance, read from the library's words, or null for any
+ * other cause. The slot's own words would then be false: no slot was compared, and the seed may still be
+ * locked. The library writes "chance shown <text>" / "fair chance <text>" for a wrong text, "fair chance
+ * none, slot <n> <why>" when no fair chance exists, and "chance recorded <n> ppm" / "fair chance <n> ppm"
+ * for a recorded chance that is not the fair one.
  */
-export function wrongChanceShown(check: Check | undefined): { shown: string; fair: string } | null {
-  const shown = "chance shown "
-  const fair = "fair chance "
-  if (!check || check.ok || !check.expected?.startsWith(shown) || !check.computed?.startsWith(fair)) return null
-  return { shown: check.expected.slice(shown.length), fair: check.computed.slice(fair.length) }
+export type WrongChance =
+  | { kind: "shown"; shown: string; fair: string }
+  | { kind: "none"; shown: string; slot: string; why: "offered no step" | "not in the box" }
+  | { kind: "recorded"; recorded: number; fair: number }
+
+export function wrongChanceShown(check: Check | undefined): WrongChance | null {
+  if (!check || check.ok || check.expected === undefined || check.computed === undefined) return null
+  const { expected, computed } = check
+  const recorded = /^chance recorded (\d+) ppm$/.exec(expected)
+  const fairPpm = /^fair chance (\d+) ppm$/.exec(computed)
+  if (recorded && fairPpm) return { kind: "recorded", recorded: Number(recorded[1]), fair: Number(fairPpm[1]) }
+  if (!expected.startsWith("chance shown ")) return null
+  const shown = expected.slice("chance shown ".length)
+  const none = /^fair chance none, slot (\d+) is (offered no step|not in the box)$/.exec(computed)
+  if (none) return { kind: "none", shown, slot: none[1], why: none[2] as "offered no step" | "not in the box" }
+  if (!computed.startsWith("fair chance ")) return null
+  return { kind: "shown", shown, fair: computed.slice("fair chance ".length) }
 }
 
-export const wrongChanceWords = ({ shown, fair }: { shown: string; fair: string }) =>
-  `The chance shown with this upgraded win, ${shown}, is not its fair chance rounded down to 0.01 %, which is ${fair}.`
+export function wrongChanceWords(cause: WrongChance): string {
+  switch (cause.kind) {
+    case "shown":
+      return `The chance shown with this upgraded win, ${cause.shown}, is not its fair chance rounded down to 0.01 %, which is ${cause.fair}.`
+    case "none":
+      return cause.why === "offered no step"
+        ? `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up, in slot ${cause.slot}, has no item above it in this box, so no upgrade is offered from it.`
+        : `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up names slot ${cause.slot}, and this box has no slot ${cause.slot}.`
+    case "recorded":
+      return `The chance recorded with this upgraded win, ${cause.recorded.toLocaleString("en")} in 1,000,000, is not its fair chance, ${cause.fair.toLocaleString("en")} in 1,000,000.`
+  }
+}
 
 /** The library's own list, so a check it adds cannot reach the page without its words (each Record below). */
 export type UpgradeStepName = UpgradeStepCheckName
@@ -352,9 +376,23 @@ export const UPGRADE_VERDICT = {
   lost: "Your browser recomputed this upgrade from the data above and got the same result we recorded: the upgrade was lost, and the item you gave up is gone.",
 } as const
 
+/**
+ * Card 4 of the open page for an upgraded win: the step's title and text, since the number was read over
+ * the step's two ranges, never the box's. Its source names the open proof's own fields.
+ */
+export const UPGRADE_WIN_STEP4 = {
+  title: UPGRADE_STEPS[3].title,
+  source:
+    "Read from the open record: `open.stakedSlotIndex`, `open.stepChancePpm`, `open.stepChanceCompact`, `open.drawnSlotIndex` and `open.snapshotHash`; from the box record: the buy-back values of `edition`, which fix the fair chance; from the prize list record: `snapshot.body`.",
+  text: UPGRADE_STEPS[3].text,
+} as const
+
 /** Under the open verdict, when the win was made by an upgrade. */
 export const UPGRADE_WIN = {
   note: "This win was made by an upgrade. Its number is read against the upgrade's two ranges, not against the box's prize table.",
+  /** Under a PASS only: what the open's check leaves to the upgrade's own check (the library's caveat). */
+  passCaveat:
+    "This check did not look at the item given up for it, at the kind of box, or at the number of upgrades in a row; the upgrade's own check does.",
   link: "Check the upgrade that made this win",
 } as const
 
@@ -377,7 +415,7 @@ export const STEP_LOOKUP_WORDS = {
 } as const
 
 /**
- * A step chance in percent, rounded DOWN to two decimals, so it is never shown above the true chance (cto 24259).
+ * A step chance in percent, rounded DOWN to two decimals, so it is never shown above the true chance (owner ruling, KAN-1154).
  * The same string as the server's `chanceCompact` (platform DisplayRounding.renderFloor), "< 0.01%" below 100 ppm
  * included; a step never goes under 10 %, but the two must not differ anywhere.
  */

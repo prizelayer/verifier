@@ -190,38 +190,46 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
     case 4:
       return (
         <div className="space-y-2">
-          {trace.cumulative ? (
-            <table className="w-full text-xs">
-              <caption className="text-left text-sm text-muted-foreground">
-                The two ranges{trace.value === undefined ? "" : `; v = ${trace.value.toLocaleString("en")}`}
-              </caption>
-              <thead>
-                <tr className="text-left">
-                  <th scope="col">Result</th>
-                  <th scope="col">Numbers it owns</th>
-                  <th scope="col">Contains v</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trace.cumulative.map((row) => {
-                  // The library's own reading decides the row; the page does not compare v with the bounds.
-                  const word = row.slotIndex === 0 ? "won" : "lost"
-                  const has = trace.computedOutcome === word
-                  return (
-                    <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
-                      <td>{word}</td>
-                      <td>{`${row.from.toLocaleString("en")} to ${(row.to - 1).toLocaleString("en")}`}</td>
-                      <td>{has ? "yes, here" : ""}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          ) : null}
+          {trace.cumulative ? <TwoRanges ranges={trace.cumulative} value={trace.value} outcome={trace.computedOutcome} /> : null}
           {checks.upgradeOutcome ? (
             <Compare label="upgradeOutcome" expectedLabel="Result we recorded" computedLabel="Result your browser found" check={checks.upgradeOutcome} />
           ) : null}
         </div>
       )
   }
+}
+
+/**
+ * The two ranges of an upgrade, on its own page and under an upgraded win: row 0 wins, row 1 loses, and
+ * the row is marked by the library's own reading of v, never by a slot index.
+ */
+export function TwoRanges({ ranges, value, outcome }: { ranges: readonly { slotIndex: number; from: number; to: number }[]; value: number | undefined; outcome: "won" | "lost" | undefined }) {
+  return (
+    <table className="w-full text-xs">
+      <caption className="text-left text-sm text-muted-foreground">
+        The two ranges{value === undefined ? "" : `; v = ${value.toLocaleString("en")}`}
+      </caption>
+      <thead>
+        <tr className="text-left">
+          <th scope="col">Result</th>
+          <th scope="col">Numbers it owns</th>
+          <th scope="col">Contains v</th>
+        </tr>
+      </thead>
+      <tbody>
+        {ranges.map((row) => {
+          // The library's own reading decides the row; the page does not compare v with the bounds.
+          const word = row.slotIndex === 0 ? "won" : "lost"
+          const has = outcome === word
+          return (
+            <tr key={row.slotIndex} data-contains-v={has ? "yes" : "no"} className={has ? "font-semibold" : ""}>
+              <td>{word}</td>
+              <td>{`${row.from.toLocaleString("en")} to ${(row.to - 1).toLocaleString("en")}`}</td>
+              <td>{has ? "yes, here" : ""}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
 }

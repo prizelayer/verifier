@@ -11,11 +11,12 @@ import { App } from "./App"
 import { lookUpStep, stepFromFragment, API_BASE } from "./lookup"
 import { checkProof, joinStepProof, NOT_A_PROOF, PROOF_FORMAT, STEP_PROOF_FORMAT } from "./proof"
 import { fakeServer } from "./test/fakeServer"
-import { LOST_STEP, UPGRADE_EDITION, UPGRADED_OPEN, upgradeAnswers, WON_STEP } from "./test/upgradeExample"
+import { LOST_STEP, UPGRADE_EDITION, UPGRADED_OPEN, UPGRADED_OPEN_0_TO_1, upgradeAnswers, WON_STEP, WON_STEP_0_TO_1 } from "./test/upgradeExample"
 import { EXAMPLE_PROOF } from "./example"
 import { editionFingerprint, parseEdition } from "@verifier"
 import {
   LOCKED,
+  LOOKUP_WORDS,
   percentDown,
   STEP_LOCKED,
   STEP_LOOKUP_WORDS,
@@ -23,6 +24,7 @@ import {
   UPGRADE_STEP_OF,
   UPGRADE_VERDICT,
   UPGRADE_WIN,
+  UPGRADE_WIN_STEP4,
   type UpgradeStepName,
   wrongChanceWords,
 } from "./words"
@@ -126,6 +128,57 @@ describe("the step page", () => {
     expect(verdictLine()).toBe(UPGRADE_VERDICT.won)
     expect(document.querySelector("[data-check='upgradeChance']")?.getAttribute("data-state")).toBe("match")
     expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("400,000 in 1,000,000 (40.00%)")
+    // Card 2 names where it reads the step's own claims: the step record's, never the box record's (S2).
+    const source = document.querySelector("[data-step='2'] [data-source]")?.textContent ?? ""
+    for (const field of ["step.engineType", "step.editionFingerprint", "step.chanceCompact"]) expect(source).toContain(field)
+    expect(source).not.toContain("edition.engineType")
+  })
+
+  it("shows a step's chance rounded down on card 2: 416,666 ppm is 41.66%, never 41.67%", async () => {
+    const { user } = openWithHash(`#step=${WON_STEP_0_TO_1.stepId}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("416,666 in 1,000,000 (41.66%)")
+  })
+
+  // The address the player's overlay writes (S5 of the review of #16): (a) to (e).
+  it("(a) looks up the open when the address has both #open= and step=", async () => {
+    const { user, server } = openWithHash(`#open=${UPGRADED_OPEN.winId}&step=${WON_STEP.stepId}`)
+    expect((screen.getByRole("radio", { name: STEP_LOOKUP_WORDS.kindOpen }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole("textbox", { name: "Look up an open by its id" }) as HTMLInputElement).value).toBe(UPGRADED_OPEN.winId)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    expect(server.calls[0]?.url).toBe(`${API_BASE}/verify/opens/${UPGRADED_OPEN.winId}`)
+  })
+
+  it("(b) opens the upgrade choice with an empty box and no lookup for an empty #step=", () => {
+    const { server } = openWithHash("#step=")
+    expect((screen.getByRole("radio", { name: STEP_LOOKUP_WORDS.kindStep }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole("textbox", { name: STEP_LOOKUP_WORDS.label }) as HTMLInputElement).value).toBe("")
+    expect((screen.getByRole("button", { name: "Look up" }) as HTMLButtonElement).disabled).toBe(true)
+    expect(server.calls).toEqual([])
+  })
+
+  it("(c) says an upgrade id is not one in the upgrade's words, fetching nothing", async () => {
+    const { user, server } = openWithHash("#step=not-an-id")
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(screen.getByText(STEP_LOOKUP_WORDS.notAnId)).toBeTruthy())
+    expect(screen.queryByText(LOOKUP_WORDS.notAnId)).toBeNull()
+    expect(server.calls).toEqual([])
+  })
+
+  it("(d) says an unknown upgrade was not found, in the upgrade's words", async () => {
+    const { user } = openWithHash("#step=00000000-0000-4000-8000-000000000000")
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(screen.getByText(STEP_LOOKUP_WORDS.notFound)).toBeTruthy())
+    expect(screen.queryByText(LOOKUP_WORDS.notFound)).toBeNull()
+  })
+
+  it("(e) accepts an upper-case upgrade id and fetches it in lower case", async () => {
+    const { user, server } = openWithHash(`#step=${WON_STEP.stepId.toUpperCase()}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    expect(server.calls[0]?.url).toBe(`${API_BASE}/verify/upgrade-steps/${WON_STEP.stepId}`)
   })
 
   it("shows a lost step as checked and lost, with the losing range marked, never as a win", async () => {
@@ -151,7 +204,7 @@ describe("the step page", () => {
     expect(document.querySelector("[data-step='4']")?.getAttribute("data-failed")).toBe("yes")
   })
 
-  // Every check of a step fails on its own forged answer, with its own card and words (cto, KAN-1154 E2 brief).
+  // Every check of a step fails on its own forged answer, with its own card and words (owner ruling, KAN-1154).
   // The answers are tampered where the page reads them: the step, its seed pair or its box.
   const SEED = EXAMPLE_PROOF.seedPair
   const forged: [UpgradeStepName, (a: { step: object; seedPair: object; edition: object }) => Promise<void> | void][] = [
@@ -206,10 +259,48 @@ describe("the step page", () => {
     await waitFor(() => expect(verdictWord()).toBe("PASS"))
     const note = document.querySelector("[data-upgrade-win]")
     expect(note?.textContent).toContain(UPGRADE_WIN.note)
+    // A PASS says what the open's check left to the upgrade's own (S4 of the review of #16).
+    expect(note?.textContent).toContain(UPGRADE_WIN.passCaveat)
     expect(screen.getByRole("link", { name: UPGRADE_WIN.link }).getAttribute("href")).toBe(`#step=${WON_STEP.stepId}`)
   })
 
-  // E2, eleonora's MUSTs from 24616: an upgraded win shown at a wrong chance fails on the chance's own words,
+  // Card 4 of an upgraded win is the step's: its two ranges, marked by the library's step outcome, never by
+  // the target's slot index (MUST-1 of the review of #16). From slot 0 to slot 1, the index would mark "lost".
+  function openZeroToOne(locked: boolean) {
+    const answers = upgradeAnswers()
+    if (locked) answers.set(`/verify/seed-pairs/${SEED.seedPairId}`, { status: 200, body: JSON.stringify({ ...SEED, revealedServerSeed: null }) })
+    window.location.hash = `#open=${UPGRADED_OPEN_0_TO_1.winId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    return user
+  }
+
+  it("marks the winning range of an upgraded win from slot 0 to slot 1, at 416,666 ppm", async () => {
+    const user = openZeroToOne(false)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    const card = document.querySelector("[data-step='4']")
+    const marked = card?.querySelectorAll("[data-contains-v='yes']")
+    expect(marked?.length).toBe(1)
+    expect(marked?.[0]?.textContent).toContain("won")
+    expect(marked?.[0]?.textContent).toContain("0 to 416,665")
+    // The rows are the step's results, never named as box slots.
+    expect(Array.from(card?.querySelectorAll("th") ?? []).map((th) => th.textContent)).toEqual(["Result", "Numbers it owns", "Contains v"])
+    expect(card?.textContent).toContain(UPGRADE_WIN_STEP4.text[0])
+    expect(card?.querySelector("[data-source]")?.textContent).toBe(UPGRADE_WIN_STEP4.source.replaceAll("`", ""))
+  })
+
+  it("draws no box range for an upgraded win while the secret is locked", async () => {
+    const user = openZeroToOne(true)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("CANNOT CHECK YET"))
+    const card = document.querySelector("[data-step='4']")
+    expect(card?.querySelector("table")).toBeNull()
+    expect(card?.querySelector("[data-contains-v]")).toBeNull()
+    expect(document.querySelector("[data-upgrade-win]")?.textContent).not.toContain(UPGRADE_WIN.passCaveat)
+  })
+
+  // E2 (owner ruling, KAN-1154): an upgraded win shown at a wrong chance fails on the chance's own words,
   // never on the slot's, and also while the secret is still locked (the fair chance needs no seed).
   function openWrongChance(locked: boolean) {
     const answers = upgradeAnswers()
@@ -221,7 +312,7 @@ describe("the step page", () => {
     render(<App fetchFn={fakeServer(answers).fetchFn} />)
     return user
   }
-  const chanceWords = wrongChanceWords({ shown: "41.00%", fair: "40.00%" })
+  const chanceWords = wrongChanceWords({ kind: "shown", shown: "41.00%", fair: "40.00%" })
 
   it("fails an upgraded win shown at a wrong chance, on the chance's words and not the slot's", async () => {
     const user = openWrongChance(false)
@@ -233,6 +324,7 @@ describe("the step page", () => {
     expect(card?.textContent).toContain(chanceWords)
     expect(document.body.textContent).toContain("Chance shown to you")
     expect(document.body.textContent).not.toContain("Slot we recorded")
+    expect(document.querySelector("[data-upgrade-win]")?.textContent).not.toContain(UPGRADE_WIN.passCaveat)
   })
 
   it("fails it the same way while the secret is still locked, and says the draw waits", async () => {
@@ -242,6 +334,36 @@ describe("the step page", () => {
     expect(verdictLine()).toBe(`Step 4 does not match: ${chanceWords}`)
     expect(document.querySelector("[data-check='drawnPpmValue']")?.getAttribute("data-state")).toBe("not-run")
     expect(document.body.textContent).not.toContain("lands on a different slot")
+  })
+
+  // N-1 A extended (owner ruling, KAN-1154): the other seed-free faults of a locked upgraded win fail on their own words.
+  async function lockedOpen(change: object) {
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/opens/${UPGRADED_OPEN.winId}`, ok({ ...UPGRADED_OPEN, ...change }))
+    answers.set(`/verify/seed-pairs/${SEED.seedPairId}`, ok({ ...SEED, revealedServerSeed: null }))
+    window.location.hash = `#open=${UPGRADED_OPEN.winId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("FAIL"))
+  }
+
+  it("fails a locked upgraded win whose staked slot is offered no step, saying why", async () => {
+    await lockedOpen({ stakedSlotIndex: 3, stepChanceCompact: "99.00%" })
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "none", shown: "99.00%", slot: "3", why: "offered no step" })}`)
+  })
+
+  it("fails a locked upgraded win whose staked slot is not in the box, saying why", async () => {
+    await lockedOpen({ stakedSlotIndex: 9, stepChanceCompact: "99.00%" })
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "none", shown: "99.00%", slot: "9", why: "not in the box" })}`)
+  })
+
+  it("fails a locked upgraded win whose recorded chance is not the fair one, under the recorded chance's labels", async () => {
+    await lockedOpen({ stepChancePpm: 416666 })
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "recorded", recorded: 416666, fair: 400000 })}`)
+    expect(document.body.textContent).toContain("Chance we recorded")
+    expect(document.body.textContent).not.toContain("Chance shown to you")
   })
 
   it("follows the link to the step without a reload, and looks the step up", async () => {

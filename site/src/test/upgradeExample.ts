@@ -75,6 +75,32 @@ export const UPGRADED_OPEN = {
   stepOutcome: "won",
 }
 
+/**
+ * A won step from the cheapest item (slot 0, 5 EUR) to the next one up (slot 1, 12 EUR): 500 / 1200 is
+ * 416 666 ppm, a chance whose floor (41.66%) and rounding (41.67%) differ. The target is slot 1, so a
+ * range marked by the slot index would be the LOSING one (review of #16, finding 1).
+ */
+export const WON_STEP_0_TO_1 = {
+  ...WON_STEP,
+  stepId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e04",
+  stakedSlotIndex: 0,
+  targetSlotIndex: 1,
+  chancePpm: 416666,
+  chanceCompact: "41.66%",
+  newWinId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e05",
+}
+
+/** The open answer for the win WON_STEP_0_TO_1 made. */
+export const UPGRADED_OPEN_0_TO_1 = {
+  ...UPGRADED_OPEN,
+  winId: WON_STEP_0_TO_1.newWinId,
+  drawnSlotIndex: 1,
+  upgradeStepId: WON_STEP_0_TO_1.stepId,
+  stakedSlotIndex: 0,
+  stepChancePpm: 416666,
+  stepChanceCompact: "41.66%",
+}
+
 /** Every answer above, by path, as the fake server serves them. */
 export function upgradeAnswers(): Map<string, Answer> {
   const ok = (body: unknown): Answer => ({ status: 200, body: JSON.stringify(body) })
@@ -82,6 +108,8 @@ export function upgradeAnswers(): Map<string, Answer> {
     [`/verify/upgrade-steps/${WON_STEP.stepId}`, ok(WON_STEP)],
     [`/verify/upgrade-steps/${LOST_STEP.stepId}`, ok(LOST_STEP)],
     [`/verify/opens/${UPGRADED_OPEN.winId}`, ok(UPGRADED_OPEN)],
+    [`/verify/upgrade-steps/${WON_STEP_0_TO_1.stepId}`, ok(WON_STEP_0_TO_1)],
+    [`/verify/opens/${UPGRADED_OPEN_0_TO_1.winId}`, ok(UPGRADED_OPEN_0_TO_1)],
     [`/verify/seed-pairs/${SEED_PAIR.seedPairId}`, ok(SEED_PAIR)],
     [`/verify/editions/${UPGRADE_EDITION.editionId}`, ok(UPGRADE_EDITION)],
   ])

@@ -1,13 +1,13 @@
 diff --git a/site/src/words.ts b/site/src/words.ts
-index 444c5bb..89c7ae3 100644
+index 0698a5e..0b0c2c3 100644
 --- a/site/src/words.ts
 +++ b/site/src/words.ts
-@@ -279,7 +279,7 @@ export const UPGRADE_STEPS = [
- export function wrongChanceShown(check: Check | undefined): { shown: string; fair: string } | null {
-   const shown = "chance shown "
-   const fair = "fair chance "
--  if (!check || check.ok || !check.expected?.startsWith(shown) || !check.computed?.startsWith(fair)) return null
-+  if (!check || check.ok || check.expected?.startsWith(shown) || !check.computed?.startsWith(fair)) return null
-   return { shown: check.expected.slice(shown.length), fair: check.computed.slice(fair.length) }
- }
- 
+@@ -289,7 +289,7 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
+   const recorded = /^chance recorded (\d+) ppm$/.exec(expected)
+   const fairPpm = /^fair chance (\d+) ppm$/.exec(computed)
+   if (recorded && fairPpm) return { kind: "recorded", recorded: Number(recorded[1]), fair: Number(fairPpm[1]) }
+-  if (!expected.startsWith("chance shown ")) return null
++  if (expected.startsWith("chance shown ")) return null
+   const shown = expected.slice("chance shown ".length)
+   const none = /^fair chance none, slot (\d+) is (offered no step|not in the box)$/.exec(computed)
+   if (none) return { kind: "none", shown, slot: none[1], why: none[2] as "offered no step" | "not in the box" }

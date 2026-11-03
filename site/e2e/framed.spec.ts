@@ -36,8 +36,13 @@ test.beforeAll(async () => {
     return { type: TYPES[extname(file)] ?? "application/octet-stream", body: await readFile(file) }
   })
   // The host page frames the page with the overlay's sandbox, as the player does.
-  const frame = `<iframe sandbox="allow-scripts allow-same-origin" src="${origin(page)}/#open=${WIN}" style="width:900px;height:900px"></iframe>`
-  host = await serve(async (path) => (path === "/" ? { type: "text/html", body: `<!doctype html><title>host</title>${frame}` } : null))
+  // "/" frames an open's address, "/step" an upgrade's (the player's stepFrameSrc, KAN-1154).
+  const frame = (fragment: string) =>
+    `<iframe sandbox="allow-scripts allow-same-origin" src="${origin(page)}/#${fragment}" style="width:900px;height:900px"></iframe>`
+  const hostPages: Record<string, string> = { "/": frame(`open=${WIN}`), "/step": frame(`step=${WIN}`) }
+  host = await serve(async (path) =>
+    path in hostPages ? { type: "text/html", body: `<!doctype html><title>host</title>${hostPages[path]}` } : null,
+  )
 })
 test.afterAll(() => {
   page.close()
@@ -69,4 +74,27 @@ test("Look up works in a frame sandboxed with allow-scripts allow-same-origin on
   expect(blocked).toEqual([])
 })
 
-// Refs: KAN-1205
+test("an upgrade's Look up works in the same sandboxed frame", async ({ page: tab, context }) => {
+  const refused: string[] = []
+  await context.route(/^(https?|wss?):\/\/(?!127\.0\.0\.1[:/])/, (route) => {
+    refused.push(route.request().url())
+    return route.abort()
+  })
+  const blocked: string[] = []
+  tab.on("console", (m) => {
+    if (/form submission|allow-forms/i.test(m.text())) blocked.push(m.text())
+  })
+
+  await tab.goto(`${origin(host)}/step`)
+  const framed = tab.frameLocator("iframe")
+  await expect(framed.getByRole("textbox", { name: "Look up an upgrade by its id" })).toHaveValue(WIN)
+  expect(refused).toEqual([])
+
+  await framed.getByRole("button", { name: "Look up" }).click()
+
+  await expect(framed.getByText("Your browser could not reach our server.")).toBeVisible()
+  expect(refused).toEqual([`${ENVIRONMENT.api}/verify/upgrade-steps/${WIN}`])
+  expect(blocked).toEqual([])
+})
+
+// Refs: KAN-1205, KAN-1154

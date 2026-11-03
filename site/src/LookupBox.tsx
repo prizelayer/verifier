@@ -48,6 +48,14 @@ export function LookupBox({
   useEffect(() => {
     current.current = { winId, shownText }
   })
+  // False once this box is gone (the page remounts it for a new address), so its late answer lands nowhere.
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
 
   async function press() {
     // While busy the button keeps its focus (aria-disabled, not disabled), so a press is ignored here.
@@ -75,7 +83,7 @@ export function LookupBox({
       setBusy(false)
       onBusy?.(false)
     }
-    if (normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
+    if (!alive.current || normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
     setResult({ asked, kind, result: found })
     if (found.kind === "found") onFound(found.text)
   }

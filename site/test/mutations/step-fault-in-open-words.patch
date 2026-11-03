@@ -1,0 +1,13 @@
+diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
+index a9a9862..f55b5fa 100644
+--- a/site/src/LookupBox.tsx
++++ b/site/src/LookupBox.tsx
+@@ -192,7 +192,7 @@ export function LookupBox({
+ const FAULT = "border-l-2 border-fail pl-3 text-fail"
+ 
+ function LookupWords({ result, kind }: { result: LookupResult; kind: Kind }) {
+-  const words = kind === "step" ? STEP_LOOKUP_WORDS : LOOKUP_WORDS
++  const words = kind === "step" && result.kind === "found" ? STEP_LOOKUP_WORDS : LOOKUP_WORDS
+   switch (result.kind) {
+     case "found":
+       return <p>{words.found}</p>

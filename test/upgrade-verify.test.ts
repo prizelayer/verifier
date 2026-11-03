@@ -374,7 +374,7 @@ describe('verify on an upgrade win', () => {
     }
   });
 
-  // E2 N-1 (eleonora, A): the shown chance needs no seed, so it is checked while the seed is still locked.
+  // E2 N-1 (owner ruling, KAN-1154): the shown chance needs no seed, so it is checked while the seed is still locked.
   it('fails a wrong shown chance while the seed is locked, naming both texts', async () => {
     const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '41.00%' } });
     assert.equal(report.status, 'failed', report.summary);
@@ -398,6 +398,69 @@ describe('verify on an upgrade win', () => {
     });
     assert.equal(report.status, 'failed', report.summary);
     assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.66%', computed: 'fair chance 40.00%' });
+  });
+
+  // The other seed-free facts of a locked upgrade win fail too (owner ruling, KAN-1154): none needs the seed.
+  it('fails a locked upgrade win whose staked slot is offered no step', async () => {
+    // Slot 3 holds the top buy-back value of the box, so no step is offered from it.
+    const report = await verify({
+      ...upgradeWin,
+      serverSeedHex: null,
+      expected: { ...upgradeWin.expected, stakedSlotIndex: 3, stepChanceCompact: '99.00%' },
+    });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
+    assert.deepEqual(report.checks.drawnSlotIndex, {
+      ok: false,
+      expected: 'chance shown 99.00%',
+      computed: 'fair chance none, slot 3 is offered no step',
+    });
+  });
+
+  it('fails a locked upgrade win whose staked slot is not in the box', async () => {
+    const report = await verify({
+      ...upgradeWin,
+      serverSeedHex: null,
+      expected: { ...upgradeWin.expected, stakedSlotIndex: 9, stepChanceCompact: '99.00%' },
+    });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.deepEqual(report.checks.drawnSlotIndex, {
+      ok: false,
+      expected: 'chance shown 99.00%',
+      computed: 'fair chance none, slot 9 is not in the box',
+    });
+  });
+
+  it('fails a locked upgrade win whose recorded chance is not the fair one, under the fair text', async () => {
+    const report = await verify({
+      ...upgradeWin,
+      serverSeedHex: null,
+      expected: { ...upgradeWin.expected, stepChancePpm: 416_666, stepChanceCompact: '40.00%' },
+    });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.deepEqual(report.checks.drawnSlotIndex, {
+      ok: false,
+      expected: 'chance recorded 416666 ppm',
+      computed: 'fair chance 400000 ppm',
+    });
+  });
+
+  it('fails a locked upgrade win whose shown text only differs by a trailing space', async () => {
+    const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '40.00% ' } });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 40.00% ', computed: 'fair chance 40.00%' });
+  });
+
+  it('draws no box range for a locked upgrade win, and the step table with its outcome once revealed', async () => {
+    const locked = await verify({ ...upgradeWin, serverSeedHex: null });
+    assert.equal(locked.trace.cumulative, undefined);
+    assert.equal(locked.trace.computedStepOutcome, undefined);
+    const revealed = await verify(upgradeWin);
+    assert.equal(revealed.trace.computedStepOutcome, 'won');
+    assert.deepEqual(
+      revealed.trace.cumulative?.map((r) => r.slotIndex),
+      [0, 1],
+    );
   });
 
   it('refuses a locked upgrade win without its edition or its staked slot, never pending', async () => {

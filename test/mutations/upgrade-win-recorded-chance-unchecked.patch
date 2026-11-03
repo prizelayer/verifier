@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 9c50a6f..d1d04b8 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1370,7 +1370,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
+   const fairText = stepChanceText(offer.value.chancePpm);
+   if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
+   const recorded = input.expected.stepChancePpm as number;
+-  return recorded === offer.value.chancePpm
++  return recorded !== -1
+     ? undefined
+     : { ok: false, expected: `chance recorded ${recorded} ppm`, computed: `fair chance ${offer.value.chancePpm} ppm` };
+ }

@@ -1,13 +1,13 @@
 diff --git a/site/src/LookupBox.tsx b/site/src/LookupBox.tsx
-index be5d6a0..2a4f4d4 100644
+index a9a9862..2329e63 100644
 --- a/site/src/LookupBox.tsx
 +++ b/site/src/LookupBox.tsx
-@@ -75,7 +75,7 @@ export function LookupBox({
+@@ -83,7 +83,7 @@ export function LookupBox({
        setBusy(false)
        onBusy?.(false)
      }
--    if (normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
-+    if (normalId(current.current.winId) !== asked || (current.current.shownText !== boxAtPress && false)) return
+-    if (!alive.current || normalId(current.current.winId) !== asked || current.current.shownText !== boxAtPress) return
++    if (!alive.current || normalId(current.current.winId) !== asked || (current.current.shownText !== boxAtPress && false)) return
      setResult({ asked, kind, result: found })
      if (found.kind === "found") onFound(found.text)
    }
