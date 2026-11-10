@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 14004fd..dba8e41 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -130,7 +130,6 @@ export const LOCKED =
+   "The secret for this open is still locked, because it is still being used for your next opens. " +
+   'It is revealed when you press "Start a new pair", or, once its pair has served 1,000 opens or is ' +
+   "more than 24 hours old, at your next open or your next visit to a box page. " +
+-  'In the player page, press "Fair" to open "Your fairness pair": "Start a new pair" is there. ' +
+   "Until then your browser can check the chances (step 2) and, when the proof has one, the prize list, " +
+   "but not the pick itself."
+ 

@@ -6,7 +6,7 @@ import { App } from "./App"
 import { EXAMPLE_PROOF } from "./example"
 import { API_BASE, lookUp } from "./lookup"
 import { exampleAnswers, fakeServer } from "./test/fakeServer"
-import { FIRST_VISIT, LOCKED, LOOKUP_WORDS, STEPS } from "./words"
+import { FIRST_VISIT, LOCKED, LOOKUP_WORDS, NOT_PROVEN_SEEDS, STEPS } from "./words"
 
 /**
  * The first visit: the block above the inputs, the id the lookup expects, what a lookup
@@ -107,8 +107,21 @@ describe("the pending verdict", () => {
     expect(LOCKED).toBe(
       "The secret for this open is still locked, because it is still being used for your next opens. " +
         'It is revealed when you press "Start a new pair", or, once its pair has served 1,000 opens or is more than 24 hours old, at your next open or your next visit to a box page. ' +
-        '"Start a new pair" is in the player page, under the Open button, in Details. ' +
+        'In the player page, press "Fair" to open "Your fairness pair": "Start a new pair" is there. ' +
         "Until then your browser can check the chances (step 2) and, when the proof has one, the prize list, but not the pick itself.",
+    )
+  })
+
+  // Approved words (ADR-KAN-40, amendment 2026-11-10): the player page's pair is behind the word
+  // "Fair", so the sentence names that word and never the place under the Open button.
+  it("prints the approved NOT_PROVEN_SEEDS paragraph word for word", () => {
+    expect(NOT_PROVEN_SEEDS).toBe(
+      "This page reads the fingerprint and the client seed from our server. " +
+        "On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed. " +
+        'In the player page, press "Fair" before you open a box: "Your fairness pair" shows the whole fingerprint and lets you copy it. ' +
+        "If you kept a copy from before your open, check that it is the fingerprint in step 1. " +
+        "When our server creates a fingerprint for a player, it writes a record in its audit log. " +
+        "This page does not check that record.",
     )
   })
 

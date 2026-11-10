@@ -111,16 +111,27 @@ export const FIRST_VISIT = {
 export const PROOF_EXPLAINED =
   'A proof is the four public records of one open (the open, its seed pair, its box and its prize list), saved as one JSON text that starts with {"format": "prizelayer-proof/1". "Look up" writes it here. You can save it, and check it later, even offline.'
 
-/** "What this does not prove", paragraph 2: what the page cannot tell on its own. */
+/**
+ * "What this does not prove", paragraph 2: what the page cannot tell on its own. The player page's
+ * place is named by the word a player presses, "Fair" (the header pill and the phone's tab), never by
+ * a position: the position moved once, when the Details link under the Open button became the pill
+ * (KAN-1052). The words are Leo's approved set; they change only with his answer (ADR-KAN-40,
+ * amendment 2026-11-10).
+ * Refs: KAN-40, KAN-1391
+ */
 export const NOT_PROVEN_SEEDS =
-  "This page reads the fingerprint and the client seed from our server. On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed. The player page shows the fingerprint under the Open button before you press it, and lets you copy it whole under Details. If you kept a copy from before your open, check that it is the fingerprint in step 1. When our server creates a fingerprint for a player, it writes a record in its audit log. This page does not check that record."
+  'This page reads the fingerprint and the client seed from our server. On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed. In the player page, press "Fair" before you open a box: "Your fairness pair" shows the whole fingerprint and lets you copy it. If you kept a copy from before your open, check that it is the fingerprint in step 1. When our server creates a fingerprint for a player, it writes a record in its audit log. This page does not check that record.'
 
-/** The pending verdict: what is still locked, when it opens, and what can be checked meanwhile. */
+/**
+ * The pending verdict: what is still locked, when it opens, and what can be checked meanwhile. Where
+ * "Start a new pair" is: behind "Fair", as in NOT_PROVEN_SEEDS. Approved words (ADR-KAN-40).
+ * Refs: KAN-40, KAN-1391
+ */
 export const LOCKED =
   "The secret for this open is still locked, because it is still being used for your next opens. " +
   'It is revealed when you press "Start a new pair", or, once its pair has served 1,000 opens or is ' +
   "more than 24 hours old, at your next open or your next visit to a box page. " +
-  '"Start a new pair" is in the player page, under the Open button, in Details. ' +
+  'In the player page, press "Fair" to open "Your fairness pair": "Start a new pair" is there. ' +
   "Until then your browser can check the chances (step 2) and, when the proof has one, the prize list, " +
   "but not the pick itself."
 
