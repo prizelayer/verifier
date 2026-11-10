@@ -88,7 +88,7 @@ done < "$here/storage-apis.txt"
 # The words that must be there, and the sentences that must not be: the claims the page cannot prove, and
 # the two sentences that stopped being true once the player page showed the fingerprint before play and let a
 # player set the client seed, so they cannot come back. "under the Open button" stopped being true when the
-# player page moved its pair behind the word "Fair" (KAN-1227); the page names that word instead (KAN-1391).
+# player page moved its pair behind the word "Fair" (KAN-1052); the page names that word instead (KAN-1391).
 for required in 'Check an open yourself' 'What this does not prove' \
   'The secret we revealed is the one we registered.' 'The chances are the ones recorded on your open.' \
   'The pick itself.' 'From the number to your item.' \

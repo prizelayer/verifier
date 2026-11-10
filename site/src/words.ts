@@ -114,8 +114,9 @@ export const PROOF_EXPLAINED =
 /**
  * "What this does not prove", paragraph 2: what the page cannot tell on its own. The player page's
  * place is named by the word a player presses, "Fair" (the header pill and the phone's tab), never by
- * a position: the position moved once, when the line under the Open button became the pill (KAN-1227).
- * The words are Leo's approved set; they change only with his answer (ADR-KAN-40, amendment 2026-11-10).
+ * a position: the position moved once, when the Details link under the Open button became the pill
+ * (KAN-1052). The words are Leo's approved set; they change only with his answer (ADR-KAN-40,
+ * amendment 2026-11-10).
  * Refs: KAN-40, KAN-1391
  */
 export const NOT_PROVEN_SEEDS =
