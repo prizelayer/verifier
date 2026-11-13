@@ -1,5 +1,5 @@
 import type { CheckName, UpgradeStepReport, VerificationReport } from "@verifier"
-import { FAIL_WORDS, LOCKED, wrongChanceShown, wrongChanceWords, STEP_LOCKED, UPGRADE_FAIL_WORDS, UPGRADE_STEP_OF, UPGRADE_VERDICT, type UpgradeStepName, unusableWords } from "./words"
+import { FAIL_WORDS, LOCKED, wrongChanceShown, wrongChanceWords, STEP_LOCKED, UPGRADE_STEP_OF, UPGRADE_VERDICT, type UpgradeStepName, unusableWords, upgradeCheckWords } from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
 export const CHECK_WORDS: Record<CheckName, string> = {
@@ -59,9 +59,10 @@ export function caveatOf(report: VerificationReport): string | null {
 
 /**
  * The verdict of an upgrade step (KAN-1154). PASS means the check matched, whatever the step's result;
- * the line then says plainly whether it was won or lost, and a lost step is never worded as a win.
+ * the line then says plainly whether it was won or lost, and a lost step is never worded as a win. A FAIL
+ * uses the words of the edition's version (`engineVersion`, KAN-1567), or version 1's when there is none.
  */
-export function stepVerdictOf(report: UpgradeStepReport): { word: string; line: string } {
+export function stepVerdictOf(report: UpgradeStepReport, engineVersion?: number): { word: string; line: string } {
   switch (report.status) {
     case "verified":
       return { word: "PASS", line: report.trace.computedOutcome === "won" ? UPGRADE_VERDICT.won : UPGRADE_VERDICT.lost }
@@ -74,7 +75,7 @@ export function stepVerdictOf(report: UpgradeStepReport): { word: string; line: 
         line:
           failure.field !== undefined
             ? `Step ${step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
-            : `Step ${step} does not match: ${UPGRADE_FAIL_WORDS[failure.check as UpgradeStepName]}`,
+            : `Step ${step} does not match: ${upgradeCheckWords(engineVersion).fail[failure.check as UpgradeStepName]}`,
       }
     }
     case "pending":

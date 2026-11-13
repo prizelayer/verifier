@@ -21,11 +21,18 @@ import {
   STEP_LOCKED,
   STEP_LOOKUP_WORDS,
   UPGRADE_FAIL_WORDS,
+  UPGRADE_CHECK_LABELS,
+  UPGRADE_CHECK_WORDS,
+  UPGRADE_JUMP_WORDS,
   UPGRADE_STEP_OF,
+  UPGRADE_STEPS,
+  UPGRADE_TARGET_ROW,
   UPGRADE_VERDICT,
   UPGRADE_WIN,
   UPGRADE_WIN_STEP4,
   type UpgradeStepName,
+  upgradeCheckWords,
+  wrongChanceShown,
   wrongChanceWords,
 } from "./words"
 
@@ -214,10 +221,11 @@ describe("the step page", () => {
     [
       "engineVersion",
       async (a) => {
-        // A version-2 box whose fingerprint is its own true one: only the version can fail.
-        const v2 = { ...UPGRADE_EDITION, engineVersion: 2 }
-        const fp = await editionFingerprint(parseEdition(v2))
-        a.edition = { ...v2, editionFingerprint: fp }
+        // A version-3 box whose fingerprint is its own true one: only the version can fail. Version 3, since the
+        // page checks versions 1 and 2 (KAN-1567).
+        const v3 = { ...UPGRADE_EDITION, engineVersion: 3 }
+        const fp = await editionFingerprint(parseEdition(v3))
+        a.edition = { ...v3, editionFingerprint: fp }
         a.step = { ...a.step, editionFingerprint: fp }
       },
     ],
@@ -253,6 +261,111 @@ describe("the step page", () => {
     })
   }
 
+  // Version 2 (KAN-1567): a step may name any more valuable item of the box at 1 % or more, so card 2 names
+  // the target without saying it is the next one up.
+  it("names the item a version 1 step aims at 'Next item up'", async () => {
+    const { user } = openWithHash(`#step=${WON_STEP.stepId}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    const values = document.querySelector("[data-upgrade-values]")?.textContent ?? ""
+    expect(values).toContain(`${UPGRADE_TARGET_ROW.nextUp}slot 2, buy-back value 3000 cents`)
+    expect(values).not.toContain(UPGRADE_TARGET_ROW.target)
+  })
+
+  it("checks a version 2 jump past the next item up, and names its item 'Target item'", async () => {
+    // The worked box on version 2, with its own true fingerprint: 12 EUR (slot 1) staked for 80 EUR (slot 3),
+    // past 30 EUR, at 1200 / 8000 = 150,000 ppm. Nonce 1 draws 186,669, so the jump is lost.
+    const editionV2 = { ...UPGRADE_EDITION, editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a12", engineVersion: 2 }
+    const fp = await editionFingerprint(parseEdition(editionV2))
+    const jump = {
+      ...LOST_STEP,
+      stepId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e21",
+      engineVersion: 2,
+      editionId: editionV2.editionId,
+      editionFingerprint: fp,
+      nonce: 1,
+      drawnPpmValue: 186669,
+      targetSlotIndex: 3,
+      chancePpm: 150000,
+      chanceCompact: "15.00%",
+    }
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/upgrade-steps/${jump.stepId}`, ok(jump))
+    answers.set(`/verify/editions/${editionV2.editionId}`, ok({ ...editionV2, editionFingerprint: fp }))
+    window.location.hash = `#step=${jump.stepId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    expect(verdictLine()).toBe(UPGRADE_VERDICT.lost)
+    expect(document.querySelector("[data-check='upgradeTarget']")?.getAttribute("data-state")).toBe("match")
+    const values = document.querySelector("[data-upgrade-values]")?.textContent ?? ""
+    expect(values).toContain(`${UPGRADE_TARGET_ROW.target}slot 3, buy-back value 8000 cents`)
+    expect(values).toContain("150,000 in 1,000,000 (15.00%)")
+    expect(values).not.toContain(UPGRADE_TARGET_ROW.nextUp)
+    // Card 2 and its checks in version 2's words: no sentence says the item is the next one up, or 10 %.
+    const card = document.querySelector("[data-step='2']")?.textContent ?? ""
+    for (const p of UPGRADE_JUMP_WORDS.step2Text) expect(card).toContain(p)
+    expect(card).not.toContain(UPGRADE_STEPS[1].text[0])
+    expect(card).not.toContain(UPGRADE_STEPS[1].text[2])
+    expect(document.querySelector("[data-check='engineVersion']")?.textContent).toContain(UPGRADE_JUMP_WORDS.checkWords.engineVersion)
+    expect(document.querySelector("[data-check='upgradeTarget']")?.textContent).toContain(UPGRADE_JUMP_WORDS.checkWords.upgradeTarget)
+    expect(document.querySelector("[data-check='upgradeTarget']")?.textContent).toContain(`${UPGRADE_JUMP_WORDS.labels.upgradeTarget}:`)
+    expect(card).not.toContain("next one up from the item you gave up")
+  })
+
+  it("keeps version 1's words on card 2 of a version 1 step", async () => {
+    const { user } = openWithHash(`#step=${WON_STEP.stepId}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    const card = document.querySelector("[data-step='2']")?.textContent ?? ""
+    for (const p of UPGRADE_STEPS[1].text) expect(card).toContain(p)
+    expect(card).not.toContain(UPGRADE_JUMP_WORDS.step2Text[0])
+    expect(document.querySelector("[data-check='upgradeTarget']")?.textContent).toContain(UPGRADE_CHECK_WORDS.upgradeTarget)
+    expect(upgradeCheckWords(1)).toEqual({ labels: UPGRADE_CHECK_LABELS, ok: UPGRADE_CHECK_WORDS, fail: UPGRADE_FAIL_WORDS })
+  })
+
+  // Version 1's words as literals copied from the published page (c2a8ca4). The test above compares the page
+  // with the constants, so it cannot see a constant that was edited; this one can.
+  it("shows version 1's words byte for byte, as published", async () => {
+    const { user } = openWithHash(`#step=${WON_STEP.stepId}`)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    const card = document.querySelector("[data-step='2']")?.textContent ?? ""
+    for (const sentence of [
+      "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
+      "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",
+      "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is the next one up from yours, and that the chance is exactly that value. There is no upgrade below a 10% chance, and at most 3 in a row.",
+    ]) expect(card).toContain(sentence)
+    expect(document.querySelector("[data-check='engineVersion']")?.textContent).toContain(
+      "The box uses version 1 of the upgrade rules, the version this page checks.",
+    )
+    const target = document.querySelector("[data-check='upgradeTarget']")?.textContent ?? ""
+    expect(target).toContain("The item offered:")
+    expect(target).toContain("The item offered is the next one up from the item you gave up.")
+    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("Next item upslot 2")
+    expect(upgradeCheckWords(1).fail.upgradeTarget).toBe("The item offered is not the next one up from the item you gave up.")
+  })
+
+  it("fails a version 2 step that aims at a less valuable item, in version 2's words", async () => {
+    const editionV2 = { ...UPGRADE_EDITION, editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a12", engineVersion: 2 }
+    const fp = await editionFingerprint(parseEdition(editionV2))
+    // 30 EUR (slot 2) staked for 12 EUR (slot 1): down, so no step at all.
+    const down = { ...WON_STEP, engineVersion: 2, editionId: editionV2.editionId, editionFingerprint: fp, stakedSlotIndex: 2, targetSlotIndex: 1 }
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/upgrade-steps/${down.stepId}`, ok(down))
+    answers.set(`/verify/editions/${editionV2.editionId}`, ok({ ...editionV2, editionFingerprint: fp }))
+    window.location.hash = `#step=${down.stepId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("FAIL"))
+    expect(verdictLine()).toBe(`Step 2 does not match: ${UPGRADE_JUMP_WORDS.failWords.upgradeTarget}`)
+    expect(document.querySelector("[data-check='upgradeTarget']")?.textContent).toContain(UPGRADE_JUMP_WORDS.failWords.upgradeTarget)
+  })
+
   it("checks an upgraded win over the step's two ranges and links to its step", async () => {
     const { user } = openWithHash(`#open=${UPGRADED_OPEN.winId}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))
@@ -266,6 +379,32 @@ describe("the step page", () => {
       "This page did not check the item given up for this upgrade, the kind of box, or how many upgrades came in a row. The upgrade's own check covers those.",
     )
     expect(screen.getByRole("link", { name: UPGRADE_WIN.link }).getAttribute("href")).toBe(`#step=${WON_STEP.stepId}`)
+    expect(document.querySelector("[data-step='4']")?.textContent).toContain("Slot your browser found")
+  })
+
+  // On version 2 the win records the item the player named, and this page checks only that it is an allowed
+  // target: a PASS says it did not compare it with the upgrade's own record (KAN-1567).
+  it("says under a version 2 win's PASS that it did not compare the item with the upgrade's, and labels the slot as checked", async () => {
+    const edition = { ...UPGRADE_EDITION, editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a14", engineVersion: 2 }
+    const fp = await editionFingerprint(parseEdition(edition))
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/editions/${edition.editionId}`, ok({ ...edition, editionFingerprint: fp }))
+    answers.set(`/verify/opens/${UPGRADED_OPEN.winId}`, ok({ ...UPGRADED_OPEN, editionId: edition.editionId, editionFingerprint: fp }))
+    window.location.hash = `#open=${UPGRADED_OPEN.winId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe("PASS"))
+    const note = document.querySelector("[data-upgrade-win]")?.textContent ?? ""
+    expect(note).toContain(UPGRADE_JUMP_WORDS.winPassCaveat)
+    expect(note).not.toContain(UPGRADE_WIN.passCaveat)
+    expect(UPGRADE_JUMP_WORDS.winPassCaveat).toBe(
+      "This page did not check the item given up for this upgrade, the kind of box, how many upgrades came in a row, or that this is the item the upgrade aimed at. The upgrade's own check covers the first three. It also names the item the upgrade aimed at: compare it with the item on this page.",
+    )
+    const card = document.querySelector("[data-step='4']")?.textContent ?? ""
+    expect(card).toContain(UPGRADE_JUMP_WORDS.winSlotLabel)
+    expect(card).not.toContain("Slot your browser found")
   })
 
   // Card 4 of an upgraded win is the step's: its two ranges, marked by the library's step outcome, never by
@@ -379,6 +518,44 @@ describe("the step page", () => {
     expect(document.body.textContent).not.toContain("Slot we recorded")
   })
 
+  // Version 2 and later (KAN-1567): the win records its target, and a version the page does not check is named.
+  async function lockedOpenOn(engineVersion: number, change: object, verdict: string) {
+    const edition = { ...UPGRADE_EDITION, editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a13", engineVersion }
+    const fp = await editionFingerprint(parseEdition(edition))
+    const answers = upgradeAnswers()
+    const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
+    answers.set(`/verify/editions/${edition.editionId}`, ok({ ...edition, editionFingerprint: fp }))
+    answers.set(
+      `/verify/opens/${UPGRADED_OPEN.winId}`,
+      ok({ ...UPGRADED_OPEN, editionId: edition.editionId, editionFingerprint: fp, ...change }),
+    )
+    answers.set(`/verify/seed-pairs/${SEED.seedPairId}`, ok({ ...SEED, revealedServerSeed: null }))
+    window.location.hash = `#open=${UPGRADED_OPEN.winId}`
+    const user = userEvent.setup()
+    render(<App fetchFn={fakeServer(answers).fetchFn} />)
+    await user.click(screen.getByRole("button", { name: "Look up" }))
+    await waitFor(() => expect(verdictWord()).toBe(verdict))
+  }
+
+  it("waits on a locked version 2 win that jumped past the next item up, at its fair chance", async () => {
+    await lockedOpenOn(2, { drawnSlotIndex: 3, stepChancePpm: 150000, stepChanceCompact: "15.00%" }, "CANNOT CHECK YET")
+  })
+
+  it("fails a locked version 2 win whose recorded item is not a step up, saying from which item to which", async () => {
+    await lockedOpenOn(2, { drawnSlotIndex: 0 }, "FAIL")
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "jump", shown: "40.00%", slot: "1", target: "0" })}`)
+    expect(verdictLine()).toBe(
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be a fair chance: this box allows no upgrade from the item in slot 1 to the item in slot 0.",
+    )
+  })
+
+  it("fails a locked win of a version the page does not check, naming the version", async () => {
+    await lockedOpenOn(3, {}, "FAIL")
+    expect(verdictLine()).toBe(
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 3 of the upgrade rules, and this page checks versions 1 and 2 only.",
+    )
+  })
+
   for (const slot of [-1, 1.5]) {
     it(`words a staked slot of ${slot} of a locked upgraded win as a slot the box does not have`, async () => {
       await lockedOpen({ stakedSlotIndex: slot })
@@ -419,9 +596,26 @@ describe("the words", () => {
       ...fixture.upgradeOffer.vectors.flatMap((v: { queries: { chancePpm?: number; chanceCompact?: string }[] }) =>
         v.queries.filter((q) => q.chanceCompact !== undefined).map((q) => [q.chancePpm, q.chanceCompact]),
       ),
+      // Every target a version 2 win may name, down to the 1 % minimum (KAN-1567).
+      ...fixture.upgradeTargets.vectors.flatMap((v: { queries: { targets: { chancePpm: number; chanceCompact: string }[] }[] }) =>
+        v.queries.flatMap((q) => q.targets.map((t) => [t.chancePpm, t.chanceCompact])),
+      ),
     ]
     expect(pairs.length).toBeGreaterThanOrEqual(10)
+    expect(pairs).toContainEqual([10000, "1.00%"])
     for (const [ppm, shown] of pairs) expect(percentDown(ppm)).toBe(shown)
+  })
+
+  it("reads the library's version 2 causes of a wrong chance, and still its version 1 causes (KAN-1567)", () => {
+    const fail = (expected: string, computed: string) => wrongChanceShown({ ok: false, expected, computed })
+    expect(fail("chance shown 9.00%", "fair chance none, slot 1 cannot step to slot -2")).toEqual({ kind: "jump", shown: "9.00%", slot: "1", target: "-2" })
+    expect(fail("chance shown 9.00%", "fair chance none, version 7 of the upgrade rules is not checked here")).toEqual({
+      kind: "version",
+      shown: "9.00%",
+      version: "7",
+    })
+    expect(fail("chance shown 9.00%", "fair chance none, slot 3 is offered no step")).toEqual({ kind: "none", shown: "9.00%", slot: "3", why: "offered no step" })
+    expect(fail("chance shown 9.00%", "fair chance 8.00%")).toEqual({ kind: "shown", shown: "9.00%", fair: "8.00%" })
   })
 
   it("says 'this upgrade' while its secret is locked", () => {

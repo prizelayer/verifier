@@ -15,7 +15,9 @@ import {
   STEP1_PENDING,
   STEPS,
   type StepNumber,
+  UPGRADE_JUMP_WORDS,
   UPGRADE_WIN_STEP4,
+  stepJumps,
   unusableWords,
   wrongChanceShown,
   wrongChanceWords,
@@ -218,7 +220,10 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
           ) : null}
         </div>
       )
-    case 4:
+    case 4: {
+      // On a version where an upgrade names its target, the browser checks the slot the win records.
+      const slotLabel =
+        input.gameKind === "upgrade" && stepJumps(input.edition.engineVersion) ? UPGRADE_JUMP_WORDS.winSlotLabel : "Slot your browser found"
       return (
         <div className="space-y-2">
           {input.gameKind === "upgrade" ? (
@@ -264,7 +269,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             ) : wrongChanceShown(checks.drawnSlotIndex) ? (
               <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel="Fair chance, rounded down" check={checks.drawnSlotIndex} />
             ) : (
-              <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel="Slot your browser found" check={checks.drawnSlotIndex} />
+              <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel={slotLabel} check={checks.drawnSlotIndex} />
             )
           ) : null}
           {input.snapshot ? (
@@ -293,6 +298,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
           ) : null}
         </div>
       )
+    }
   }
 }
 

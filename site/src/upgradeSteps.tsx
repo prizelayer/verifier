@@ -1,4 +1,4 @@
-import { UPGRADE_STEP_CHECK_NAMES, type UpgradeStepInput, type UpgradeStepReport } from "@verifier"
+import { UPGRADE_STEP_CHECK_NAMES, upgradeRule, type UpgradeStepInput, type UpgradeStepReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups } from "./preimage"
 import { SourceLine } from "./steps"
@@ -7,14 +7,15 @@ import {
   DEPENDS_ON,
   SEED_LOCKED,
   STEP1_PENDING,
-  UPGRADE_CHECK_LABELS,
-  UPGRADE_CHECK_WORDS,
-  UPGRADE_FAIL_WORDS,
   UPGRADE_STEP_OF,
   UPGRADE_STEPS,
+  UPGRADE_JUMP_WORDS,
+  UPGRADE_TARGET_ROW,
   type StepNumber,
   type UpgradeStepName,
   percentDown,
+  stepJumps,
+  upgradeCheckWords,
   unusableWords,
 } from "./words"
 
@@ -32,13 +33,16 @@ export function UpgradeStepCards({ report, input }: Props) {
   const failedSteps = new Set(names.filter((n) => report.checks[n]?.ok === false).map((n) => UPGRADE_STEP_OF[n]))
   const pending = input.serverSeedHex === null
   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
+  // Version 2 (KAN-1567) words where they differ; version 1's otherwise.
+  const words = upgradeCheckWords(input.edition.engineVersion)
+  const jumps = stepJumps(input.edition.engineVersion)
 
   return (
     <div className="space-y-6">
       {UPGRADE_STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
         const failed = failedSteps.has(step)
         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
-        const text = pending && step === 1 ? STEP1_PENDING.text : stepText
+        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 2 ? UPGRADE_JUMP_WORDS.step2Text : stepText
         return (
           <section
             key={step}
@@ -77,13 +81,13 @@ export function UpgradeStepCards({ report, input }: Props) {
                   const sentence = !check
                     ? null
                     : check.ok
-                      ? UPGRADE_CHECK_WORDS[name]
+                      ? words.ok[name]
                       : check.error !== undefined
                         ? unusableWords(check.field, check.error)
-                        : UPGRADE_FAIL_WORDS[name]
+                        : words.fail[name]
                   return (
                     <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
-                      <span className="font-medium">{UPGRADE_CHECK_LABELS[name]}:</span>{" "}
+                      <span className="font-medium">{words.labels[name]}:</span>{" "}
                       <span className="font-semibold">{state}</span>
                       {sentence ? `. ${sentence}` : null}
                     </li>
@@ -141,7 +145,9 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
                 </td>
               </tr>
               <tr>
-                <th scope="row" className="text-left font-medium">Next item up</th>
+                <th scope="row" className="text-left font-medium">
+                  {upgradeRule(input.edition.engineVersion)?.jumps === false ? UPGRADE_TARGET_ROW.nextUp : UPGRADE_TARGET_ROW.target}
+                </th>
                 <td>
                   {offered && target
                     ? `slot ${offered.targetSlotIndex}, buy-back value ${String(target.requiredBuyBackValueCents)} cents`
