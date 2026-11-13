@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 4ab1647..51a3208 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -328,7 +328,7 @@ export function wrongChanceWords(cause: WrongChance): string {
+         ? `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up, in slot ${cause.slot}, has no item above it in this box, so no upgrade is offered from it.`
+         : `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up names slot ${cause.slot}, and this box has no slot ${cause.slot}.`
+     case "jump":
+-      return `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: this box allows no upgrade from the item in slot ${cause.slot} to the item in slot ${cause.target}.`
++      return `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: this box allows no upgrade from the item in slot ${cause.target} to the item in slot ${cause.slot}.`
+     case "version":
+       return `The chance shown with this upgraded win, ${cause.shown}, cannot be checked: this box uses version ${cause.version} of the upgrade rules, and this page checks versions 1 and 2 only.`
+     case "recorded":

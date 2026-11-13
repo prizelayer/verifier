@@ -1,0 +1,13 @@
+diff --git a/site/src/verdict.ts b/site/src/verdict.ts
+index 488884f..01defbd 100644
+--- a/site/src/verdict.ts
++++ b/site/src/verdict.ts
+@@ -75,7 +75,7 @@ export function stepVerdictOf(report: UpgradeStepReport, engineVersion?: number)
+         line:
+           failure.field !== undefined
+             ? `Step ${step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
+-            : `Step ${step} does not match: ${upgradeCheckWords(engineVersion).fail[failure.check as UpgradeStepName]}`,
++            : `Step ${step} does not match: ${upgradeCheckWords(engineVersion === 2 ? 1 : engineVersion).fail[failure.check as UpgradeStepName]}`,
+       }
+     }
+     case "pending":

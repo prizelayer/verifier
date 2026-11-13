@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 9c50a6f..2714c74 100644
+index e346b3b..8e59d7f 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1365,7 +1365,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
+@@ -1463,7 +1463,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
      return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is not in the box` };
    }
    if (offer.value === null) {
--    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is offered no step` };
-+    return undefined; return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is offered no step` };
+-    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${noStepWhy(rule, stakedSlot, targetSlot)}` };
++    return undefined;
    }
    const fairText = stepChanceText(offer.value.chancePpm);
    if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };

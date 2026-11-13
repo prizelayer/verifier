@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..9c75a07 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1670,7 +1670,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+     trace.computedEditionFingerprint = computedFingerprint;
+     checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
+     if (rule !== undefined) {
+-      offer = attempt(() => stepFor(input.edition, rule, expected.stakedSlotIndex, expected.targetSlotIndex));
++      offer = attempt(() => upgradeTarget(input.edition, expected.stakedSlotIndex));
+     }
+   } else {
+     checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);

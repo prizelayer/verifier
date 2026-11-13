@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..0626e67 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -708,7 +708,7 @@ export function upgradeTargets(edition: Pick<Edition, 'slots'>, slotIndex: numbe
+     );
+   const targets: UpgradeOffer[] = [];
+   for (const slot of higher) {
+-    const chancePpm = upgradeChancePpm(current, slot.requiredBuyBackValueCents);
++    const chancePpm = upgradeChancePpm(current, higher[0].requiredBuyBackValueCents);
+     if (chancePpm < rule.minChancePpm) break;
+     targets.push({ targetSlotIndex: slot.slotIndex, chancePpm });
+   }

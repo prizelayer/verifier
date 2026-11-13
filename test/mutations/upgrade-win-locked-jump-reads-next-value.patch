@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..de173a8 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1458,7 +1458,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
+   if (rule === undefined) {
+     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${unknownVersionWhy(input.edition.engineVersion)}` };
+   }
+-  const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, targetSlot));
++  const offer = attempt(() => upgradeTarget(input.edition, stakedSlot));
+   if (!offer.ok) {
+     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is not in the box` };
+   }

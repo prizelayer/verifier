@@ -1,0 +1,13 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+index cbbd260..806eeee 100644
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -143,7 +143,7 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
+               </tr>
+               <tr>
+                 <th scope="row" className="text-left font-medium">
+-                  {upgradeRule(input.edition.engineVersion)?.jumps === false ? UPGRADE_TARGET_ROW.nextUp : UPGRADE_TARGET_ROW.target}
++                  {upgradeRule(input.edition.engineVersion)?.jumps === undefined ? UPGRADE_TARGET_ROW.nextUp : UPGRADE_TARGET_ROW.target}
+                 </th>
+                 <td>
+                   {offered && target

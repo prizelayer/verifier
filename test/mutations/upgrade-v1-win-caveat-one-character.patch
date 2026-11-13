@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index ab2e6aa..a98aa6c 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1253,7 +1253,7 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
+             'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
+             `${stakedSlot} is shown on the step's own page` +
+             `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
+-            'and so are the cap on steps and the engine type and version, which this run does not check.',
++            'and so are the cap on steps and the engine type and version which this run does not check.',
+     );
+   } else {
+     computedSlotIndex = slotFor(derivation.value, input.edition.slots);

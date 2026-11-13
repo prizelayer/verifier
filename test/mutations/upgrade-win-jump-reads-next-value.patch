@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..6230902 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -791,7 +791,7 @@ function upgradeWinSlot(
+   if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
+   const rule = upgradeRule(edition.engineVersion);
+   if (rule === undefined) return { outcome, why: `none: ${unknownVersionWhy(edition.engineVersion)}` };
+-  const offer = stepFor(edition, rule, stakedSlot, recordedSlot);
++  const offer = upgradeTarget(edition, stakedSlot);
+   if (offer === null) return { outcome, why: `none: ${noStepWhy(rule, stakedSlot, recordedSlot)}` };
+   if (offer.chancePpm !== chancePpm) {
+     return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
