@@ -196,6 +196,15 @@ nothing, and is verified the same way. `verifyUpgradeStep()` checks all of this 
 step; `verify()` with `gameKind: 'upgrade'` checks an upgrade win over the step's table, never over
 the box table.
 
+That is version 1 of the upgrade engine (`engineVersion` 1). On version 2, a step may name **any**
+slot of the same edition whose buy-back value is strictly higher than the staked one, at the same
+`p = floor(1 000 000 × staked / target)`, with no step below 10 000 ppm (1 %); the third-step cap and
+the draw are unchanged. `upgradeTargets()` lists every target a win may name, ordered by value, then
+by slot index. A version 2 step and a version 2 win are checked against the target they record; a
+version 1 step that names any slot other than the next value up still fails. `UPGRADE_RULES` lists
+the versions this library checks. A step or a win on any other version fails, and is never read by
+another version's rule.
+
 ### 4. The edition fingerprint
 
 `SHA-256` over these bytes, in this exact order:
@@ -257,6 +266,8 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `bytesFromHex` / `hexFromBytes` | Hex helpers. |
 | `verifyUpgradeStep(input)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`). Never throws. |
 | `upgradeTarget(edition, slotIndex)` | The step a win in that slot is offered, `{ targetSlotIndex, chancePpm }`, or `null`. |
+| `upgradeTargets(edition, slotIndex, engineVersion)` | Every target a win in that slot may name on that version (section 3b), each `{ targetSlotIndex, chancePpm }`. The cap on steps is not applied here: a win at the cap still gets its list. Throws for a version it does not check. |
+| `UPGRADE_RULES` / `upgradeRule(engineVersion)` | The versions of the upgrade engine this library checks, each with its minimum chance and whether a step may jump; `undefined` for any other version. |
 | `upgradeChancePpm(current, next)` | `floor(1 000 000 × current / next)`, exact in `BigInt`. |
 | `stepTable(p)` / `stepOutcome(v, p)` | The step's two-entry table, and `won` or `lost` for `v` over it. |
 

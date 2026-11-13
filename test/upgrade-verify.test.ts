@@ -136,16 +136,17 @@ describe('verifyUpgradeStep', () => {
   });
 
   it('fails an edition on another version of the upgrade engine, even with its own true fingerprint', async () => {
-    const v2: Edition = { ...EDITION, engineVersion: 2 };
+    // Version 3: versions 1 and 2 are both checked since KAN-1567.
+    const v3: Edition = { ...EDITION, engineVersion: 3 };
     const report = await verifyUpgradeStep({
       ...wonStep,
-      edition: v2,
-      expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v2) },
+      edition: v3,
+      expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v3) },
     });
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'engineVersion');
     assert.equal(report.checks.editionFingerprint?.ok, true);
-    assert.equal(report.checks.engineVersion?.computed, '2');
+    assert.equal(report.checks.engineVersion?.computed, '3');
   });
 
   // MUST-1 of the review of #15: each core check fails on its own forged input.
@@ -203,8 +204,8 @@ describe('verifyUpgradeStep', () => {
     editionFingerprint: async () => ({ ...wonStep, expected: { ...wonStep.expected, editionFingerprint: 'cd'.repeat(32) } }),
     engineType: async () => ({ ...wonStep, engineType: 'single_draw_weighted_table' }),
     engineVersion: async () => {
-      const v2: Edition = { ...EDITION, engineVersion: 2 };
-      return { ...wonStep, edition: v2, expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v2) } };
+      const v3: Edition = { ...EDITION, engineVersion: 3 };
+      return { ...wonStep, edition: v3, expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v3) } };
     },
     upgradeTarget: async () => ({ ...wonStep, expected: { ...wonStep.expected, targetSlotIndex: 3 } }),
     upgradeChance: async () => ({ ...wonStep, expected: { ...wonStep.expected, chancePpm: 500_000 } }),
@@ -347,6 +348,31 @@ describe('verify on an upgrade win', () => {
     assert.ok(report.caveats.some((c) => c.includes('the cap on steps and the engine type and version')));
   });
 
+  // Version 1's report words, as literals copied from the published library (c2a8ca4): the version table
+  // writes them again through new code, so a test that compared the code with itself could not see an edit.
+  it('keeps version 1\'s report words byte for byte', async () => {
+    const won = await verify(upgradeWin);
+    assert.ok(won.caveats.includes(
+      'This win was made by an upgrade step from slot 1. This run checks the step\'s draw, its fair chance and ' +
+        'its target over the step\'s own table. That the staked win really held slot 1 is shown on the step\'s ' +
+        'own page (step 9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01), and so are the cap on steps and the engine type ' +
+        'and version, which this run does not check.',
+    ), won.caveats.join('\n'));
+    const top = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, stakedSlotIndex: 3 } });
+    assert.deepEqual(top.checks.engineVersion, { ok: true, expected: '1', computed: '1' });
+    assert.deepEqual(top.checks.upgradeTarget, { ok: false, expected: '2', computed: 'none: slot 3 is offered no step' });
+    assert.deepEqual(
+      top.notRun.filter((n) => n.check === 'upgradeChance' || n.check === 'chanceCompact').map((n) => n.reason),
+      ['the edition offers no step from the staked slot', 'the edition offers no step from the staked slot'],
+    );
+    const locked = await verify({
+      ...upgradeWin,
+      serverSeedHex: null,
+      expected: { ...upgradeWin.expected, stakedSlotIndex: 3 },
+    });
+    assert.equal(locked.checks.drawnSlotIndex?.computed, 'fair chance none, slot 3 is offered no step');
+  });
+
   it('refuses an upgrade win without its step facts', async () => {
     const { stepChancePpm: _chance, ...withoutChance } = upgradeWin.expected;
     const report = await verify({ ...upgradeWin, expected: withoutChance });
@@ -477,6 +503,247 @@ describe('verify on an upgrade win', () => {
     const { stepChanceCompact: _text, ...withoutText } = upgradeWin.expected;
     const report = await verify({ ...upgradeWin, gameKind: 'box_open', expected: withoutText });
     assert.notEqual(report.status, 'invalid', report.summary);
+  });
+});
+
+/**
+ * Version 2 of the upgrade engine (KAN-1567, ADR-KAN-1154 amendment 4): a step may name any strictly higher
+ * value of the box at 1 % or more. The worked box on version 2, the same seed pair: nonce 5 draws 133 803
+ * (this library's derive, which the draw family pins), under the 166 666 ppm of 5 -> 30 EUR, so the jump
+ * from slot 0 to slot 2 wins; nonce 1 (186 669) loses it.
+ */
+describe('version 2: a jump', () => {
+  const EDITION_V2: Edition = { ...EDITION, engineVersion: 2 };
+  /** 1 -> 100 EUR is exactly 10 000 ppm; 1 -> 100.01 EUR is 9 999 ppm. */
+  const EDGES_V2: Edition = {
+    ...EDITION_V2,
+    slots: [
+      { slotIndex: 0, probabilityPpm: 980_000, requiredBuyBackValueCents: 100n, requiredMarketValueCents: 100n },
+      { slotIndex: 1, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_001n, requiredMarketValueCents: 10_001n },
+      { slotIndex: 2, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_000n, requiredMarketValueCents: 10_000n },
+    ],
+  };
+  let jump: UpgradeStepInput;
+  let jumpWin: VerificationInput;
+  let edgesFingerprint: string;
+
+  before(async () => {
+    const v2Fingerprint = await editionFingerprint(EDITION_V2);
+    edgesFingerprint = await editionFingerprint(EDGES_V2);
+    jump = {
+      ...wonStep,
+      nonce: 5,
+      edition: EDITION_V2,
+      expected: {
+        editionFingerprint: v2Fingerprint,
+        stakedSlotIndex: 0,
+        targetSlotIndex: 2,
+        chancePpm: 166_666,
+        chanceCompact: '16.66%',
+        drawnPpmValue: 133_803,
+        outcome: 'won',
+        stepNo: 1,
+      },
+    };
+    jumpWin = {
+      serverSeedHex: SEED,
+      commitmentHex: COMMITMENT,
+      clientSeed: 'alice-seed',
+      nonce: 5,
+      edition: EDITION_V2,
+      gameKind: 'upgrade',
+      expected: {
+        editionFingerprint: v2Fingerprint,
+        drawnPpmValue: 133_803,
+        drawnSlotIndex: 2,
+        upgradeStepId: '9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e11',
+        stakedSlotIndex: 0,
+        stepChancePpm: 166_666,
+        stepChanceCompact: '16.66%',
+        stepOutcome: 'won',
+      },
+    };
+  });
+
+  it('verifies a won jump past the next value, every check run', async () => {
+    const report = await verifyUpgradeStep(jump);
+    assert.equal(report.status, 'verified', report.summary);
+    assert.deepEqual(report.notRun, []);
+    assert.deepEqual(report.checks.engineVersion, { ok: true, expected: '2', computed: '2' });
+    assert.deepEqual(report.checks.upgradeTarget, { ok: true, expected: '2', computed: '2' });
+    assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 166_666 });
+    assert.equal(report.trace.computedOutcome, 'won');
+  });
+
+  it('verifies a lost jump exactly like a won one', async () => {
+    const report = await verifyUpgradeStep({ ...jump, nonce: 1, expected: { ...jump.expected, drawnPpmValue: 186_669, outcome: 'lost' } });
+    assert.equal(report.status, 'verified', report.summary);
+    assert.equal(report.trace.computedOutcome, 'lost');
+  });
+
+  it('verifies the next value up on version 2 too', async () => {
+    const report = await verifyUpgradeStep({ ...wonStep, edition: EDITION_V2, expected: { ...wonStep.expected, editionFingerprint: jump.expected.editionFingerprint } });
+    assert.equal(report.status, 'verified', report.summary);
+  });
+
+  it('takes a step at exactly 1 %, and refuses one at 9 999 ppm', async () => {
+    const atMinimum = await verifyUpgradeStep({
+      ...jump,
+      nonce: 1,
+      edition: EDGES_V2,
+      expected: { editionFingerprint: edgesFingerprint, stakedSlotIndex: 0, targetSlotIndex: 2, chancePpm: 10_000, chanceCompact: '1.00%', drawnPpmValue: 186_669, outcome: 'lost', stepNo: 1 },
+    });
+    assert.equal(atMinimum.status, 'verified', atMinimum.summary);
+
+    const under = await verifyUpgradeStep({
+      ...jump,
+      nonce: 1,
+      edition: EDGES_V2,
+      expected: { editionFingerprint: edgesFingerprint, stakedSlotIndex: 0, targetSlotIndex: 1, chancePpm: 9_999, chanceCompact: '0.99%', drawnPpmValue: 186_669, outcome: 'lost', stepNo: 1 },
+    });
+    assert.equal(under.status, 'failed');
+    assert.equal(under.firstFailure?.check, 'upgradeTarget');
+    assert.deepEqual(under.checks.upgradeTarget, { ok: false, expected: '1', computed: 'none: slot 0 cannot step to slot 1' });
+    assert.deepEqual(
+      under.notRun.map((n) => [n.check, n.reason]),
+      [
+        ['upgradeChance', 'the edition allows no step from the staked slot to the target'],
+        ['chanceCompact', 'the edition allows no step from the staked slot to the target'],
+        ['upgradeOutcome', 'it needs the step chance, which could not be computed'],
+      ],
+    );
+  });
+
+  it('refuses a target that is not worth more than the staked slot, or not in the box', async () => {
+    const down = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, stakedSlotIndex: 2, targetSlotIndex: 1 } });
+    assert.deepEqual(down.checks.upgradeTarget, { ok: false, expected: '1', computed: 'none: slot 2 cannot step to slot 1' });
+    const same = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, stakedSlotIndex: 2, targetSlotIndex: 2 } });
+    assert.deepEqual(same.checks.upgradeTarget, { ok: false, expected: '2', computed: 'none: slot 2 cannot step to slot 2' });
+    const missing = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, targetSlotIndex: 9 } });
+    assert.deepEqual(missing.checks.upgradeTarget, { ok: false, expected: '9', computed: 'none: slot 0 cannot step to slot 9' });
+    for (const report of [down, same, missing]) assert.equal(report.firstFailure?.check, 'upgradeTarget');
+  });
+
+  it('refuses a tie: a held value never steps to another slot of the same value', async () => {
+    const tied: Edition = {
+      ...EDITION_V2,
+      slots: [
+        { slotIndex: 0, probabilityPpm: 400_000, requiredBuyBackValueCents: 500n, requiredMarketValueCents: 500n },
+        { slotIndex: 1, probabilityPpm: 300_000, requiredBuyBackValueCents: 1200n, requiredMarketValueCents: 1200n },
+        { slotIndex: 2, probabilityPpm: 300_000, requiredBuyBackValueCents: 1200n, requiredMarketValueCents: 1200n },
+      ],
+    };
+    const report = await verifyUpgradeStep({
+      ...jump,
+      edition: tied,
+      expected: { ...jump.expected, editionFingerprint: await editionFingerprint(tied), stakedSlotIndex: 1, targetSlotIndex: 2, chancePpm: 1_000_000 - 1, chanceCompact: '99.99%' },
+    });
+    assert.deepEqual(report.checks.upgradeTarget, { ok: false, expected: '2', computed: 'none: slot 1 cannot step to slot 2' });
+  });
+
+  it('checks the chance of a jump against the formula, never the next value\'s chance', async () => {
+    const nextValueChance = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, chancePpm: 416_666, chanceCompact: '41.66%' } });
+    assert.equal(nextValueChance.firstFailure?.check, 'upgradeChance');
+    assert.deepEqual(nextValueChance.checks.upgradeChance, { ok: false, expected: '416666', computed: '166666' });
+  });
+
+  it('refuses the same jump on version 1, as before: version 1 checks the next value up only', async () => {
+    const report = await verifyUpgradeStep({ ...jump, edition: EDITION, expected: { ...jump.expected, editionFingerprint: fingerprint } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'upgradeTarget');
+    assert.deepEqual(report.checks.upgradeTarget, { ok: false, expected: '2', computed: '1' });
+    assert.deepEqual(report.checks.engineVersion, { ok: true, expected: '1', computed: '1' });
+  });
+
+  it('fails closed on version 3: no other version\'s rule reads the step', async () => {
+    const v3: Edition = { ...EDITION, engineVersion: 3 };
+    const report = await verifyUpgradeStep({ ...jump, edition: v3, expected: { ...jump.expected, editionFingerprint: await editionFingerprint(v3) } });
+    assert.equal(report.status, 'failed');
+    assert.equal(report.firstFailure?.check, 'engineVersion');
+    assert.deepEqual(report.checks.engineVersion, { ok: false, expected: '1 or 2', computed: '3' });
+    assert.equal(report.checks.upgradeTarget, undefined);
+    assert.equal(report.trace.computedOffer, undefined);
+    assert.deepEqual(
+      report.notRun.map((n) => [n.check, n.reason]),
+      [
+        ['upgradeTarget', 'version 3 of the upgrade rules is not checked here'],
+        ['upgradeChance', 'version 3 of the upgrade rules is not checked here'],
+        ['chanceCompact', 'it needs the step chance, which could not be computed'],
+        ['upgradeOutcome', 'it needs the step chance, which could not be computed'],
+      ],
+    );
+  });
+
+  it('checks a won jump as a win: the recorded slot, from the staked slot, at the formula\'s chance', async () => {
+    const report = await verify(jumpWin);
+    assert.equal(report.status, 'verified', report.summary);
+    assert.equal(report.trace.computedSlotIndex, 2);
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: true, expected: '2', computed: '2' });
+  });
+
+  it('says on a won jump that the target the step named is not compared, and names what was checked', async () => {
+    // The win records its own slot on version 2, so a PASS proves an allowed target, not the named one.
+    const report = await verify(jumpWin);
+    assert.equal(report.status, 'verified', report.summary);
+    // The other caveat is the snapshot's (no prize list was given).
+    assert.ok(report.caveats.includes(
+      'This win was made by an upgrade step from slot 0 on version 2 of the upgrade rules. This run checks that ' +
+        'slot 2 is a target the edition allows from slot 0 on that version, that the chance is the formula\'s, ' +
+        'and that the step\'s draw wins at it over the step\'s own table. Which target the step named is not ' +
+        'compared here: it is shown on the step\'s own page (step 9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e11), and so ' +
+        'are that the staked win really held slot 0, the cap on steps and the engine type, which this run does ' +
+        'not check.',
+    ), report.caveats.join('\n'));
+  });
+
+  it('fails a won jump whose recorded slot is no target of the staked slot', async () => {
+    const missing = await verify({ ...jumpWin, expected: { ...jumpWin.expected, drawnSlotIndex: 9 } });
+    assert.equal(missing.firstFailure?.check, 'drawnSlotIndex');
+    assert.deepEqual(missing.checks.drawnSlotIndex, { ok: false, expected: '9', computed: 'none: slot 0 cannot step to slot 9' });
+    const self = await verify({ ...jumpWin, expected: { ...jumpWin.expected, drawnSlotIndex: 0 } });
+    assert.deepEqual(self.checks.drawnSlotIndex, { ok: false, expected: '0', computed: 'none: slot 0 cannot step to slot 0' });
+  });
+
+  it('fails a won jump recorded at a chance that is not the formula\'s, even one that wins', async () => {
+    const report = await verify({ ...jumpWin, expected: { ...jumpWin.expected, stepChancePpm: 170_000, stepChanceCompact: '17.00%' } });
+    assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
+    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 166666 ppm, not 170000/);
+  });
+
+  it('reads a version 1 win by the next value up, as before, whatever slot it records', async () => {
+    const report = await verify({ ...jumpWin, edition: EDITION, expected: { ...jumpWin.expected, editionFingerprint: fingerprint } });
+    assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
+    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 416666 ppm, not 166666/);
+  });
+
+  it('stays pending on a locked jump with the right shown chance, and fails a wrong one', async () => {
+    const pending = await verify({ ...jumpWin, serverSeedHex: null });
+    assert.equal(pending.status, 'pending', pending.summary);
+    const shownWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChanceCompact: '41.66%' } });
+    assert.deepEqual(shownWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.66%', computed: 'fair chance 16.66%' });
+    const recordedWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChancePpm: 166_667 } });
+    assert.deepEqual(recordedWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance recorded 166667 ppm', computed: 'fair chance 166666 ppm' });
+  });
+
+  it('fails a locked jump whose recorded slot is no target, before the reveal', async () => {
+    const report = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, drawnSlotIndex: 9 } });
+    assert.equal(report.status, 'failed', report.summary);
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 16.66%', computed: 'fair chance none, slot 0 cannot step to slot 9' });
+  });
+
+  it('fails closed on a win of version 3, revealed or locked', async () => {
+    const v3: Edition = { ...EDITION, engineVersion: 3 };
+    const v3Win = { ...jumpWin, edition: v3, expected: { ...jumpWin.expected, editionFingerprint: await editionFingerprint(v3) } };
+    const revealed = await verify(v3Win);
+    assert.equal(revealed.status, 'failed', revealed.summary);
+    assert.deepEqual(revealed.checks.drawnSlotIndex, { ok: false, expected: '2', computed: 'none: version 3 of the upgrade rules is not checked here' });
+    const locked = await verify({ ...v3Win, serverSeedHex: null });
+    assert.equal(locked.status, 'failed', locked.summary);
+    assert.deepEqual(locked.checks.drawnSlotIndex, {
+      ok: false,
+      expected: 'chance shown 16.66%',
+      computed: 'fair chance none, version 3 of the upgrade rules is not checked here',
+    });
   });
 });
 
