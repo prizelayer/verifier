@@ -18,8 +18,10 @@ import {
   SERVER_SEED_BYTES,
   UPGRADE_ENGINE_TYPE,
   UPGRADE_ENGINE_VERSION,
+  UPGRADE_JUMP_MIN_CHANCE_PPM,
   UPGRADE_MAX_STEPS,
   UPGRADE_MIN_CHANCE_PPM,
+  UPGRADE_RULES,
   UPGRADE_STEP_RTP_BPS,
   bigEndianUint32,
   bytesFromHex,
@@ -38,10 +40,15 @@ import {
   stepOutcome,
   stepTable,
   upgradeChancePpm,
+  upgradeRule,
   upgradeTarget,
+  upgradeTargets,
   verify,
   verifyFrom,
+  verifyUpgradeStep,
+  type Edition,
   type SlotOdds,
+  type UpgradeStepInput,
 } from '../src/verifier.js';
 
 const FIXTURE = JSON.parse(
@@ -1054,6 +1061,331 @@ describe('every upgrade offer vector', () => {
           assert.equal(stepChanceText(expected.chancePpm), shown, `chanceCompact, held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
         } else assert.equal(shown, undefined, `no offer, no chanceCompact: held slot ${query.heldSlotIndex}`);
       }
+    });
+  }
+});
+
+/**
+ * The two families of version 2 (KAN-1567, platform PR-1): the list of targets a win may name, and the
+ * worst path a box must still pass at its floor. Both are computed here from this library's own
+ * `upgradeTargets`, so the target rule is pinned twice: once as a list, once through every payout it
+ * leads to. rng-fairness §4b.
+ */
+const TARGETS = FIXTURE.upgradeTargets;
+const WORST = FIXTURE.upgradeWorstPath;
+const MILLION = BigInt(PPM_TOTAL);
+
+interface TargetEntry {
+  targetSlotIndex: number;
+  kind: string;
+  chancePpm: number;
+  chanceCompact: string;
+}
+
+interface TargetsQuery extends OfferQuery {
+  chanceCompact?: string;
+  targets: TargetEntry[];
+}
+
+interface TargetsVector {
+  id: string;
+  engineType: string;
+  engineVersion: number;
+  slotsAsGiven: { slotIndex: number; buyBackValueCents: number; kind: string }[];
+  queries: TargetsQuery[];
+}
+
+interface Fraction {
+  numerator: string;
+  denominator: string;
+}
+
+interface WorstPathVector {
+  id: string;
+  engineType: string;
+  engineVersion: number;
+  priceCents: string;
+  slots: { slotIndex: number; probabilityPpm: number; buyBackValueCents: number }[];
+  worstPathPayoutCents: Fraction;
+  worstPathRtp: Fraction;
+  worstPathRtpText: string;
+  verdicts: { floorBps: number; meetsFloor: boolean }[];
+}
+
+/** The list for one query, from this library: none past the cap; the kind is the target slot's own, as given. */
+function targetsFor(vector: TargetsVector, query: TargetsQuery): TargetEntry[] {
+  if (vector.engineType !== UPGRADE_ENGINE_TYPE || query.stepNo >= UPGRADE_MAX_STEPS) return [];
+  // Only the buy-back values take part, so the whole million sits on the first slot as given, as in offerFor.
+  const slots: SlotOdds[] = vector.slotsAsGiven.map((slot, i) => ({
+    slotIndex: slot.slotIndex,
+    probabilityPpm: i === 0 ? PPM_TOTAL : 0,
+    requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+    requiredMarketValueCents: 0n,
+  }));
+  const kinds = new Map(vector.slotsAsGiven.map((slot) => [slot.slotIndex, slot.kind]));
+  return upgradeTargets({ slots }, query.heldSlotIndex, vector.engineVersion).map((target) => ({
+    targetSlotIndex: target.targetSlotIndex,
+    kind: kinds.get(target.targetSlotIndex) as string,
+    chancePpm: target.chancePpm,
+    chanceCompact: stepChanceText(target.chancePpm),
+  }));
+}
+
+/**
+ * The worst path's payout per open, scaled by 1 000 000^(1 + MAX_STEPS): the player who steps at every
+ * chance until the cap and names, at every step, the target that leaves the least. A win at depth d (steps
+ * already taken) is worth its value × 1 000 000^(MAX_STEPS − d) when it has no target, else the least of
+ * chance × the target's worth at d + 1; both sides carry the same scale, so no division happens before the end.
+ */
+function worstPathScaled(vector: WorstPathVector): bigint {
+  const slots: SlotOdds[] = vector.slots.map((slot) => ({
+    slotIndex: slot.slotIndex,
+    probabilityPpm: slot.probabilityPpm,
+    requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+    requiredMarketValueCents: 0n,
+  }));
+  let deeper = new Map<number, bigint>();
+  for (let depth = UPGRADE_MAX_STEPS; depth >= 0; depth--) {
+    const here = new Map<number, bigint>();
+    for (const slot of slots) {
+      const targets = depth >= UPGRADE_MAX_STEPS ? [] : upgradeTargets({ slots }, slot.slotIndex, vector.engineVersion);
+      here.set(
+        slot.slotIndex,
+        targets.length === 0
+          ? slot.requiredBuyBackValueCents * MILLION ** BigInt(UPGRADE_MAX_STEPS - depth)
+          : targets
+              .map((target) => BigInt(target.chancePpm) * (deeper.get(target.targetSlotIndex) as bigint))
+              .reduce((least, payout) => (payout < least ? payout : least)),
+      );
+    }
+    deeper = here;
+  }
+  return slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * (deeper.get(slot.slotIndex) as bigint), 0n);
+}
+
+function lowestTerms(numerator: bigint, denominator: bigint): Fraction {
+  let a = numerator;
+  let b = denominator;
+  while (b !== 0n) [a, b] = [b, a % b];
+  return { numerator: String(numerator / a), denominator: String(denominator / a) };
+}
+
+/** A ratio as a percent floored to 6 decimals: 0.93000362… is "93.000362%". */
+function percentFloor6(numerator: bigint, denominator: bigint): string {
+  const millionths = (numerator * 100n * 1_000_000n) / denominator;
+  return `${millionths / 1_000_000n}.${String(millionths % 1_000_000n).padStart(6, '0')}%`;
+}
+
+describe('the version 2 sections of the fixture (KAN-1567)', () => {
+  it('state the version table this library uses', () => {
+    for (const section of [TARGETS, WORST]) {
+      assert.equal(section.constants.engineType, UPGRADE_ENGINE_TYPE);
+      assert.deepEqual(section.constants.engineVersions, UPGRADE_RULES.map((rule) => rule.engineVersion));
+      assert.equal(section.constants.maxSteps, UPGRADE_MAX_STEPS);
+      assert.equal(section.constants.minChancePpm, upgradeRule(1)?.minChancePpm);
+      assert.equal(section.constants.jumpMinChancePpm, upgradeRule(2)?.minChancePpm);
+      assert.equal(section.constants.jumpMinChancePpm, UPGRADE_JUMP_MIN_CHANCE_PPM);
+      assert.equal(section.constants.stepRtpBps, UPGRADE_STEP_RTP_BPS);
+    }
+  });
+
+  it('have the vectors platform PR-1 named', () => {
+    // Names, not a count: a silently dropped vector shows here by its id.
+    assert.deepEqual(
+      (TARGETS.vectors as TargetsVector[]).map((v) => v.id),
+      ['worked-box-v2', 'worked-box-v1', 'jump-minimum-edges', 'ties-list-each-slot', 'wallet-credit-target', 'cap'],
+    );
+    assert.deepEqual(
+      (WORST.vectors as WorstPathVector[]).map((v) => v.id),
+      [
+        'worked-box-v1',
+        'worked-box-v2',
+        'exact-93-v1',
+        'exact-93-v2',
+        'operator-floor-94-v2',
+        'climb-passes-worst-fails-v1',
+        'climb-passes-worst-fails-v2',
+        'depth-greedy-cut-cap-v2',
+      ],
+    );
+  });
+});
+
+describe('every upgrade target-list vector', () => {
+  for (const vector of TARGETS.vectors as TargetsVector[]) {
+    it(vector.id, () => {
+      record('upgradeTargets', vector.id);
+      for (const query of vector.queries) {
+        // The offer is the upgradeOffer rule on every version; the list is the version's own.
+        const offer = offerFor(vector, query);
+        const computed: TargetsQuery = { ...offer, targets: targetsFor(vector, query) };
+        if (offer.chancePpm !== undefined) computed.chanceCompact = stepChanceText(offer.chancePpm);
+        assert.deepEqual(computed, query, `held slot ${query.heldSlotIndex}, step ${query.stepNo}`);
+      }
+    });
+  }
+});
+
+describe('every upgrade worst-path vector', () => {
+  for (const vector of WORST.vectors as WorstPathVector[]) {
+    it(vector.id, () => {
+      record('upgradeWorstPath', vector.id);
+      assert.equal(vector.engineType, UPGRADE_ENGINE_TYPE);
+      const scale = MILLION ** BigInt(1 + UPGRADE_MAX_STEPS);
+      const price = BigInt(vector.priceCents);
+      const worst = worstPathScaled(vector);
+      assert.deepEqual(lowestTerms(worst, scale), vector.worstPathPayoutCents, 'worst-path payout');
+      assert.deepEqual(lowestTerms(worst, scale * price), vector.worstPathRtp, 'worst-path RTP');
+      assert.equal(percentFloor6(worst, scale * price), vector.worstPathRtpText, 'worst-path RTP text');
+      // The box returns Σ ppm × value over 1 000 000 × price; it and the worst path must both reach the floor.
+      const box = vector.slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
+      assert.deepEqual(
+        vector.verdicts.map(({ floorBps }) => ({
+          floorBps,
+          meetsFloor:
+            box * 10_000n >= BigInt(floorBps) * MILLION * price && worst * 10_000n >= BigInt(floorBps) * scale * price,
+        })),
+        vector.verdicts,
+        'verdicts',
+      );
+    });
+  }
+});
+
+/**
+ * The third family of version 2 (KAN-1567, platform PR-1b): a step to a target the player named, which
+ * version 1 does not allow. Every value is recomputed from the vector's inputs, as for `upgradeStep`, and
+ * the named target is checked against version 2's rule: a slot of the box worth strictly more, at the
+ * formula's chance, and that chance at least 1 %. Then each step runs through `verifyUpgradeStep`, the
+ * check the page calls: verified on a version 2 edition of the vector's slots, failed on the target when
+ * the same edition says version 1. rng-fairness §4b.
+ */
+const JUMP_STEP = FIXTURE.upgradeJumpStep;
+
+interface JumpStepVector extends StepVector {
+  slotsAsGiven: { slotIndex: number; buyBackValueCents: number }[];
+  heldSlotIndex: number;
+  /** The held win's step number, 0 for a box win; the step record carries this + 1. */
+  stepNo: number;
+  targetSlotIndex: number;
+}
+
+/** The vector's slots as an edition's slots: only the buy-back values take part, as in offerFor. */
+function jumpSlots(vector: JumpStepVector): SlotOdds[] {
+  return vector.slotsAsGiven.map((slot, i) => ({
+    slotIndex: slot.slotIndex,
+    probabilityPpm: i === 0 ? PPM_TOTAL : 0,
+    requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+    requiredMarketValueCents: 0n,
+  }));
+}
+
+/**
+ * The step record of one vector on an edition of its slots at `engineVersion`. The fingerprint is
+ * computed here, so the engine id and the price are any fixed values: the check under test is the step's.
+ */
+async function jumpStepInput(vector: JumpStepVector, engineVersion: number): Promise<UpgradeStepInput> {
+  const edition: Edition = {
+    engineId: '15671567-0000-4000-8000-000000000002',
+    engineVersion,
+    priceCents: 2000n,
+    slots: jumpSlots(vector),
+  };
+  return {
+    serverSeedHex: JUMP_STEP.serverSeedHex,
+    commitmentHex: JUMP_STEP.commitmentHex,
+    clientSeed: vector.clientSeed,
+    nonce: vector.nonce,
+    edition,
+    engineType: JUMP_STEP.constants.engineType,
+    expected: {
+      editionFingerprint: await editionFingerprint(edition),
+      stakedSlotIndex: vector.heldSlotIndex,
+      targetSlotIndex: vector.targetSlotIndex,
+      chancePpm: vector.chancePpm,
+      chanceCompact: vector.chanceCompact,
+      drawnPpmValue: vector.v,
+      outcome: vector.outcome,
+      stepNo: vector.stepNo + 1,
+    },
+  };
+}
+
+describe('the jump-step section of the fixture (KAN-1567)', () => {
+  it('states version 2 and the constants this library uses for it', () => {
+    const c = JUMP_STEP.constants;
+    assert.equal(c.engineType, UPGRADE_ENGINE_TYPE);
+    assert.equal(c.engineVersion, 2);
+    assert.deepEqual(upgradeRule(c.engineVersion), { engineVersion: 2, minChancePpm: c.jumpMinChancePpm, jumps: true });
+    assert.equal(c.jumpMinChancePpm, UPGRADE_JUMP_MIN_CHANCE_PPM);
+    assert.equal(c.minChancePpm, upgradeRule(1)?.minChancePpm);
+    assert.equal(c.maxSteps, UPGRADE_MAX_STEPS);
+    assert.equal(c.stepRtpBps, UPGRADE_STEP_RTP_BPS);
+  });
+
+  it('carries a commitment that is the digest of its own server seed', async () => {
+    assert.equal(await commitment(bytesFromHex(JUMP_STEP.serverSeedHex)), JUMP_STEP.commitmentHex);
+  });
+
+  it('has the vectors platform PR-1b named', () => {
+    // Names, not a count: a silently dropped vector shows here by its id.
+    assert.deepEqual(
+      (JUMP_STEP.vectors as JumpStepVector[]).map((v) => v.id),
+      ['past-next-won', 'past-next-lost', 'jump-minimum-won'],
+    );
+  });
+});
+
+describe('every upgrade jump-step vector, from its inputs', () => {
+  const seed = bytesFromHex(JUMP_STEP.serverSeedHex);
+  for (const vector of JUMP_STEP.vectors as JumpStepVector[]) {
+    it(vector.id, async () => {
+      record('upgradeJumpStep', vector.id);
+      const slots = jumpSlots(vector);
+      const valueOf = (slotIndex: number) => slots.find((slot) => slot.slotIndex === slotIndex)?.requiredBuyBackValueCents;
+      assert.equal(valueOf(vector.heldSlotIndex), BigInt(vector.stakedBuyBackValueCents), 'the staked value is the held slot\'s');
+      assert.equal(valueOf(vector.targetSlotIndex), BigInt(vector.targetBuyBackValueCents), 'the target value is the named slot\'s');
+      assert.ok(vector.stepNo < UPGRADE_MAX_STEPS, 'the held win is under the cap');
+
+      // Version 2's rule for the named slot: worth strictly more, the formula's chance, at least 1 %.
+      assert.ok(BigInt(vector.targetBuyBackValueCents) > BigInt(vector.stakedBuyBackValueCents), 'worth strictly more');
+      const chance = upgradeChancePpm(BigInt(vector.stakedBuyBackValueCents), BigInt(vector.targetBuyBackValueCents));
+      assert.equal(chance, vector.chancePpm, 'chance');
+      assert.ok(chance >= UPGRADE_JUMP_MIN_CHANCE_PPM, 'at least 1 %');
+      assert.deepEqual(
+        upgradeTargets({ slots }, vector.heldSlotIndex, JUMP_STEP.constants.engineVersion).find(
+          (target) => target.targetSlotIndex === vector.targetSlotIndex,
+        ),
+        { targetSlotIndex: vector.targetSlotIndex, chancePpm: vector.chancePpm },
+        'a version 2 target of the held slot, at that chance',
+      );
+      // And a step version 1 does not allow: its single offer is another slot, or none.
+      assert.notEqual(upgradeTarget({ slots }, vector.heldSlotIndex)?.targetSlotIndex, vector.targetSlotIndex, 'not version 1\'s offer');
+
+      assert.deepEqual(stepTable(chance).map((row) => row.probabilityPpm), vector.stepTablePpm, 'step table');
+      const v = (await derive(seed, vector.clientSeed, vector.nonce)).value;
+      assert.equal(v, vector.v, 'drawn v');
+      const outcome = stepOutcome(v, chance);
+      assert.equal(outcome, vector.outcome, 'outcome');
+      assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+      assert.equal(stepChanceText(chance), vector.chanceCompact, 'chanceCompact');
+    });
+  }
+});
+
+describe('every upgrade jump-step vector, through verifyUpgradeStep', () => {
+  for (const vector of JUMP_STEP.vectors as JumpStepVector[]) {
+    it(`${vector.id}: verified on version 2, failed on the target on version 1`, async () => {
+      const report = await verifyUpgradeStep(await jumpStepInput(vector, 2));
+      assert.equal(report.status, 'verified', report.summary);
+      assert.deepEqual(report.notRun, []);
+      assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: vector.targetSlotIndex, chancePpm: vector.chancePpm });
+      assert.equal(report.trace.computedOutcome, vector.outcome);
+
+      const onVersion1 = await verifyUpgradeStep(await jumpStepInput(vector, 1));
+      assert.equal(onVersion1.status, 'failed');
+      assert.equal(onVersion1.firstFailure?.check, 'upgradeTarget');
+      assert.equal(onVersion1.checks.editionFingerprint?.ok, true);
     });
   }
 });

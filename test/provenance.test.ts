@@ -100,6 +100,16 @@ for (const file of FIXTURES) {
 }
 
 describe('the provenance tables', () => {
+  it('carries no placeholder', () => {
+    // A pin may be prepared before its source commit exists, marked with this word. The file is public
+    // once pushed, so a marked pin must fail here rather than rely on someone remembering to fill it.
+    assert.doesNotMatch(
+      PROVENANCE,
+      /PLACEHOLDER/,
+      'fixtures/PROVENANCE.md still carries a PLACEHOLDER line: fill the pin it names, then delete the line',
+    );
+  });
+
   it('give a second file none of the first file\'s pins', () => {
     assert.notEqual(
       pinnedValue('golden-vectors-v1.json', 'SHA-256', '[0-9a-f]{64}'),
