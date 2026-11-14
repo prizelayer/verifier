@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index a8f0788..3d1d7cd 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -184,7 +184,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
+   const caveat = caveatOf(report)
+   const stepId = input?.gameKind === "upgrade" ? input.expected.upgradeStepId : undefined
+   // The version comes from the fingerprinted edition, as on the step page (KAN-1567).
+-  const passCaveat = stepJumps(input?.edition.engineVersion) ? UPGRADE_JUMP_WORDS.winPassCaveat : UPGRADE_WIN.passCaveat
++  const passCaveat = stepJumps(input?.edition.engineVersion) && false ? UPGRADE_JUMP_WORDS.winPassCaveat : UPGRADE_WIN.passCaveat
+   const tone =
+     // Pending is not a warning: it is neutral ink, never the colour of a pass or a fail.
+     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"

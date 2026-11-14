@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..2f84dc6 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -698,7 +698,7 @@ export function upgradeTargets(edition: Pick<Edition, 'slots'>, slotIndex: numbe
+   if (current <= 0n) return [];
+ 
+   const higher = slots
+-    .filter((slot) => slot.requiredBuyBackValueCents > current)
++    .filter((slot) => slot.slotIndex !== slotIndex && slot.requiredBuyBackValueCents >= current)
+     .sort((a, b) =>
+       a.requiredBuyBackValueCents === b.requiredBuyBackValueCents
+         ? a.slotIndex - b.slotIndex

@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index ab2e6aa..8c168b5 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -623,7 +623,7 @@ export interface UpgradeRule {
+  * Refs: KAN-1567, ADR-KAN-1154 amendment 4
+  */
+ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
+-  Object.freeze({ engineVersion: 1, minChancePpm: UPGRADE_MIN_CHANCE_PPM, jumps: false }),
++  Object.freeze({ engineVersion: 1, minChancePpm: UPGRADE_MIN_CHANCE_PPM, jumps: true }),
+   Object.freeze({ engineVersion: 2, minChancePpm: UPGRADE_JUMP_MIN_CHANCE_PPM, jumps: true }),
+ ]);
+ 

@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 4ab1647..c760533 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -314,7 +314,7 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
+   const jump = new RegExp(`^fair chance none, slot ${NUMBER} cannot step to slot ${NUMBER}$`).exec(computed)
+   if (jump) return { kind: "jump", shown, slot: jump[1], target: jump[2] }
+   const version = /^fair chance none, version (.*) of the upgrade rules is not checked here$/.exec(computed)
+-  if (version) return { kind: "version", shown, version: version[1] }
++  if (version && shown === "") return { kind: "version", shown, version: version[1] }
+   if (!computed.startsWith("fair chance ")) return null
+   return { kind: "shown", shown, fair: computed.slice("fair chance ".length) }
+ }

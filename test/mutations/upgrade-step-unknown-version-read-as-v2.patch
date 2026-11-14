@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..fdbf53c 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1662,7 +1662,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+   const expectedFingerprint = expected.editionFingerprint.toLowerCase();
+   const preimage = attempt(() => editionBytes(input.edition));
+   // Bound by the fingerprint: engineVersion is inside the `0x01` preimage, so it picks the rule.
+-  const rule = upgradeRule(input.edition.engineVersion);
++  const rule = upgradeRule(input.edition.engineVersion) ?? UPGRADE_RULES[1];
+   let offer: Attempt<UpgradeOffer | null> | undefined;
+   if (preimage.ok) {
+     const computedFingerprint = hexFromBytes(await sha256(preimage.value));

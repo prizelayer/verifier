@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..797f5b7 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -624,7 +624,7 @@ export interface UpgradeRule {
+  */
+ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
+   Object.freeze({ engineVersion: 1, minChancePpm: UPGRADE_MIN_CHANCE_PPM, jumps: false }),
+-  Object.freeze({ engineVersion: 2, minChancePpm: UPGRADE_JUMP_MIN_CHANCE_PPM, jumps: true }),
++  Object.freeze({ engineVersion: 2, minChancePpm: UPGRADE_MIN_CHANCE_PPM, jumps: true }),
+ ]);
+ 
+ /** The rule of one engine version, or `undefined` for a version this library does not check. */

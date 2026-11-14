@@ -1,0 +1,13 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+index f4c4f81..2ad2865 100644
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -42,7 +42,7 @@ export function UpgradeStepCards({ report, input }: Props) {
+       {UPGRADE_STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
+         const failed = failedSteps.has(step)
+         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
+-        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 2 ? UPGRADE_JUMP_WORDS.step2Text : stepText
++        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 4 ? UPGRADE_JUMP_WORDS.step2Text : stepText
+         return (
+           <section
+             key={step}

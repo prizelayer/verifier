@@ -6,7 +6,7 @@ import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { SourceLine, StepCards } from "./steps"
 import { UpgradeStepCards } from "./upgradeSteps"
-import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_STEP_OF, UPGRADE_WIN, type UpgradeStepName } from "./words"
+import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_JUMP_WORDS, UPGRADE_STEP_OF, UPGRADE_WIN, stepJumps, type UpgradeStepName } from "./words"
 import { caveatOf, stepVerdictOf, verdictOf } from "./verdict"
 
 export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
@@ -144,7 +144,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
         ) : report ? (
           <Verdict report={report} input={input} />
         ) : stepReport ? (
-          <StepVerdict report={stepReport} />
+          <StepVerdict report={stepReport} engineVersion={stepInput?.edition.engineVersion} />
         ) : null}
       </div>
 
@@ -183,6 +183,8 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
   const { word, line } = verdictOf(report)
   const caveat = caveatOf(report)
   const stepId = input?.gameKind === "upgrade" ? input.expected.upgradeStepId : undefined
+  // The version comes from the fingerprinted edition, as on the step page (KAN-1567).
+  const passCaveat = stepJumps(input?.edition.engineVersion) ? UPGRADE_JUMP_WORDS.winPassCaveat : UPGRADE_WIN.passCaveat
   const tone =
     // Pending is not a warning: it is neutral ink, never the colour of a pass or a fail.
     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"
@@ -193,7 +195,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
       {caveat ? <p data-caveat="yes">{caveat}</p> : null}
       {stepId !== undefined ? (
         <p data-upgrade-win>
-          {UPGRADE_WIN.note} {report.status === "verified" ? `${UPGRADE_WIN.passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
+          {UPGRADE_WIN.note} {report.status === "verified" ? `${passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
         </p>
       ) : null}
     </div>
@@ -201,8 +203,8 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
 }
 
 /** The verdict of an upgrade step: the same words and colours as an open's, never a celebration. */
-function StepVerdict({ report }: { report: UpgradeStepReport }) {
-  const { word, line } = stepVerdictOf(report)
+function StepVerdict({ report, engineVersion }: { report: UpgradeStepReport; engineVersion: number | undefined }) {
+  const { word, line } = stepVerdictOf(report, engineVersion)
   const tone = report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"
   return (
     <div className="space-y-1" data-status={report.status} data-outcome={report.trace.computedOutcome ?? "none"}>

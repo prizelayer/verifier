@@ -1,8 +1,8 @@
 diff --git a/site/src/App.tsx b/site/src/App.tsx
-index 7ff0756..b1cffae 100644
+index a8f0788..b9fe432 100644
 --- a/site/src/App.tsx
 +++ b/site/src/App.tsx
-@@ -190,7 +190,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
+@@ -192,7 +192,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
      <div className="space-y-1" data-status={report.status}>
        <p className={`text-3xl font-bold ${tone}`}>{word}</p>
        <p>{line}</p>
@@ -10,4 +10,4 @@ index 7ff0756..b1cffae 100644
 +      {caveat && false ? <p data-caveat="yes">{caveat}</p> : null}
        {stepId !== undefined ? (
          <p data-upgrade-win>
-           {UPGRADE_WIN.note} {report.status === "verified" ? `${UPGRADE_WIN.passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
+           {UPGRADE_WIN.note} {report.status === "verified" ? `${passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.

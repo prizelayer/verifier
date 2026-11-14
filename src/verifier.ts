@@ -587,10 +587,16 @@ function sortedSlots<T extends Pick<SlotOdds, 'slotIndex' | 'probabilityPpm'>>(s
 // The upgrade step — rng-fairness §4b
 // ---------------------------------------------------------------------------
 
-/** The lowest chance an upgrade step may be offered at, in ppm (10 %). A constant of the upgrade engine. */
+/**
+ * The lowest chance an upgrade step may be offered at, in ppm (10 %). Version 1's minimum, and the minimum
+ * of the single offer ({@link upgradeTarget}) on every version.
+ */
 export const UPGRADE_MIN_CHANCE_PPM = 100_000;
 
-/** The most upgrade steps one box win may climb. A constant of the upgrade engine. */
+/** The lowest chance a version 2 step may name a target at, in ppm (1 %). */
+export const UPGRADE_JUMP_MIN_CHANCE_PPM = 10_000;
+
+/** The most upgrade steps one box win may climb. A constant of the upgrade engine, on every version. */
 export const UPGRADE_MAX_STEPS = 3;
 
 /** The slot an upgrade step is offered for, and its chance. */
@@ -600,8 +606,36 @@ export interface UpgradeOffer {
 }
 
 /**
- * The chance of a fair step from a held value to the next one up: `floor(1 000 000 × current / next)`
- * ppm, so the step's expected value never exceeds the value staked. 12,00 → 30,00 gives 400 000.
+ * One version of the upgrade engine: the lowest chance of a step, and whether a step may name any higher
+ * value of the box (`jumps`) or only the next one up.
+ */
+export interface UpgradeRule {
+  engineVersion: number;
+  minChancePpm: number;
+  jumps: boolean;
+}
+
+/**
+ * Every version of the upgrade engine this library checks, each with its own rule. A step on a version not
+ * listed here is failed, never checked by another version's rule (rng-fairness §6: version for version, fail
+ * closed). Version 2 lets a step name any strictly higher value at 1 % or more; the single offer and the cap
+ * do not change.
+ * Refs: KAN-1567, ADR-KAN-1154 amendment 4
+ */
+export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
+  Object.freeze({ engineVersion: 1, minChancePpm: UPGRADE_MIN_CHANCE_PPM, jumps: false }),
+  Object.freeze({ engineVersion: 2, minChancePpm: UPGRADE_JUMP_MIN_CHANCE_PPM, jumps: true }),
+]);
+
+/** The rule of one engine version, or `undefined` for a version this library does not check. */
+export function upgradeRule(engineVersion: number): UpgradeRule | undefined {
+  return UPGRADE_RULES.find((rule) => rule.engineVersion === engineVersion);
+}
+
+/**
+ * The chance of a fair step from a held value to a higher one: `floor(1 000 000 × current / next)` ppm, so
+ * the step's expected value never exceeds the value staked. The higher value is the next one up on version 1
+ * and any target {@link upgradeTargets} lists on version 2. 12,00 → 30,00 gives 400 000.
  *
  * Exact in `bigint`: no float ever touches a chance.
  */
@@ -639,6 +673,68 @@ export function upgradeTarget(edition: Pick<Edition, 'slots'>, slotIndex: number
 
   const chancePpm = upgradeChancePpm(current, target.requiredBuyBackValueCents);
   return chancePpm < UPGRADE_MIN_CHANCE_PPM ? null : { targetSlotIndex: target.slotIndex, chancePpm };
+}
+
+/**
+ * Every target a win in `slotIndex` may name on `engineVersion`. On version 2: each slot whose buy-back value
+ * is strictly higher than the held one, ordered by value, then by slot index, up to the first whose chance is
+ * under the version's minimum. The chance never rises as the value rises, so no slot past that one could pass.
+ * On version 1 the list is the offer of {@link upgradeTarget} alone. A held value of 0 lists nothing.
+ *
+ * Throws for a version this library does not check and for a slot the edition does not hold. The cap
+ * ({@link UPGRADE_MAX_STEPS}) is not checked here, as in {@link upgradeTarget}.
+ * Refs: KAN-1567
+ */
+export function upgradeTargets(edition: Pick<Edition, 'slots'>, slotIndex: number, engineVersion: number): UpgradeOffer[] {
+  const rule = upgradeRule(engineVersion);
+  if (rule === undefined) throw new Error(`version ${engineVersion} of the upgrade engine is not one this library checks`);
+  if (!rule.jumps) {
+    const offer = upgradeTarget(edition, slotIndex);
+    return offer === null ? [] : [offer];
+  }
+  const slots = sortedSlots(edition.slots);
+  const held = slots.find((slot) => slot.slotIndex === slotIndex);
+  if (held === undefined) throw new Error(`slot ${slotIndex} is not in the edition`);
+  const current = held.requiredBuyBackValueCents;
+  if (current <= 0n) return [];
+
+  const higher = slots
+    .filter((slot) => slot.requiredBuyBackValueCents > current)
+    .sort((a, b) =>
+      a.requiredBuyBackValueCents === b.requiredBuyBackValueCents
+        ? a.slotIndex - b.slotIndex
+        : a.requiredBuyBackValueCents < b.requiredBuyBackValueCents
+          ? -1
+          : 1,
+    );
+  const targets: UpgradeOffer[] = [];
+  for (const slot of higher) {
+    const chancePpm = upgradeChancePpm(current, slot.requiredBuyBackValueCents);
+    if (chancePpm < rule.minChancePpm) break;
+    targets.push({ targetSlotIndex: slot.slotIndex, chancePpm });
+  }
+  return targets;
+}
+
+/**
+ * The step from `stakedSlot` that a record naming `targetSlot` is checked against, under `rule`, or `null`
+ * when there is none. Version 1: the offer, whatever slot the record names, so a record naming another
+ * slot fails on the target. Version 2: the entry of {@link upgradeTargets} for the named slot, so a slot of
+ * the box worth more, at the version's minimum or above.
+ */
+function stepFor(edition: Pick<Edition, 'slots'>, rule: UpgradeRule, stakedSlot: number, targetSlot: number): UpgradeOffer | null {
+  if (!rule.jumps) return upgradeTarget(edition, stakedSlot);
+  return upgradeTargets(edition, stakedSlot, rule.engineVersion).find((t) => t.targetSlotIndex === targetSlot) ?? null;
+}
+
+/** Why a step has no fair chance, in the words the reports use: version 1 names the staked slot alone. */
+function noStepWhy(rule: UpgradeRule, stakedSlot: number, targetSlot: number): string {
+  return rule.jumps ? `slot ${stakedSlot} cannot step to slot ${targetSlot}` : `slot ${stakedSlot} is offered no step`;
+}
+
+/** The words of a version this library does not check, for the reports. */
+function unknownVersionWhy(engineVersion: unknown): string {
+  return `version ${String(engineVersion)} of the upgrade rules is not checked here`;
 }
 
 /**
@@ -680,20 +776,24 @@ export function stepOutcome(v: number, chancePpm: number): 'won' | 'lost' {
 }
 
 /**
- * The slot an upgrade win holds, from its step's drawn value: the target the edition offers from
- * `stakedSlot`, when that offer's chance is `chancePpm` and `v` wins at it; otherwise no slot, with
- * the reason.
+ * The slot an upgrade win holds, from its step's drawn value: the target of the step from `stakedSlot`
+ * under the edition's version, when that step's chance is `chancePpm` and `v` wins at it; otherwise no
+ * slot, with the reason. Version 1's target is the offer; version 2's is the slot the win records
+ * (`recordedSlot`), when it is a target of the staked slot. Any other version holds no slot.
  */
 function upgradeWinSlot(
   v: number,
   chancePpm: number,
   edition: Edition,
   stakedSlot: number,
+  recordedSlot: number,
 ): { outcome: 'won' | 'lost'; slotIndex?: number; why: string } {
   const outcome = stepOutcome(v, chancePpm);
   if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
-  const offer = upgradeTarget(edition, stakedSlot);
-  if (offer === null) return { outcome, why: `none: slot ${stakedSlot} is offered no step` };
+  const rule = upgradeRule(edition.engineVersion);
+  if (rule === undefined) return { outcome, why: `none: ${unknownVersionWhy(edition.engineVersion)}` };
+  const offer = stepFor(edition, rule, stakedSlot, recordedSlot);
+  if (offer === null) return { outcome, why: `none: ${noStepWhy(rule, stakedSlot, recordedSlot)}` };
   if (offer.chancePpm !== chancePpm) {
     return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
   }
@@ -1111,7 +1211,9 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
     const chancePpm = input.expected.stepChancePpm as number;
     const expectedSlot = String(input.expected.drawnSlotIndex);
     const stakedSlot = input.expected.stakedSlotIndex as number;
-    const step = attempt(() => upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot));
+    const step = attempt(() =>
+      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex),
+    );
     if (!step.ok) {
       checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);
     } else {
@@ -1134,12 +1236,24 @@ async function verifyChecked(input: VerificationInput): Promise<VerificationRepo
           ? { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` }
           : slotCheck;
     }
+    // On a version whose steps name their own target, the slot here is the one the win records: this run
+    // proves it is an allowed target, not that it is the target the step named.
+    const winRule = upgradeRule(input.edition.engineVersion);
     caveats.push(
-      `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
-        'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
-        `${stakedSlot} is shown on the step's own page` +
-        `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
-        'and so are the cap on steps and the engine type and version, which this run does not check.',
+      winRule?.jumps === true
+        ? `This win was made by an upgrade step from slot ${stakedSlot} on version ${winRule.engineVersion} of the ` +
+            `upgrade rules. This run checks that slot ${input.expected.drawnSlotIndex} is a target the edition ` +
+            `allows from slot ${stakedSlot} on that version, that the chance is the formula's, and that the step's ` +
+            'draw wins at it over the step\'s own table. Which target the step named is not compared here: it is ' +
+            'shown on the step\'s own page' +
+            `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
+            `and so are that the staked win really held slot ${stakedSlot}, the cap on steps and the engine type, ` +
+            'which this run does not check.'
+        : `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
+            'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
+            `${stakedSlot} is shown on the step's own page` +
+            `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
+            'and so are the cap on steps and the engine type and version, which this run does not check.',
     );
   } else {
     computedSlotIndex = slotFor(derivation.value, input.edition.slots);
@@ -1341,21 +1455,28 @@ function uuidKey(uuid: string): string {
 }
 
 /**
- * The seed-free facts of a locked upgrade win, or undefined when they all hold. Each needs only the edition
- * and the staked slot, so it fails before the reveal (owner ruling, KAN-1154): a slot the box does not hold
- * or offers no step has no fair chance, so no shown chance can be fair; a recorded chance that is not the
- * fair one is wrong whatever v is (the shown text is compared first). The causes keep the two prefixes the
- * page reads ("chance shown" or "chance recorded", then "fair chance").
+ * The seed-free facts of a locked upgrade win, or undefined when they all hold. Each needs only the edition,
+ * the staked slot and, on version 2, the recorded slot, so it fails before the reveal (owner ruling,
+ * KAN-1154): a slot the box does not hold, a step the version does not allow, or a version this library does
+ * not check has no fair chance, so no shown chance can be fair; a recorded chance that is not the fair one is
+ * wrong whatever v is (the shown text is compared first). The causes keep the two prefixes the page reads
+ * ("chance shown" or "chance recorded", then "fair chance").
  */
 function wrongChanceText(input: VerificationInput): Check | undefined {
   const stakedSlot = input.expected.stakedSlotIndex as number;
   const shown = input.expected.stepChanceCompact as string;
-  const offer = attempt(() => upgradeTarget(input.edition, stakedSlot));
+  // Version 2's fair chance depends on the target too, which the win records as its own slot.
+  const targetSlot = input.expected.drawnSlotIndex;
+  const rule = upgradeRule(input.edition.engineVersion);
+  if (rule === undefined) {
+    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${unknownVersionWhy(input.edition.engineVersion)}` };
+  }
+  const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, targetSlot));
   if (!offer.ok) {
     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is not in the box` };
   }
   if (offer.value === null) {
-    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is offered no step` };
+    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${noStepWhy(rule, stakedSlot, targetSlot)}` };
   }
   const fairText = stepChanceText(offer.value.chancePpm);
   if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
@@ -1429,13 +1550,14 @@ function requireNonce(nonce: number): void {
 // Verifying one upgrade step — rng-fairness §4b and §6
 // ---------------------------------------------------------------------------
 
-/** The engine type of an upgrade edition. Its constants are the cap and the minimum chance above. */
+/** The engine type of an upgrade edition. Its constants are the cap and the minimum chances above. */
 export const UPGRADE_ENGINE_TYPE = 'single_draw_weighted_table_fair_upgrade';
 
 /**
- * The one version of the upgrade engine this library knows. rng-fairness §4b applies to version 1 only,
- * and the constants above are version 1's; a step on another version is failed, never checked by v1's
- * rules (§6: version for version, fail closed).
+ * Version 1 of the upgrade engine: the next value up only, at 10 % or more. The version the fixture's
+ * `upgradeStep` and `upgradeOffer` families state. {@link UPGRADE_RULES} lists every version this library
+ * checks; a step on any other is failed, never checked by another version's rules (§6: version for
+ * version, fail closed).
  */
 export const UPGRADE_ENGINE_VERSION = 1;
 
@@ -1498,7 +1620,10 @@ export interface UpgradeStepReport {
   trace: Partial<Derivation> & {
     editionPreimageHex?: string;
     computedEditionFingerprint?: string;
-    /** The step the edition offers from the staked slot, or absent when it offers none. */
+    /**
+     * The step the edition allows from the staked slot: version 1's offer, or version 2's entry for the
+     * recorded target. Absent when there is none.
+     */
     computedOffer?: UpgradeOffer;
     /** The step's two-entry table as a cumulative lookup: slot 0 wins. */
     cumulative?: CumulativeRow[];
@@ -1509,9 +1634,10 @@ export interface UpgradeStepReport {
 }
 
 /**
- * Verify one upgrade step: the commitment, the odds, that the edition is an upgrade edition, that the
- * target is the next value up from the staked slot and the chance its fair floor, that the step number
- * is within the cap, that the seed reproduces the drawn value, and that this value reads as the
+ * Verify one upgrade step: the commitment, the odds, that the edition is an upgrade edition on a version
+ * this library checks, that the target is one its version allows from the staked slot (version 1: the next
+ * value up; version 2: any higher value at 1 % or more) and the chance its fair floor, that the step
+ * number is within the cap, that the seed reproduces the drawn value, and that this value reads as the
  * recorded outcome over the step's own table. A lost step verifies exactly like a won one.
  */
 export async function verifyUpgradeStep(input: UpgradeStepInput): Promise<UpgradeStepReport> {
@@ -1545,22 +1671,28 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
   const seedRevealed = input.serverSeedHex !== null;
   const expected = input.expected;
 
-  // The odds, and what they offer from the staked slot. None of this needs the seed.
+  // The odds, and what they allow from the staked slot under the edition's version. None of this needs the seed.
   const expectedFingerprint = expected.editionFingerprint.toLowerCase();
   const preimage = attempt(() => editionBytes(input.edition));
+  // Bound by the fingerprint: engineVersion is inside the `0x01` preimage, so it picks the rule.
+  const rule = upgradeRule(input.edition.engineVersion);
   let offer: Attempt<UpgradeOffer | null> | undefined;
   if (preimage.ok) {
     const computedFingerprint = hexFromBytes(await sha256(preimage.value));
     trace.editionPreimageHex = hexFromBytes(preimage.value);
     trace.computedEditionFingerprint = computedFingerprint;
     checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
-    offer = attempt(() => upgradeTarget(input.edition, expected.stakedSlotIndex));
+    if (rule !== undefined) {
+      offer = attempt(() => stepFor(input.edition, rule, expected.stakedSlotIndex, expected.targetSlotIndex));
+    }
   } else {
     checks.editionFingerprint = unusable(expectedFingerprint, 'edition', preimage.error);
   }
   checks.engineType = check(UPGRADE_ENGINE_TYPE, input.engineType);
-  // Bound by the fingerprint: engineVersion is inside the `0x01` preimage.
-  checks.engineVersion = check(String(UPGRADE_ENGINE_VERSION), String(input.edition.engineVersion));
+  checks.engineVersion = check(
+    rule === undefined ? UPGRADE_RULES.map((r) => r.engineVersion).join(' or ') : String(rule.engineVersion),
+    String(input.edition.engineVersion),
+  );
   caveats.push(
     'The engine type is read from the published engine row. The edition fingerprint binds the engine id, ' +
       'and an engine row cannot be changed after it is published; this run did not look at that row itself.',
@@ -1568,21 +1700,28 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
 
   let chance: number | undefined;
   if (offer === undefined) {
-    skip('upgradeTarget', 'it needs the prize table, which is unusable');
-    skip('upgradeChance', 'it needs the prize table, which is unusable');
+    // A version with no rule here is never read by another version's rule: the step's maths are not run.
+    const why = !preimage.ok ? 'it needs the prize table, which is unusable' : unknownVersionWhy(input.edition.engineVersion);
+    skip('upgradeTarget', why);
+    skip('upgradeChance', why);
     skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (!offer.ok) {
     checks.upgradeTarget = unusable(String(expected.targetSlotIndex), 'expected.stakedSlotIndex', offer.error);
     skip('upgradeChance', 'it needs the target, which could not be computed');
     skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (offer.value === null) {
+    // An offer is only computed under a rule, so `rule` is set here.
+    const stepRule = rule as UpgradeRule;
     checks.upgradeTarget = {
       ok: false,
       expected: String(expected.targetSlotIndex),
-      computed: `none: slot ${expected.stakedSlotIndex} is offered no step`,
+      computed: `none: ${noStepWhy(stepRule, expected.stakedSlotIndex, expected.targetSlotIndex)}`,
     };
-    skip('upgradeChance', 'the edition offers no step from the staked slot');
-    skip('chanceCompact', 'the edition offers no step from the staked slot');
+    const why = stepRule.jumps
+      ? 'the edition allows no step from the staked slot to the target'
+      : 'the edition offers no step from the staked slot';
+    skip('upgradeChance', why);
+    skip('chanceCompact', why);
   } else {
     trace.computedOffer = offer.value;
     chance = offer.value.chancePpm;

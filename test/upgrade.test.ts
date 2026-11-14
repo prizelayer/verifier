@@ -12,9 +12,13 @@ import {
   stepTable,
   stepChanceText,
   upgradeChancePpm,
+  upgradeRule,
   upgradeTarget,
+  upgradeTargets,
   UPGRADE_ENGINE_VERSION,
+  UPGRADE_JUMP_MIN_CHANCE_PPM,
   UPGRADE_MAX_STEPS,
+  UPGRADE_RULES,
   UPGRADE_STEP_RTP_BPS,
   UPGRADE_MIN_CHANCE_PPM,
 } from '../src/verifier.js';
@@ -113,6 +117,64 @@ describe('upgrade target', () => {
 
   it('refuses a slot that is not in the edition', () => {
     assert.throws(() => upgradeTarget(WORKED, 4), /slot 4 is not in the edition/);
+  });
+});
+
+describe('the version table (KAN-1567)', () => {
+  it('knows versions 1 and 2, each with its own minimum, and nothing else', () => {
+    assert.deepEqual(UPGRADE_RULES, [
+      { engineVersion: 1, minChancePpm: 100_000, jumps: false },
+      { engineVersion: 2, minChancePpm: 10_000, jumps: true },
+    ]);
+    assert.equal(UPGRADE_JUMP_MIN_CHANCE_PPM, 10_000);
+    assert.equal(upgradeRule(1)?.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
+    assert.equal(upgradeRule(3), undefined);
+    assert.equal(upgradeRule(0), undefined);
+  });
+
+  it('cannot be changed by a caller', () => {
+    assert.ok(Object.isFrozen(UPGRADE_RULES));
+    assert.ok(UPGRADE_RULES.every((rule) => Object.isFrozen(rule)));
+  });
+});
+
+describe('upgrade targets', () => {
+  it('lists every higher value on version 2, in value order, and only the offer on version 1', () => {
+    assert.deepEqual(upgradeTargets(WORKED, 0, 2), [
+      { targetSlotIndex: 1, chancePpm: 416_666 },
+      { targetSlotIndex: 2, chancePpm: 166_666 },
+      { targetSlotIndex: 3, chancePpm: 62_500 },
+    ]);
+    assert.deepEqual(upgradeTargets(WORKED, 0, 1), [{ targetSlotIndex: 1, chancePpm: 416_666 }]);
+    assert.deepEqual(upgradeTargets(WORKED, 3, 2), []);
+    assert.deepEqual(upgradeTargets(WORKED, 3, 1), []);
+  });
+
+  it('lists a target at exactly 1 % and stops at the first one under it on version 2', () => {
+    // 1 -> 100 EUR is 10 000 ppm; 1 -> 100.01 EUR is 9 999 ppm, and 1 -> 200 EUR is past it.
+    const edges = edition([100, 10_001, 10_000, 20_000], [250_000, 250_000, 250_000, 250_000]);
+    assert.deepEqual(upgradeTargets(edges, 0, 2), [{ targetSlotIndex: 2, chancePpm: 10_000 }]);
+    assert.deepEqual(upgradeTargets(edges, 0, 1), []);
+  });
+
+  it('lists each slot of a tied value, the lower index first, and never a value equal to the held one', () => {
+    const tied = edition([1200, 500, 1200, 3000], [250_000, 250_000, 250_000, 250_000]);
+    assert.deepEqual(upgradeTargets(tied, 1, 2), [
+      { targetSlotIndex: 0, chancePpm: 416_666 },
+      { targetSlotIndex: 2, chancePpm: 416_666 },
+      { targetSlotIndex: 3, chancePpm: 166_666 },
+    ]);
+    assert.deepEqual(upgradeTargets(tied, 0, 2), [{ targetSlotIndex: 3, chancePpm: 400_000 }]);
+  });
+
+  it('lists nothing from a held value of 0', () => {
+    assert.deepEqual(upgradeTargets(edition([0, 1200], [500_000, 500_000]), 0, 2), []);
+  });
+
+  it('refuses a version it does not check, and a slot that is not in the edition', () => {
+    assert.throws(() => upgradeTargets(WORKED, 0, 3), /version 3 of the upgrade engine is not one this library checks/);
+    assert.throws(() => upgradeTargets(WORKED, 4, 2), /slot 4 is not in the edition/);
+    assert.throws(() => upgradeTargets(WORKED, 4, 1), /slot 4 is not in the edition/);
   });
 });
 

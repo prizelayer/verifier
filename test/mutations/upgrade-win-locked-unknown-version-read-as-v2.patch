@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index e346b3b..9eb80da 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1454,7 +1454,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
+   const shown = input.expected.stepChanceCompact as string;
+   // Version 2's fair chance depends on the target too, which the win records as its own slot.
+   const targetSlot = input.expected.drawnSlotIndex;
+-  const rule = upgradeRule(input.edition.engineVersion);
++  const rule = upgradeRule(input.edition.engineVersion) ?? UPGRADE_RULES[1];
+   if (rule === undefined) {
+     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${unknownVersionWhy(input.edition.engineVersion)}` };
+   }

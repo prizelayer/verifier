@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 4ab1647..aa7b49b 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -312,7 +312,7 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
+   if (none) return { kind: "none", shown, slot: none[1], why: none[2] as "offered no step" | "not in the box" }
+   // Version 2 (KAN-1567): no step from the staked slot to the slot the win records, or a version not checked.
+   const jump = new RegExp(`^fair chance none, slot ${NUMBER} cannot step to slot ${NUMBER}$`).exec(computed)
+-  if (jump) return { kind: "jump", shown, slot: jump[1], target: jump[2] }
++  if (jump && shown === "") return { kind: "jump", shown, slot: jump[1], target: jump[2] }
+   const version = /^fair chance none, version (.*) of the upgrade rules is not checked here$/.exec(computed)
+   if (version) return { kind: "version", shown, version: version[1] }
+   if (!computed.startsWith("fair chance ")) return null

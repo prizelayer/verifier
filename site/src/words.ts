@@ -1,4 +1,4 @@
-import type { Check, CheckName, UpgradeStepCheckName } from "@verifier"
+import { upgradeRule, type Check, type CheckName, type UpgradeStepCheckName } from "@verifier"
 
 /** The four steps, in the words a player reads. Step 1 and step 2 never say when a value was published. */
 export const STEPS = [
@@ -238,7 +238,8 @@ export const FOOTER = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Upgrade steps (KAN-1154): a player stakes a win for the next item up, and one pick decides it.
+// Upgrade steps (KAN-1154): a player stakes a win for a more valuable item of the box (on version 1, the next
+// item up), and one pick decides it.
 // ---------------------------------------------------------------------------
 
 /** The four cards of an upgrade step. Steps 1 and 3 are the same as an open's; 2 and 4 are the step's own. */
@@ -286,14 +287,19 @@ export const UPGRADE_STEPS = [
  * Why an upgraded win's slot check failed on its chance, read from the library's words, or null for any
  * other cause. The slot's own words would then be false: no slot was compared, and the seed may still be
  * locked. The library writes "chance shown <text>" / "fair chance <text>" for a wrong text, "fair chance
- * none, slot <n> <why>" when no fair chance exists, and "chance recorded <n> ppm" / "fair chance <n> ppm"
+ * none, slot <n> <why>" when no fair chance exists (on version 2, "slot <n> cannot step to slot <t>", or
+ * "version <v> of the upgrade rules is not checked here"), and "chance recorded <n> ppm" / "fair chance <n> ppm"
  * for a recorded chance that is not the fair one. A number is read in any form a hand-made proof can carry
  * (negative, fractional), so a FAIL never falls back to the slot's words.
  */
 export type WrongChance =
   | { kind: "shown"; shown: string; fair: string }
   | { kind: "none"; shown: string; slot: string; why: "offered no step" | "not in the box" }
+  | { kind: "jump"; shown: string; slot: string; target: string }
+  | { kind: "version"; shown: string; version: string }
   | { kind: "recorded"; recorded: number; fair: number }
+
+const NUMBER = String.raw`(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)`
 
 export function wrongChanceShown(check: Check | undefined): WrongChance | null {
   if (!check || check.ok || check.expected === undefined || check.computed === undefined) return null
@@ -305,6 +311,11 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
   const shown = expected.slice("chance shown ".length)
   const none = /^fair chance none, slot (-?\d+(?:\.\d+)?(?:e[+-]?\d+)?) is (offered no step|not in the box)$/.exec(computed)
   if (none) return { kind: "none", shown, slot: none[1], why: none[2] as "offered no step" | "not in the box" }
+  // Version 2 (KAN-1567): no step from the staked slot to the slot the win records, or a version not checked.
+  const jump = new RegExp(`^fair chance none, slot ${NUMBER} cannot step to slot ${NUMBER}$`).exec(computed)
+  if (jump) return { kind: "jump", shown, slot: jump[1], target: jump[2] }
+  const version = /^fair chance none, version (.*) of the upgrade rules is not checked here$/.exec(computed)
+  if (version) return { kind: "version", shown, version: version[1] }
   if (!computed.startsWith("fair chance ")) return null
   return { kind: "shown", shown, fair: computed.slice("fair chance ".length) }
 }
@@ -317,6 +328,10 @@ export function wrongChanceWords(cause: WrongChance): string {
       return cause.why === "offered no step"
         ? `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up, in slot ${cause.slot}, has no item above it in this box, so no upgrade is offered from it.`
         : `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: the item given up names slot ${cause.slot}, and this box has no slot ${cause.slot}.`
+    case "jump":
+      return `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: this box allows no upgrade from the item in slot ${cause.slot} to the item in slot ${cause.target}.`
+    case "version":
+      return `The chance shown with this upgraded win, ${cause.shown}, cannot be checked: this box uses version ${cause.version} of the upgrade rules, and this page checks versions 1 and 2 only.`
     case "recorded":
       return `The chance recorded with this upgraded win, ${cause.recorded.toLocaleString("en")} in 1,000,000, is not its fair chance, ${cause.fair.toLocaleString("en")} in 1,000,000.`
   }
@@ -373,13 +388,72 @@ export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
     "The chances shown here do not match the fingerprint recorded on your upgrade. The step below was checked against a table we cannot confirm.",
   engineType: "This box is not an upgrade box, so it offers no upgrade.",
   engineVersion:
-    "This box uses another version of the upgrade rules. This page checks version 1 only, so it cannot confirm this upgrade.",
+    "This box uses another version of the upgrade rules. This page checks versions 1 and 2 only, so it cannot confirm this upgrade.",
   upgradeTarget: "The item offered is not the next one up from the item you gave up.",
   upgradeChance: "The chance we recorded is not the fair chance of this upgrade.",
   chanceCompact: "The percent you were shown is not this fair chance, rounded down to 0.01 %.",
   stepNo: "This would be more upgrades in a row than a win may take.",
   drawnPpmValue: FAIL_WORDS.drawnPpmValue,
   upgradeOutcome: "With the fair chance, this number gives a different result than the one we recorded.",
+}
+
+/**
+ * The row naming the item a step aims at, on card 2. Version 1 steps only to the next value up. Any other
+ * version lets a step name its own target, so its row says no more than that.
+ * Refs: KAN-1567
+ */
+export const UPGRADE_TARGET_ROW = { nextUp: "Next item up", target: "Target item" } as const
+
+/**
+ * The words that differ on version 2, where a step may name any more valuable item of the box at 1 % or
+ * more. Every other word of a step is the same on both versions, and version 1 keeps the words above.
+ * Refs: KAN-1567
+ */
+export const UPGRADE_JUMP_WORDS = {
+  step2Text: [
+    "An upgrade gives up the item you hold for a chance at a more valuable item in the same box: the item you chose, not only the next one up.",
+    UPGRADE_STEPS[1].text[1],
+    "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item you chose is worth more than yours, and that the chance is exactly that value. There is no upgrade below a 1% chance, and at most 3 in a row.",
+  ],
+  checkWords: {
+    engineVersion: "The box uses version 2 of the upgrade rules, a version this page checks.",
+    upgradeTarget: "The item you chose is worth more than the item you gave up, at a chance of 1% or more.",
+  },
+  failWords: {
+    upgradeTarget: "The item you chose is not one this upgrade allows: it must be worth more than the item you gave up, at a chance of 1% or more.",
+  },
+  labels: {
+    upgradeTarget: "The item you chose",
+  },
+  /** Under the PASS of an upgraded win: the win records its own item, which this page does not compare with the upgrade's. */
+  winPassCaveat:
+    "This page did not check the item given up for this upgrade, the kind of box, how many upgrades came in a row, or that this is the item the upgrade aimed at. The upgrade's own check covers the first three. It also names the item the upgrade aimed at: compare it with the item on this page.",
+  /** Card 4 of an upgraded win: the browser checked the slot the win records, it did not find one. */
+  winSlotLabel: "Slot your browser checked",
+} as const
+
+/**
+ * Whether a step on this edition's version may name its own target. The library's version table decides,
+ * so a new version is added in one place; an edition with no version, or one the library does not check,
+ * gets version 1's words.
+ */
+export function stepJumps(engineVersion: number | undefined): boolean {
+  return engineVersion !== undefined && upgradeRule(engineVersion)?.jumps === true
+}
+
+/** The labels and words of a step's checks for an edition on `engineVersion`: version 2's where they differ. */
+export function upgradeCheckWords(engineVersion: number | undefined): {
+  labels: Record<UpgradeStepName, string>
+  ok: Record<UpgradeStepName, string>
+  fail: Record<UpgradeStepName, string>
+} {
+  return stepJumps(engineVersion)
+    ? {
+        labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
+        ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords },
+        fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords },
+      }
+    : { labels: UPGRADE_CHECK_LABELS, ok: UPGRADE_CHECK_WORDS, fail: UPGRADE_FAIL_WORDS }
 }
 
 /** The verdict lines of a step. A lost step that checks out is a PASS of the check, never a celebration. */
@@ -429,7 +503,7 @@ export const STEP_LOOKUP_WORDS = {
 /**
  * A step chance in percent, rounded DOWN to two decimals, so it is never shown above the true chance (owner ruling, KAN-1154).
  * The same string as the server's `chanceCompact` (platform DisplayRounding.renderFloor), "< 0.01%" below 100 ppm
- * included; a step never goes under 10 %, but the two must not differ anywhere.
+ * included; a step never goes under 1 % (10 % on version 1), but the two must not differ anywhere.
  */
 export function percentDown(ppm: number): string {
   if (ppm < 100) return "< 0.01%"
