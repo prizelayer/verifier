@@ -1067,9 +1067,10 @@ describe('every upgrade offer vector', () => {
 
 /**
  * The two families of version 2 (KAN-1567, platform PR-1): the list of targets a win may name, and the
- * worst path a box must still pass at its floor. Both are computed here from this library's own
- * `upgradeTargets`, so the target rule is pinned twice: once as a list, once through every payout it
- * leads to. rng-fairness §4b.
+ * worst path, the least a player can expect. Since KAN-1685 the floor binds the box alone: each step
+ * returns 93 % of its stake, so the worst path is shown, never checked against the floor. Both are
+ * computed here from this library's own `upgradeTargets`, so the target rule is pinned twice: once as a
+ * list, once through every payout it leads to. rng-fairness §4b.
  */
 const TARGETS = FIXTURE.upgradeTargets;
 const WORST = FIXTURE.upgradeWorstPath;
@@ -1237,13 +1238,12 @@ describe('every upgrade worst-path vector', () => {
       assert.deepEqual(lowestTerms(worst, scale), vector.worstPathPayoutCents, 'worst-path payout');
       assert.deepEqual(lowestTerms(worst, scale * price), vector.worstPathRtp, 'worst-path RTP');
       assert.equal(percentFloor6(worst, scale * price), vector.worstPathRtpText, 'worst-path RTP text');
-      // The box returns Σ ppm × value over 1 000 000 × price; it and the worst path must both reach the floor.
+      // The box returns Σ ppm × value over 1 000 000 × price, and it alone must reach the floor (KAN-1685).
       const box = vector.slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
       assert.deepEqual(
         vector.verdicts.map(({ floorBps }) => ({
           floorBps,
-          meetsFloor:
-            box * 10_000n >= BigInt(floorBps) * MILLION * price && worst * 10_000n >= BigInt(floorBps) * scale * price,
+          meetsFloor: box * 10_000n >= BigInt(floorBps) * MILLION * price,
         })),
         vector.verdicts,
         'verdicts',

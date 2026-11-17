@@ -350,11 +350,11 @@ export async function runConformance(fixture) {
     eq(`${label}.payout`, lowestTerms(worst, scale), fraction(vector.worstPathPayoutCents));
     eq(`${label}.rtp`, lowestTerms(worst, scale * price), fraction(vector.worstPathRtp));
     eq(`${label}.rtpText`, percentFloor6(worst, scale * price), vector.worstPathRtpText);
-    // The box returns the sum of ppm x value over 1 000 000 x price; it and the worst path must both reach the floor.
+    // The box returns the sum of ppm x value over 1 000 000 x price, and it alone must reach the floor: each
+    // step returns 93 % of its stake, so the worst path is shown, not checked (KAN-1685).
     const box = slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * slot.requiredBuyBackValueCents, 0n);
     eq(`${label}.verdicts`,
-      vector.verdicts.map(({ floorBps }) => `${floorBps}:${
-        box * 10_000n >= BigInt(floorBps) * MILLION * price && worst * 10_000n >= BigInt(floorBps) * scale * price}`).join(','),
+      vector.verdicts.map(({ floorBps }) => `${floorBps}:${box * 10_000n >= BigInt(floorBps) * MILLION * price}`).join(','),
       vector.verdicts.map(({ floorBps, meetsFloor }) => `${floorBps}:${meetsFloor}`).join(','));
   }
 

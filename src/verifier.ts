@@ -633,11 +633,13 @@ export function upgradeRule(engineVersion: number): UpgradeRule | undefined {
 }
 
 /**
- * The chance of a step from a held value to a higher one: `floor(RTP × 1 000 000 × current / next)` ppm with
- * RTP = {@link UPGRADE_STEP_RTP_BPS} / 10 000, so the step's expected value is 93 % of the value staked. The higher value is the next one up on version 1
- * and any target {@link upgradeTargets} lists on version 2. 12,00 → 30,00 gives 372 000.
+ * The chance of a step from a held value to a higher one: `floor(RTP × 1 000 000 × current / next)` ppm
+ * with RTP = {@link UPGRADE_STEP_RTP_BPS} / 10 000, so the step's expected value is 93 % of the value
+ * staked. The higher value is the next one up on version 1 and any target {@link upgradeTargets} lists on
+ * version 2. 12,00 → 30,00 gives 372 000.
  *
  * Exact in `bigint`: no float ever touches a chance.
+ * Refs: KAN-1685
  */
 export function upgradeChancePpm(currentCents: bigint, nextCents: bigint): number {
   if (currentCents <= 0n || nextCents <= currentCents) {
@@ -1563,8 +1565,9 @@ export const UPGRADE_ENGINE_VERSION = 1;
 
 /**
  * The step's return to player in basis points: 9 300, so a step returns 93 % of the staked value in
- * expectation (a demo setting, KAN-1685). {@link upgradeChancePpm} is the chance at exactly this value;
- * the fixture states it, and the conformance suite compares the two.
+ * expectation (a demo setting). {@link upgradeChancePpm} is the chance at exactly this value; the fixture
+ * states it, and the conformance suite compares the two.
+ * Refs: KAN-1685
  */
 export const UPGRADE_STEP_RTP_BPS = 9_300;
 
