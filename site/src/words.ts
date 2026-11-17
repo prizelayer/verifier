@@ -259,7 +259,7 @@ export const UPGRADE_STEPS = [
       "Read from the box record: `edition` (its prize table and chances); from the step record: `step.engineType`, `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.chancePpm`, `step.chanceCompact` and `step.stepNo`.",
     text: [
       "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
-      "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",
+      "The chance is fixed by the two buy-back values: 93% of the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 37.20% chance. On average you get back 93% of what you staked, and never more.",
       "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is the next one up from yours, and that the chance is exactly that value. There is no upgrade below a 10% chance, and at most 3 in a row.",
     ],
   },
@@ -277,7 +277,7 @@ export const UPGRADE_STEPS = [
     method: null,
     source: "Read from the step record: `step.outcome`. The two ranges come from the chance checked in step 2.",
     text: [
-      "An upgrade has only two ranges. The first is as wide as the chance and wins; the second holds every other number and loses. With a 40% chance, the numbers 0 to 399,999 win.",
+      "An upgrade has only two ranges. The first is as wide as the chance and wins; the second holds every other number and loses. With a 37.20% chance, the numbers 0 to 371,999 win.",
       "Your browser reads your number v against those two ranges, not against the box's prize table, and compares the result with the one we recorded.",
     ],
   },
@@ -374,7 +374,7 @@ export const UPGRADE_CHECK_WORDS: Record<UpgradeStepName, string> = {
   engineType: "The box is an upgrade box.",
   engineVersion: "The box uses version 1 of the upgrade rules, the version this page checks.",
   upgradeTarget: "The item offered is the next one up from the item you gave up.",
-  upgradeChance: "The chance is the value you gave up divided by the value offered, rounded down.",
+  upgradeChance: "The chance is 93% of the value you gave up divided by the value offered, rounded down.",
   chanceCompact: "The percent you were shown is this fair chance, rounded down to 0.01 %.",
   stepNo: "This upgrade is within the 3 a win may take.",
   drawnPpmValue: "The pick, redone from the secret, the client seed and the counter, gives the number we recorded.",

@@ -4,9 +4,10 @@ import type { Answer } from "./fakeServer"
 /**
  * The public answers of two upgrade steps and of the win the first one made (KAN-1154), on the worked
  * box of plan v1.2: buy-back 5 / 12 / 30 / 80 EUR, a 12 EUR win (slot 1) staked for the 30 EUR item
- * (slot 2) at 400 000 ppm. They reuse the example's revealed seed pair (`alice-seed`), whose nonce 1
- * draws 186 669 (below 400 000: won) and nonce 2 draws 459 796 (lost); both values are spec rows the
- * platform pins. The fingerprint was computed once by the library and is pinned here.
+ * (slot 2) at 372 000 ppm (each step returns 93 % of its stake, KAN-1685). They reuse the example's revealed
+ * seed pair (`alice-seed`), whose nonce 1 draws 186 669 (below 372 000: won) and nonce 2 draws 459 796
+ * (lost); both values are spec rows the platform pins. The fingerprint was computed once by the library and
+ * is pinned here.
  */
 export const UPGRADE_EDITION = {
   editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a11",
@@ -38,8 +39,8 @@ export const WON_STEP = {
   snapshotHash: null,
   stakedSlotIndex: 1,
   targetSlotIndex: 2,
-  chancePpm: 400000,
-  chanceCompact: "40.00%",
+  chancePpm: 372000,
+  chanceCompact: "37.20%",
   drawnPpmValue: 186669,
   outcome: "won",
   newWinId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e02",
@@ -70,23 +71,23 @@ export const UPGRADED_OPEN = {
   chosenProbabilityPpm: null,
   upgradeStepId: WON_STEP.stepId,
   stakedSlotIndex: 1,
-  stepChancePpm: 400000,
-  stepChanceCompact: "40.00%",
+  stepChancePpm: 372000,
+  stepChanceCompact: "37.20%",
   stepOutcome: "won",
 }
 
 /**
- * A won step from the cheapest item (slot 0, 5 EUR) to the next one up (slot 1, 12 EUR): 500 / 1200 is
- * 416 666 ppm, a chance whose floor (41.66%) and rounding (41.67%) differ. The target is slot 1, so a
- * range marked by the slot index would be the LOSING one (review of #16, finding 1).
+ * A won step from the cheapest item (slot 0, 5 EUR) to the next one up (slot 1, 12 EUR): 930 000 × 500 / 1200
+ * is 387 500 ppm. The target is slot 1, so a range marked by the slot index would be the LOSING one (review
+ * of #16, finding 1).
  */
 export const WON_STEP_0_TO_1 = {
   ...WON_STEP,
   stepId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e04",
   stakedSlotIndex: 0,
   targetSlotIndex: 1,
-  chancePpm: 416666,
-  chanceCompact: "41.66%",
+  chancePpm: 387500,
+  chanceCompact: "38.75%",
   newWinId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e05",
 }
 
@@ -97,8 +98,23 @@ export const UPGRADED_OPEN_0_TO_1 = {
   drawnSlotIndex: 1,
   upgradeStepId: WON_STEP_0_TO_1.stepId,
   stakedSlotIndex: 0,
-  stepChancePpm: 416666,
-  stepChanceCompact: "41.66%",
+  stepChancePpm: 387500,
+  stepChanceCompact: "38.75%",
+}
+
+/**
+ * A won step from slot 2 (30 EUR) to slot 3 (80 EUR): 930 000 × 3000 / 8000 is 348 750 ppm, 34.875 %, a
+ * chance whose floor (34.87%) and rounding (34.88%) differ. At 93 % the steps of the worked box above have
+ * no such remainder, so this one carries it (KAN-1685).
+ */
+export const WON_STEP_2_TO_3 = {
+  ...WON_STEP,
+  stepId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e06",
+  stakedSlotIndex: 2,
+  targetSlotIndex: 3,
+  chancePpm: 348750,
+  chanceCompact: "34.87%",
+  newWinId: "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e07",
 }
 
 /** Every answer above, by path, as the fake server serves them. */
@@ -110,6 +126,7 @@ export function upgradeAnswers(): Map<string, Answer> {
     [`/verify/opens/${UPGRADED_OPEN.winId}`, ok(UPGRADED_OPEN)],
     [`/verify/upgrade-steps/${WON_STEP_0_TO_1.stepId}`, ok(WON_STEP_0_TO_1)],
     [`/verify/opens/${UPGRADED_OPEN_0_TO_1.winId}`, ok(UPGRADED_OPEN_0_TO_1)],
+    [`/verify/upgrade-steps/${WON_STEP_2_TO_3.stepId}`, ok(WON_STEP_2_TO_3)],
     [`/verify/seed-pairs/${SEED_PAIR.seedPairId}`, ok(SEED_PAIR)],
     [`/verify/editions/${UPGRADE_EDITION.editionId}`, ok(UPGRADE_EDITION)],
   ])
