@@ -1,0 +1,61 @@
+{
+  "valid": true,
+  "floorBps": 9300,
+  "operatorMinimumBps": null,
+  "rtpBps": 9636,
+  "note": "Valid now. Stock, prices and floors can change before you publish; this check reserves nothing.",
+  "refusals": [],
+  "warnings": [],
+  "upgrade": {
+    "engineType": "single_draw_weighted_table_fair_upgrade",
+    "engineVersion": 3,
+    "maxSteps": null,
+    "minChancePpm": 1000,
+    "minChanceCompact": "0.10%",
+    "offerMinChancePpm": 1000,
+    "offerMinChanceCompact": "0.10%",
+    "stepRtpBps": 9636,
+    "stepRtpText": "96.36 %",
+    "alwaysClimbRtp": null,
+    "alwaysClimbRtpText": null,
+    "upgradeRefusal": null,
+    "upgradeWarning": null,
+    "slots": [
+      {
+        "slotIndex": 0,
+        "targetSlotIndex": 1,
+        "chancePpm": 401500,
+        "chanceCompact": "40.15%",
+        "noOfferReason": null
+      },
+      {
+        "slotIndex": 1,
+        "targetSlotIndex": 2,
+        "chancePpm": 578160,
+        "chanceCompact": "57.81%",
+        "noOfferReason": null
+      },
+      {
+        "slotIndex": 2,
+        "targetSlotIndex": 3,
+        "chancePpm": 428267,
+        "chanceCompact": "42.82%",
+        "noOfferReason": null
+      },
+      {
+        "slotIndex": 3,
+        "targetSlotIndex": 4,
+        "chancePpm": 216810,
+        "chanceCompact": "21.68%",
+        "noOfferReason": null
+      },
+      {
+        "slotIndex": 4,
+        "targetSlotIndex": null,
+        "chancePpm": null,
+        "chanceCompact": null,
+        "noOfferReason": "top_value"
+      }
+    ]
+  }
+}

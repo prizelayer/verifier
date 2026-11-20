@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 4d71f20..f4e942b 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -555,7 +555,7 @@ export const UPGRADE_V3_WORDS = {
+         "An upgrade gives up the item you hold for a chance at a more valuable item in the same box: the item you chose, not only the next one up.",
+         rate === undefined
+           ? "The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %, and it is never under 93 %. The chance is that rate times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.18% chance. On average you get back at least that rate of what you staked."
+-          : `The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %; on this box it is ${rate}, and it is never under 93 %. The chance is ${rate} times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.18% chance. On average you get back at least ${rate} of what you staked.`,
++          : `The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %; on this box it is ${rate}, and it is never under 93 %. The chance is ${rate} times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.19% chance. On average you get back at least ${rate} of what you staked.`,
+         "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is a more valuable one in the same box, and that the chance is the box's upgrade rate times the value staked, divided by the value of the item offered, rounded up to a millionth. Your browser works out the upgrade rate itself, from the box's chances and its price: it is the box's return, rounded down to 0.01 %, and at most 99.90 %. There is no upgrade below a 0.10% chance. There is no limit on upgrades in a row: a chain ends at the most valuable prize of the box.",
+       ],
+     }

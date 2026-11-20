@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 9fc7248..6504073 100644
+index 65c17d6..4948522 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -877,7 +877,7 @@ export async function verifyFrom(build: () => VerificationInput): Promise<Verifi
+@@ -1321,7 +1321,7 @@ export async function verifyFrom(build: () => VerificationInput, options: Upgrad
    try {
      input = build();
    } catch (error) {
 -    return invalidReport(error);
 +    throw error;
    }
-   return verify(input);
+   return verify(input, options);
  }

@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 65c17d6..d0624c7 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -684,7 +684,7 @@ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
+     minChancePpm: UPGRADE_MIN_CHANCE_PPM,
+     offerMinChancePpm: UPGRADE_MIN_CHANCE_PPM,
+     jumps: false,
+-    maxSteps: UPGRADE_MAX_STEPS,
++    maxSteps: null,
+     stepRtpBps: 10_000,
+     stepRtpCapBps: null,
+     stepRtpFloorBps: null,

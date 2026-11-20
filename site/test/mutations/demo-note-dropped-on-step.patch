@@ -1,0 +1,13 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+index 5253d12..299dc7c 100644
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -59,7 +59,7 @@ export function UpgradeStepCards({ report, input }: Props) {
+             {text.map((p) => (
+               <p key={p}>{p}</p>
+             ))}
+-            {step === 2 && report.trace.ruleSet === "DEMO_RULES_2026_11_17" ? (
++            {step === 2 && report.trace.ruleSet === "DEMO_RULES" ? (
+               <p className="font-semibold" data-demo="yes">
+                 {DEMO_STEP_NOTE}
+               </p>

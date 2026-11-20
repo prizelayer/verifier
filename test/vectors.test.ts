@@ -40,6 +40,7 @@ import {
   stepOutcome,
   stepTable,
   upgradeChancePpm,
+  upgradeStepRateBps,
   upgradeRule,
   upgradeTarget,
   upgradeTargets,
@@ -1067,10 +1068,9 @@ describe('every upgrade offer vector', () => {
 
 /**
  * The two families of version 2 (KAN-1567, platform PR-1): the list of targets a win may name, and the
- * worst path, the least a player can expect. Since KAN-1685 the floor binds the box alone: each step
- * returns 93 % of its stake, so the worst path is shown, never checked against the floor. Both are
- * computed here from this library's own `upgradeTargets`, so the target rule is pinned twice: once as a
- * list, once through every payout it leads to. rng-fairness §4b.
+ * worst path a box must still pass at its floor. Both are computed here from this library's own
+ * `upgradeTargets`, so the target rule is pinned twice: once as a list, once through every payout it
+ * leads to. rng-fairness §4b.
  */
 const TARGETS = FIXTURE.upgradeTargets;
 const WORST = FIXTURE.upgradeWorstPath;
@@ -1181,7 +1181,9 @@ describe('the version 2 sections of the fixture (KAN-1567)', () => {
   it('state the version table this library uses', () => {
     for (const section of [TARGETS, WORST]) {
       assert.equal(section.constants.engineType, UPGRADE_ENGINE_TYPE);
-      assert.deepEqual(section.constants.engineVersions, UPGRADE_RULES.map((rule) => rule.engineVersion));
+      // The fixture's version 1 and 2 sections state versions 1 and 2; version 3's families come with the
+      // platform's version 3 vectors (KAN-1751 PR-1b2) and state their own constants.
+      assert.deepEqual(section.constants.engineVersions, UPGRADE_RULES.filter((rule) => rule.engineVersion <= 2).map((rule) => rule.engineVersion));
       assert.equal(section.constants.maxSteps, UPGRADE_MAX_STEPS);
       assert.equal(section.constants.minChancePpm, upgradeRule(1)?.minChancePpm);
       assert.equal(section.constants.jumpMinChancePpm, upgradeRule(2)?.minChancePpm);
@@ -1238,12 +1240,13 @@ describe('every upgrade worst-path vector', () => {
       assert.deepEqual(lowestTerms(worst, scale), vector.worstPathPayoutCents, 'worst-path payout');
       assert.deepEqual(lowestTerms(worst, scale * price), vector.worstPathRtp, 'worst-path RTP');
       assert.equal(percentFloor6(worst, scale * price), vector.worstPathRtpText, 'worst-path RTP text');
-      // The box returns Σ ppm × value over 1 000 000 × price, and it alone must reach the floor (KAN-1685).
+      // The box returns Σ ppm × value over 1 000 000 × price; it and the worst path must both reach the floor.
       const box = vector.slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
       assert.deepEqual(
         vector.verdicts.map(({ floorBps }) => ({
           floorBps,
-          meetsFloor: box * 10_000n >= BigInt(floorBps) * MILLION * price,
+          meetsFloor:
+            box * 10_000n >= BigInt(floorBps) * MILLION * price && worst * 10_000n >= BigInt(floorBps) * scale * price,
         })),
         vector.verdicts,
         'verdicts',
@@ -1316,7 +1319,11 @@ describe('the jump-step section of the fixture (KAN-1567)', () => {
     const c = JUMP_STEP.constants;
     assert.equal(c.engineType, UPGRADE_ENGINE_TYPE);
     assert.equal(c.engineVersion, 2);
-    assert.deepEqual(upgradeRule(c.engineVersion), { engineVersion: 2, minChancePpm: c.jumpMinChancePpm, jumps: true });
+    const rule = upgradeRule(c.engineVersion);
+    assert.equal(rule?.minChancePpm, c.jumpMinChancePpm);
+    assert.equal(rule?.jumps, true);
+    assert.equal(rule?.maxSteps, c.maxSteps);
+    assert.equal(rule?.stepRtpBps, c.stepRtpBps);
     assert.equal(c.jumpMinChancePpm, UPGRADE_JUMP_MIN_CHANCE_PPM);
     assert.equal(c.minChancePpm, upgradeRule(1)?.minChancePpm);
     assert.equal(c.maxSteps, UPGRADE_MAX_STEPS);
@@ -1390,6 +1397,251 @@ describe('every upgrade jump-step vector, through verifyUpgradeStep', () => {
   }
 });
 
+const RATE_STEP = FIXTURE.upgradeRateStep;
+
+interface RateTarget {
+  targetSlotIndex: number;
+  chancePpm: number;
+  chanceCompact: string;
+}
+
+interface RateQuery {
+  heldSlotIndex: number;
+  /** The held win's step number, 0 for a box win. */
+  stepNo: number;
+  targets: RateTarget[];
+  offer?: RateTarget;
+  noOfferReason?: 'top_value' | 'under_minimum';
+}
+
+interface RateStepVector extends JumpStepVector {
+  stakedBuyBackValueCents: number;
+}
+
+interface RateFamily {
+  id: string;
+  note: string;
+  priceCents: string;
+  slots: { slotIndex: number; probabilityPpm: number; buyBackValueCents: number }[];
+  /** S, the sum over the slots of chance in ppm times buy-back cents, as a decimal string. Compared, never read. */
+  payoutTimesMillion: string;
+  /** The box's return in basis points before the cap and the floor. Compared, never read. */
+  boxBps: number;
+  /** The family's rate, written for the reader. Never read for a chance: see checkRateFamily. */
+  stepRtpBps: number;
+  queries: RateQuery[];
+  steps: RateStepVector[];
+}
+
+/** A family's box as an edition: its own chances, buy-back values and price, so its rate is its own. */
+function rateEdition(family: RateFamily, engineVersion = 3): Edition {
+  return {
+    engineId: '17511751-0000-4000-8000-000000000003',
+    engineVersion,
+    priceCents: BigInt(family.priceCents),
+    slots: family.slots.map((slot) => ({
+      slotIndex: slot.slotIndex,
+      probabilityPpm: slot.probabilityPpm,
+      requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+      requiredMarketValueCents: 0n,
+    })),
+  };
+}
+
+/**
+ * The library's rate for a family's box, computed from the box, and the family refused when its written
+ * rate differs. The oracle on platform refuses the same family (tools/oracle/upgrade_rate.py): the written
+ * number is for the reader, and a family whose number and box disagree is a broken family, not a pass.
+ * Refs: KAN-1751 plan v2.4 S-7
+ */
+function checkRateFamily(family: RateFamily): number {
+  // S and boxBps are worked out here from the box, in BigInt (S can pass 2^53 on a large box), and the
+  // library's rate must be boxBps under the cap: the three written numbers are each compared, none is read.
+  const sum = family.slots.reduce((acc, slot) => acc + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
+  if (typeof family.payoutTimesMillion !== 'string' || BigInt(family.payoutTimesMillion) !== sum) {
+    throw new Error(`family ${family.id} writes S = ${family.payoutTimesMillion}, its box gives ${sum}`);
+  }
+  const boxBps = (10_000n * sum) / (BigInt(PPM_TOTAL) * BigInt(family.priceCents));
+  if (BigInt(family.boxBps) !== boxBps) {
+    throw new Error(`family ${family.id} writes boxBps ${family.boxBps}, its box gives ${boxBps}`);
+  }
+  const rate = upgradeStepRateBps(rateEdition(family), 3);
+  if (rate !== family.stepRtpBps) {
+    throw new Error(`family ${family.id} writes a rate of ${family.stepRtpBps} bps, its box gives ${rate}`);
+  }
+  if (BigInt(rate) !== (boxBps < BigInt(RATE_STEP.constants.stepRtpCapBps) ? boxBps : BigInt(RATE_STEP.constants.stepRtpCapBps))) {
+    throw new Error(`family ${family.id}: the library's rate ${rate} is not boxBps ${boxBps} under the cap`);
+  }
+  return rate;
+}
+
+function rateStepInput(family: RateFamily, vector: RateStepVector, edition: Edition, fingerprint: string): UpgradeStepInput {
+  return {
+    serverSeedHex: RATE_STEP.serverSeedHex,
+    commitmentHex: RATE_STEP.commitmentHex,
+    clientSeed: vector.clientSeed,
+    nonce: vector.nonce,
+    edition,
+    engineType: RATE_STEP.constants.engineType,
+    expected: {
+      editionFingerprint: fingerprint,
+      stakedSlotIndex: vector.heldSlotIndex,
+      targetSlotIndex: vector.targetSlotIndex,
+      chancePpm: vector.chancePpm,
+      chanceCompact: vector.chanceCompact,
+      drawnPpmValue: vector.v,
+      outcome: vector.outcome,
+      stepNo: vector.stepNo + 1,
+    },
+  };
+}
+
+const RATE_FAMILIES = RATE_STEP.families as RateFamily[];
+
+describe('the version 3 section of the fixture (KAN-1751)', () => {
+  it('states version 3 and the constants this library uses for it', () => {
+    const c = RATE_STEP.constants;
+    const rule = upgradeRule(3);
+    assert.equal(c.engineType, UPGRADE_ENGINE_TYPE);
+    assert.equal(c.engineVersion, rule?.engineVersion);
+    assert.equal(c.maxSteps, rule?.maxSteps);
+    assert.equal(c.minChancePpm, rule?.minChancePpm);
+    assert.equal(c.offerMinChancePpm, rule?.offerMinChancePpm);
+    assert.equal(c.stepRtpCapBps, rule?.stepRtpCapBps);
+    assert.equal(c.stepRtpFloorBps, rule?.stepRtpFloorBps);
+    assert.equal(rule?.roundsUp, true);
+    assert.equal(rule?.jumps, true);
+  });
+
+  it('carries a commitment that is the digest of its own server seed', async () => {
+    assert.equal(await commitment(bytesFromHex(RATE_STEP.serverSeedHex)), RATE_STEP.commitmentHex);
+  });
+
+  it('has the families platform PR-1b2 named', () => {
+    assert.deepEqual(
+      RATE_FAMILIES.map((family) => family.id),
+      [
+        'rate-9300',
+        'rate-9300-single-offer-8-to-80',
+        'rate-9300-single-offer-5-to-80',
+        'rate-9300-single-offer-edge',
+        'rate-9300-single-offer-under-minimum',
+        'rate-pin-worked-box',
+        'rate-9400',
+        'rate-9550',
+        'rate-9636',
+        'rate-9636-minimum-target',
+        'rate-9990-above-cap',
+        'rate-9990-at-cap',
+        'rate-9500-equal-values',
+      ],
+    );
+  });
+
+  it('refuses a family whose written rate, S or boxBps is one off its box, either way', () => {
+    // S-7: the rate comes from the box. A family copied with a field moved by one must be refused;
+    // were the field read, the copy would pass.
+    for (const family of RATE_FAMILIES) {
+      for (const delta of [-1, 1]) {
+        const rate = { ...family, stepRtpBps: family.stepRtpBps + delta };
+        assert.throws(() => checkRateFamily(rate), new RegExp(`family ${family.id} writes a rate of ${rate.stepRtpBps} bps`));
+        const s = { ...family, payoutTimesMillion: String(BigInt(family.payoutTimesMillion) + BigInt(delta)) };
+        assert.throws(() => checkRateFamily(s), new RegExp(`family ${family.id} writes S = ${s.payoutTimesMillion},`));
+        const box = { ...family, boxBps: family.boxBps + delta };
+        assert.throws(() => checkRateFamily(box), new RegExp(`family ${family.id} writes boxBps ${box.boxBps},`));
+      }
+      // S is a decimal string, as the price is: a number in its place is refused, not read.
+      assert.throws(() => checkRateFamily({ ...family, payoutTimesMillion: Number(family.payoutTimesMillion) as unknown as string }), /writes S/);
+    }
+  });
+
+  it('has a family with a rate above the cap, so boxBps and the rate differ somewhere', () => {
+    assert.ok(RATE_FAMILIES.some((family) => family.boxBps > family.stepRtpBps));
+  });
+});
+
+describe('every version 3 family, from its box', () => {
+  for (const family of RATE_FAMILIES) {
+    it(family.id, () => {
+      record('upgradeRateStep', family.id);
+      const rate = checkRateFamily(family);
+      const edition = rateEdition(family);
+      family.queries.forEach((query, i) => {
+        record('upgradeRateStep', `${family.id}/query-${i}`);
+        const where = `query ${i} (held slot ${query.heldSlotIndex})`;
+        const targets = upgradeTargets(edition, query.heldSlotIndex, 3);
+        assert.deepEqual(
+          targets,
+          query.targets.map(({ targetSlotIndex, chancePpm }) => ({ targetSlotIndex, chancePpm })),
+          `${where}: targets`,
+        );
+        for (const target of query.targets) {
+          assert.equal(stepChanceText(target.chancePpm), target.chanceCompact, `${where}: chanceCompact of slot ${target.targetSlotIndex}`);
+        }
+        const offer = upgradeTarget(edition, query.heldSlotIndex, 3);
+        if (query.offer === undefined) {
+          assert.equal(offer, null, `${where}: no offer`);
+          const held = edition.slots.find((slot) => slot.slotIndex === query.heldSlotIndex)!.requiredBuyBackValueCents;
+          const higher = edition.slots.filter((slot) => slot.requiredBuyBackValueCents > held);
+          if (query.noOfferReason === 'top_value') {
+            assert.equal(higher.length, 0, `${where}: top_value means nothing is worth more`);
+          } else {
+            assert.equal(query.noOfferReason, 'under_minimum', `${where}: a known reason`);
+            const next = higher.reduce((a, b) => (b.requiredBuyBackValueCents < a.requiredBuyBackValueCents ? b : a));
+            assert.ok(
+              upgradeChancePpm(held, next.requiredBuyBackValueCents, rate, true) < RATE_STEP.constants.offerMinChancePpm,
+              `${where}: under_minimum means the next value is under the offer's minimum`,
+            );
+          }
+        } else {
+          assert.deepEqual(offer, { targetSlotIndex: query.offer.targetSlotIndex, chancePpm: query.offer.chancePpm }, `${where}: offer`);
+          // On version 3 the single offer is always the list's first entry.
+          assert.deepEqual(offer, targets[0], `${where}: the offer is the first target`);
+        }
+      });
+    });
+  }
+});
+
+describe('every version 3 step, from its inputs and through verifyUpgradeStep', () => {
+  const seed = bytesFromHex(RATE_STEP.serverSeedHex);
+  for (const family of RATE_FAMILIES) {
+    for (const vector of family.steps) {
+      it(`${family.id}/${vector.id}`, async () => {
+        record('upgradeRateStep', `${family.id}/${vector.id}`);
+        const rate = checkRateFamily(family);
+        const edition = rateEdition(family);
+        const valueOf = (slotIndex: number) => edition.slots.find((slot) => slot.slotIndex === slotIndex)?.requiredBuyBackValueCents;
+        assert.equal(valueOf(vector.heldSlotIndex), BigInt(vector.stakedBuyBackValueCents), "the staked value is the held slot's");
+        assert.equal(valueOf(vector.targetSlotIndex), BigInt(vector.targetBuyBackValueCents), "the target value is the named slot's");
+
+        const chance = upgradeChancePpm(BigInt(vector.stakedBuyBackValueCents), BigInt(vector.targetBuyBackValueCents), rate, true);
+        assert.equal(chance, vector.chancePpm, 'chance');
+        assert.deepEqual(stepTable(chance).map((row) => row.probabilityPpm), vector.stepTablePpm, 'step table');
+        const v = (await derive(seed, vector.clientSeed, vector.nonce)).value;
+        assert.equal(v, vector.v, 'drawn v');
+        const outcome = stepOutcome(v, chance);
+        assert.equal(outcome, vector.outcome, 'outcome');
+        assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+        assert.equal(stepChanceText(chance), vector.chanceCompact, 'chanceCompact');
+
+        const fingerprint = await editionFingerprint(edition);
+        const report = await verifyUpgradeStep(rateStepInput(family, vector, edition, fingerprint));
+        assert.equal(report.status, 'verified', report.summary);
+        assert.deepEqual(report.notRun, []);
+        assert.equal(report.trace.stepRateBps, family.stepRtpBps);
+        assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: vector.targetSlotIndex, chancePpm: vector.chancePpm });
+        assert.equal(report.trace.computedOutcome, vector.outcome);
+
+        // The same step on a version 2 edition of the same box is not this chance.
+        const asVersion2 = rateEdition(family, 2);
+        const onVersion2 = await verifyUpgradeStep(rateStepInput(family, vector, asVersion2, await editionFingerprint(asVersion2)));
+        assert.equal(onVersion2.status, 'failed', onVersion2.summary);
+      });
+    }
+  }
+});
+
 /**
  * Declared LAST on purpose. `node --test` runs top-level suites in definition order and does not
  * overlap them unless asked to, so by the time this runs the ledger above is complete.
@@ -1405,6 +1657,16 @@ describe('no vector in the fixture is left unasserted', () => {
     // One test rather than two (family coverage, then vector coverage) because a new family fails
     // both for the same cause, and one red per cause is easier to act on than two.
     const expected = families.flatMap(([family, body]) => {
+      // Version 3's section holds families of a box each, with queries and steps (KAN-1751): every
+      // family, every query by its place and every step by its id is one entry.
+      const rateFamilies = (body as { families?: RateFamily[] }).families;
+      if (rateFamilies !== undefined) {
+        return rateFamilies.flatMap((f) => [
+          `${family}/${f.id}`,
+          ...f.queries.map((_, i) => `${family}/${f.id}/query-${i}`),
+          ...f.steps.map((step) => `${family}/${f.id}/${step.id}`),
+        ]);
+      }
       const vectors = (body as { vectors?: { id: string }[] }).vectors;
       assert.ok(
         vectors?.length,

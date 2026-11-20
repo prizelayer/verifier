@@ -1,0 +1,13 @@
+diff --git a/test/vectors.test.ts b/test/vectors.test.ts
+index fc84c21..f5d1d63 100644
+--- a/test/vectors.test.ts
++++ b/test/vectors.test.ts
+@@ -1461,7 +1461,7 @@ function checkRateFamily(family: RateFamily): number {
+   if (typeof family.payoutTimesMillion !== 'string' || BigInt(family.payoutTimesMillion) !== sum) {
+     throw new Error(`family ${family.id} writes S = ${family.payoutTimesMillion}, its box gives ${sum}`);
+   }
+-  const boxBps = (10_000n * sum) / (BigInt(PPM_TOTAL) * BigInt(family.priceCents));
++  const boxBps = BigInt(family.boxBps);
+   if (BigInt(family.boxBps) !== boxBps) {
+     throw new Error(`family ${family.id} writes boxBps ${family.boxBps}, its box gives ${boxBps}`);
+   }

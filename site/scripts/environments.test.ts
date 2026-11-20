@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { API_TOKEN, environmentFor, environments, policyFor } from "./environments"
+import { API_TOKEN, demoStepsFor, environmentFor, environments, policyFor } from "./environments"
 
 /**
  * One build per environment (KAN-956). The table is pinned by its literals: a change of an address
@@ -80,5 +80,43 @@ describe("the page's own policy", () => {
     ["twice", `${API_TOKEN} ${API_TOKEN}`, 2],
   ])("stops the build when the token is %s", (_name, source, count) => {
     expect(() => apply(source)).toThrow(`index.html holds ${API_TOKEN} ${count} times, not once`)
+  })
+})
+
+/**
+ * The dev list of the demo steps of 17 and 18 November 2026 (KAN-1751 plan v1.2 D3 A): the production build has
+ * none, whatever the file says for dev, and a file that gives any other environment a list stops the build.
+ */
+describe("demo-steps.json", () => {
+  const ID = "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01"
+  const withSteps = (read: unknown) => JSON.stringify({ dev: { date: "2026-11-17", read, stepIds: [ID] } })
+
+  it("gives the production build zero entries, from the file as committed and from a full list", () => {
+    expect(demoStepsFor("prod")).toEqual([])
+    expect(demoStepsFor("prod", withSteps("run 1"))).toEqual([])
+    for (const environment of environments()) {
+      if (environment.name !== "dev") expect(demoStepsFor(environment.name)).toEqual([])
+    }
+  })
+
+  it("gives dev its list", () => {
+    expect(demoStepsFor("dev", withSteps("run 1"))).toEqual([ID])
+  })
+
+  it("holds only a list for dev, dated by the day its demo rule started, 17 November 2026", () => {
+    const file = JSON.parse(readFileSync(join(ROOT, "demo-steps.json"), "utf8"))
+    expect(Object.keys(file)).toEqual(["dev"])
+    expect(file.dev.date).toBe("2026-11-17")
+  })
+
+  it.each([
+    ["a list for prod", JSON.stringify({ prod: { date: "2026-11-17", read: "r", stepIds: [] } }), /only dev has a list of demo steps, not 'prod'/],
+    ["another date", JSON.stringify({ dev: { date: "2026-11-18", read: "r", stepIds: [] } }), /not '2026-11-18'/],
+    ["an id in capitals", JSON.stringify({ dev: { date: "2026-11-17", read: "r", stepIds: [ID.toUpperCase()] } }), /lower case/],
+    ["an id twice", JSON.stringify({ dev: { date: "2026-11-17", read: "r", stepIds: [ID, ID] } }), /listed twice/],
+    ["steps with no read", withSteps(null), /names the read that made it/],
+    ["steps with an empty read", withSteps(""), /names the read that made it/],
+  ])("refuses %s", (_, text, message) => {
+    expect(() => demoStepsFor("dev", text)).toThrow(message)
   })
 })

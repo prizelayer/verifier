@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index e346b3b..d1ab572 100644
+index 65c17d6..eab69ed 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -723,7 +723,7 @@ export function upgradeTargets(edition: Pick<Edition, 'slots'>, slotIndex: numbe
+@@ -919,7 +919,7 @@ function targetsFor(edition: UpgradeEditionOdds, slotIndex: number, rule: Upgrad
   */
- function stepFor(edition: Pick<Edition, 'slots'>, rule: UpgradeRule, stakedSlot: number, targetSlot: number): UpgradeOffer | null {
-   if (!rule.jumps) return upgradeTarget(edition, stakedSlot);
--  return upgradeTargets(edition, stakedSlot, rule.engineVersion).find((t) => t.targetSlotIndex === targetSlot) ?? null;
-+  return upgradeTargets(edition, stakedSlot, rule.engineVersion)[0] ?? null;
+ function stepFor(edition: UpgradeEditionOdds, rule: UpgradeRule, stakedSlot: number, targetSlot: number): UpgradeOffer | null {
+   if (!rule.jumps) return offerFor(edition, stakedSlot, rule);
+-  return targetsFor(edition, stakedSlot, rule).find((t) => t.targetSlotIndex === targetSlot) ?? null;
++  return targetsFor(edition, stakedSlot, rule)[0] ?? null;
  }
  
  /** Why a step has no fair chance, in the words the reports use: version 1 names the staked slot alone. */

@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vitest/config"
 import { buildInfoFrom } from "./scripts/build-info.ts"
-import { environmentFor, policyFor } from "./scripts/environments.ts"
+import { demoStepsFor, environmentFor, policyFor } from "./scripts/environments.ts"
 
 /**
  * One build for three places: the CloudFront host, the GitHub Pages host (under /verifier/), and a
@@ -24,6 +24,8 @@ export default defineConfig(({ command }) => {
       __VERIFIER_BUILD__: JSON.stringify(buildInfoFrom(process.env)),
       __VERIFIER_API__: JSON.stringify(environment.api),
       __VERIFIER_SUMS_URL__: JSON.stringify(environment.sums),
+      // The steps of 17 November checked under the demo rules: dev's list, and none in any other build.
+      __VERIFIER_DEMO_STEPS__: JSON.stringify(demoStepsFor(environment.name)),
     },
     plugins: [react(), tailwindcss(), policyFor(environment)],
     resolve: {

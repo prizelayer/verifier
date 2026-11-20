@@ -73,3 +73,34 @@ export function policyFor(environment: Environment): Plugin {
     },
   }
 }
+
+/**
+ * The dev list of the upgrade steps drawn at 93 % on 17 and 18 November 2026 (KAN-1751 plan v1.2 D3 A): a step
+ * on it is checked under the library's `DEMO_RULES_2026_11_17`, every other step under its version's
+ * rule. Only dev may have a list; production has none, and a file that gives any other environment one
+ * stops the build. The list names the read that made it, and a list with steps but no read is refused.
+ * Its `date` is the day the demo rule started, 17 November, as in the rule set's name; the steps run into
+ * 18 November. It is deleted at dev's next reset.
+ * Refs: KAN-1751, KAN-1685
+ */
+const DEMO_FILE = join(import.meta.dirname, "..", "demo-steps.json")
+const STEP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+export function demoStepsFor(environment: string, text: string = readFileSync(DEMO_FILE, "utf8")): string[] {
+  const table = JSON.parse(text) as Record<string, { date?: unknown; read?: unknown; stepIds?: unknown }>
+  for (const name of Object.keys(table)) {
+    if (name !== "dev") throw new Error(`demo-steps.json: only dev has a list of demo steps, not '${name}'`)
+  }
+  const dev = table.dev
+  if (dev === undefined) return []
+  if (dev.date !== "2026-11-17") throw new Error(`demo-steps.json: the list is of the demo rule that started on 2026-11-17, not '${String(dev.date)}'`)
+  const ids = dev.stepIds
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || !STEP_ID.test(id))) {
+    throw new Error("demo-steps.json: dev.stepIds must be a list of step ids in lower case")
+  }
+  if (new Set(ids).size !== ids.length) throw new Error("demo-steps.json: a step id is listed twice")
+  if (ids.length > 0 && (typeof dev.read !== "string" || dev.read === "")) {
+    throw new Error("demo-steps.json: a list with steps names the read that made it in dev.read")
+  }
+  return environment === "dev" ? (ids as string[]) : []
+}

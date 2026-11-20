@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 65c17d6..f530847 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -793,7 +793,7 @@ function stepRate(edition: UpgradeEditionOdds, rule: UpgradeRule): number {
+   }
+   let sum = 0n;
+   for (const slot of sortedSlots(edition.slots)) sum += BigInt(slot.probabilityPpm) * slot.requiredBuyBackValueCents;
+-  const boxBps = (10_000n * sum) / (BigInt(PPM_TOTAL) * price);
++  const boxBps = (10_000n * sum + BigInt(PPM_TOTAL) * price - 1n) / (BigInt(PPM_TOTAL) * price);
+   if (boxBps < BigInt(floor)) {
+     throw new Error(
+       `the box returns ${boxBps} bps, under the ${floor} bps floor of version ${rule.engineVersion}: no such box can be published`,

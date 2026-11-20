@@ -1,9 +1,9 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index e346b3b..e1a00e1 100644
+index 65c17d6..6fc38a8 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1460,7 +1460,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
-   }
+@@ -1677,7 +1677,7 @@ function wrongChanceText(input: VerificationInput, rule: UpgradeRule | undefined
+   if (!rate.ok) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${rate.error}` };
    const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, targetSlot));
    if (!offer.ok) {
 -    return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, slot ${stakedSlot} is not in the box` };

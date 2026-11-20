@@ -1,8 +1,8 @@
 diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 7c69064..e522f51 100644
+index 1aa732d..3b8a092 100644
 --- a/site/src/steps.tsx
 +++ b/site/src/steps.tsx
-@@ -39,7 +39,7 @@ export function StepCards({ report, input }: Props) {
+@@ -42,7 +42,7 @@ export function StepCards({ report, input }: Props) {
  
    return (
      <div className="space-y-6">
@@ -10,4 +10,4 @@ index 7c69064..e522f51 100644
 +      {STEPS.filter((s) => s.step !== 2).map((card) => {
          // An upgraded win's number is read over the step's two ranges, so its card 4 is the step's.
          const { step, method } = card
-         const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? UPGRADE_WIN_STEP4 : card
+         const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? upgradeWinStep4(input.edition.engineVersion) : card
