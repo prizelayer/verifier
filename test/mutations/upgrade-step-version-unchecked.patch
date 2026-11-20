@@ -1,11 +1,11 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index e346b3b..53ce2c7 100644
+index 65c17d6..4f12826 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1678,7 +1678,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+@@ -1914,7 +1914,7 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
    checks.engineType = check(UPGRADE_ENGINE_TYPE, input.engineType);
    checks.engineVersion = check(
-     rule === undefined ? UPGRADE_RULES.map((r) => r.engineVersion).join(' or ') : String(rule.engineVersion),
+     rule === undefined ? rules.map((r) => r.engineVersion).join(' or ') : String(rule.engineVersion),
 -    String(input.edition.engineVersion),
 +    rule === undefined ? UPGRADE_RULES.map((r) => r.engineVersion).join(' or ') : String(rule.engineVersion),
    );

@@ -205,6 +205,30 @@ version 1 step that names any slot other than the next value up still fails. `UP
 the versions this library checks. A step or a win on any other version fails, and is never read by
 another version's rule.
 
+On version 3, a step may name any strictly higher buy-back value of the same edition, as on version 2,
+but its chance is set by the box's own **upgrade rate** `R`, which the library computes from the edition
+and never takes from anywhere else. With `S` the sum over every slot of its chance in ppm times its
+buy-back value in cents, and `P` the price in cents:
+
+- `boxBps = (10 000 × S) div (1 000 000 × P)`, the box's return rounded down to a whole basis point;
+- `R = min(boxBps, 9 990)`, so at most 99.90 %; an edition with `boxBps` under 9 300, or a price of 0 or
+  less, is refused, because no such box can be published;
+- `p = ceil(R × 1 000 000 × staked / (10 000 × target))` ppm: rounded **up**, so a step gives back at
+  least `R` of the value staked, on average;
+- no step below 1 000 ppm (0.10 %), for a named target and for the single offer alike; and no limit on
+  steps in a row: the step number may be 1 to 29, because an edition holds at most 30 prizes and each
+  step goes to a more valuable one.
+
+Every sum and division is in `BigInt`. For example, on a box whose rate is 9 636 (96.36 %), staking 10.00
+for 20.00 gives `p = 481 800` ppm, shown as "48.18%". `upgradeStepRateBps()` gives `R`, and
+`upgradeChancePpm()` takes it with `roundsUp`.
+
+On dev only, `verify()` and `verifyUpgradeStep()` take a second argument, `{ demoRules:
+DEMO_RULES_2026_11_17 }`: the rule of a demo on dev, where on 17 and 18 November 2026 some version 1 and
+2 steps were drawn at 93 % of their fair chance. Only that exact exported object is accepted, the report
+names it (`trace.ruleSet`) and adds a caveat, and nothing selects it by default. It is deleted at dev's
+next reset.
+
 ### 4. The edition fingerprint
 
 `SHA-256` over these bytes, in this exact order:
@@ -249,7 +273,7 @@ implementations; "it passed in Node" says nothing about the engine your players 
 
 | Export | |
 |---|---|
-| `verify(input)` | The whole check. Returns `{ ok, status, firstFailure, notRun, checks, trace, caveats, summary }`. Never throws. |
+| `verify(input, options?)` | The whole check. Returns `{ ok, status, firstFailure, notRun, checks, trace, caveats, summary }`. Never throws. |
 | `verifyFrom(build)` | `verify()`, with the parsing done inside `build` and its refusals reported as `invalid`. |
 | `derive(seed, clientSeed, nonce)` | The derivation loop, with the full trace: every chunk of every attempt, and what the loop did with it. |
 | `slotFor(v, slots)` | The cumulative lookup. Sorts by `slotIndex` itself. |
@@ -264,11 +288,14 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `parseSnapshotBody(body)` | The published `snapshot.body` JSON (or its text) → typed snapshot. |
 | `parseSnapshot(json)` | The camelCase, decimal-string form → typed snapshot. |
 | `bytesFromHex` / `hexFromBytes` | Hex helpers. |
-| `verifyUpgradeStep(input)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`). Never throws. |
-| `upgradeTarget(edition, slotIndex)` | The step a win in that slot is offered, `{ targetSlotIndex, chancePpm }`, or `null`. |
+| `verifyUpgradeStep(input, options?)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`). Never throws. |
+| `upgradeTarget(edition, slotIndex, engineVersion?)` | The single step a win in that slot is offered on that version (version 1 when not given), `{ targetSlotIndex, chancePpm }`, or `null`. |
 | `upgradeTargets(edition, slotIndex, engineVersion)` | Every target a win in that slot may name on that version (section 3b), each `{ targetSlotIndex, chancePpm }`. The cap on steps is not applied here: a win at the cap still gets its list. Throws for a version it does not check. |
 | `UPGRADE_RULES` / `upgradeRule(engineVersion)` | The versions of the upgrade engine this library checks, each with its minimum chance and whether a step may jump; `undefined` for any other version. |
-| `upgradeChancePpm(current, next)` | `floor(1 000 000 × current / next)`, exact in `BigInt`. |
+| `upgradeChancePpm(current, next, rateBps?, roundsUp?)` | `rateBps × 1 000 000 × current / (10 000 × next)`, rounded down, or up when `roundsUp`; by default `floor(1 000 000 × current / next)`. Exact in `BigInt`. |
+| `upgradeStepRateBps(edition, engineVersion)` | The step's return in basis points: 10 000 on versions 1 and 2; on version 3 the box's own rate, computed from the edition (section 3b). Throws for a box under 9 300 or with no positive price. |
+| `UPGRADE_V3_CAVEATS` | The two caveats a version 3 report adds: what the step number check covers, and what the check of an upgraded win covers. |
+| `DEMO_RULES_2026_11_17` | The dev-only demo rule set (section 3b). |
 | `stepTable(p)` / `stepOutcome(v, p)` | The step's two-entry table, and `won` or `lost` for `v` over it. |
 
 Everything is `async`, because Web Crypto is. There's no synchronous variant on purpose: a second

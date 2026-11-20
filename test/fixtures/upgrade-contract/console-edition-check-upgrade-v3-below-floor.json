@@ -1,0 +1,27 @@
+{
+  "valid": false,
+  "floorBps": 9300,
+  "operatorMinimumBps": null,
+  "rtpBps": 9198,
+  "note": "Valid now. Stock, prices and floors can change before you publish; this check reserves nothing.",
+  "refusals": [
+    "RTP-floor control: expected buy-back payout is below the 9300 bps floor for price 1000 cents"
+  ],
+  "warnings": [],
+  "upgrade": {
+    "engineType": "single_draw_weighted_table_fair_upgrade",
+    "engineVersion": 3,
+    "maxSteps": null,
+    "minChancePpm": 1000,
+    "minChanceCompact": "0.10%",
+    "offerMinChancePpm": 1000,
+    "offerMinChanceCompact": "0.10%",
+    "stepRtpBps": null,
+    "stepRtpText": null,
+    "alwaysClimbRtp": null,
+    "alwaysClimbRtpText": null,
+    "upgradeRefusal": null,
+    "upgradeWarning": null,
+    "slots": []
+  }
+}
