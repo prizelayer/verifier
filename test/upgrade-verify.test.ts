@@ -3,8 +3,8 @@
  *
  * The draws use the fixture's own seed and the spec rows `alice-seed` nonces 1 and 2, whose values the
  * platform pins (186 669 and 459 796), on the worked box of KAN-1154 (buy-back 5 / 12 / 30 / 80 EUR). At a
- * chance of 372 000 ppm (12 -> 30 EUR, each step returning 93 % of its stake since KAN-1685), nonce 1 wins
- * and nonce 2 loses. The step-family vectors from the platform (A2) replace these once they exist.
+ * chance of 400 000 ppm (12 -> 30 EUR), nonce 1 wins and nonce 2 loses. The step-family vectors from the
+ * platform (A2) replace these once they exist.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -42,14 +42,11 @@ function contract(name: string): Record<string, unknown> {
 }
 
 let fingerprint: string;
-/**
- * From slot 2 (30 EUR) to slot 3 (80 EUR): 348 750 ppm, 34.875 %, a chance whose text has a remainder.
- * Nonce 1 (186 669) wins.
- */
+/** From slot 0 (5 EUR) to slot 1 (12 EUR): 416 666 ppm, a chance with a remainder. Nonce 1 (186 669) wins. */
 const REMAINDER = {
-  stakedSlotIndex: 2,
-  targetSlotIndex: 3,
-  chancePpm: 348_750,
+  stakedSlotIndex: 0,
+  targetSlotIndex: 1,
+  chancePpm: 416_666,
   drawnPpmValue: 186_669,
   outcome: 'won' as const,
   stepNo: 1,
@@ -70,8 +67,8 @@ before(async () => {
       editionFingerprint: fingerprint,
       stakedSlotIndex: 1,
       targetSlotIndex: 2,
-      chancePpm: 372_000,
-      chanceCompact: '37.20%',
+      chancePpm: 400_000,
+      chanceCompact: '40.00%',
       drawnPpmValue: 186_669,
       outcome: 'won',
       stepNo: 1,
@@ -88,12 +85,12 @@ describe('verifyUpgradeStep', () => {
       'chanceCompact', 'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion', 'stepNo',
       'upgradeChance', 'upgradeOutcome', 'upgradeTarget',
     ]);
-    assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 372_000 });
+    assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 400_000 });
     assert.deepEqual(report.trace.cumulative, [
-      { slotIndex: 0, probabilityPpm: 372_000, from: 0, to: 372_000 },
-      { slotIndex: 1, probabilityPpm: 628_000, from: 372_000, to: 1_000_000 },
+      { slotIndex: 0, probabilityPpm: 400_000, from: 0, to: 400_000 },
+      { slotIndex: 1, probabilityPpm: 600_000, from: 400_000, to: 1_000_000 },
     ]);
-    assert.match(report.summary, /draws ppm 186669, which wins at a chance of 372000 ppm/);
+    assert.match(report.summary, /draws ppm 186669, which wins at a chance of 400000 ppm/);
   });
 
   it('verifies a lost step exactly like a won one', async () => {
@@ -166,7 +163,7 @@ describe('verifyUpgradeStep', () => {
   });
 
   it('fails an edition whose buy-back values changed after its fingerprint was published', async () => {
-    // Slot 2 worth 2 400 instead of 3 000: the chance from slot 1 would be 465 000 ppm, under a published
+    // Slot 2 worth 2 400 instead of 3 000: the chance from slot 1 would be 500 000 ppm, under a published
     // fingerprint that binds 3 000.
     const changed: Edition = {
       ...EDITION,
@@ -178,7 +175,7 @@ describe('verifyUpgradeStep', () => {
   });
 
   it('fails a misreported drawn value even when its outcome is right', async () => {
-    // 186 670 still wins at 372 000 ppm: only the value itself is wrong.
+    // 186 670 still wins at 400 000 ppm: only the value itself is wrong.
     const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, drawnPpmValue: 186_670 } });
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'drawnPpmValue');
@@ -187,17 +184,17 @@ describe('verifyUpgradeStep', () => {
 
   // E1b (cto 24607 ruling): the string a player reads must be the contract's floor of the FAIR chance.
   it('verifies the string a player reads when it is the floor of a chance with a remainder', async () => {
-    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '34.87%' } });
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '41.66%' } });
     assert.equal(report.status, 'verified', report.summary);
-    assert.deepEqual(report.checks.chanceCompact, { ok: true, expected: '34.87%', computed: '34.87%' });
+    assert.deepEqual(report.checks.chanceCompact, { ok: true, expected: '41.66%', computed: '41.66%' });
   });
 
   it('fails a rounded-up string on the right chance: chanceCompact fails, upgradeChance still matches', async () => {
-    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '34.88%' } });
+    const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, ...REMAINDER, chanceCompact: '41.67%' } });
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'chanceCompact');
     assert.equal(report.checks.upgradeChance?.ok, true);
-    assert.equal(report.checks.chanceCompact?.computed, '34.87%');
+    assert.equal(report.checks.chanceCompact?.computed, '41.66%');
   });
 
   // Every check the library makes fails on its own forged input, first. The guard test below reddens when
@@ -249,7 +246,7 @@ describe('verifyUpgradeStep', () => {
   });
 
   it('compares chanceCompact exactly: a space before or after the right string fails', async () => {
-    for (const spaced of [' 37.20%', '37.20% ']) {
+    for (const spaced of [' 40.00%', '40.00% ']) {
       const report = await verifyUpgradeStep({ ...wonStep, expected: { ...wonStep.expected, chanceCompact: spaced } });
       assert.equal(report.status, 'failed', JSON.stringify(spaced));
       assert.equal(report.firstFailure?.check, 'chanceCompact');
@@ -280,8 +277,8 @@ describe('verify on an upgrade win', () => {
         drawnSlotIndex: 2,
         upgradeStepId: '9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e01',
         stakedSlotIndex: 1,
-        stepChancePpm: 372_000,
-        stepChanceCompact: '37.20%',
+        stepChancePpm: 400_000,
+        stepChanceCompact: '40.00%',
         stepOutcome: 'won',
       },
     };
@@ -308,11 +305,11 @@ describe('verify on an upgrade win', () => {
     assert.equal(lostValue.firstFailure?.check, 'drawnSlotIndex');
     assert.equal(lostValue.checks.drawnSlotIndex?.computed, 'step lost');
     const unfair = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stepChancePpm: 500_000 } });
-    assert.match(unfair.checks.drawnSlotIndex?.computed ?? '', /the step from slot 1 has a chance of 372000 ppm, not 500000/);
+    assert.match(unfair.checks.drawnSlotIndex?.computed ?? '', /the step from slot 1 has a chance of 400000 ppm, not 500000/);
   });
 
   it('fails a win whose staked slot leads to another target', async () => {
-    // From slot 0 the step goes to slot 1 at 387 500 ppm, so neither the chance nor the slot fits.
+    // From slot 0 the step goes to slot 1 at 416 666 ppm, so neither the chance nor the slot fits.
     const wrongSlot = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stakedSlotIndex: 0 } });
     assert.equal(wrongSlot.firstFailure?.check, 'drawnSlotIndex');
     const fromTop = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stakedSlotIndex: 3 } });
@@ -320,7 +317,7 @@ describe('verify on an upgrade win', () => {
   });
 
   it('reads the target by value order, never slot + 1', async () => {
-    // Slot order is not value order: from slot 1 (5 EUR) the next value up is slot 3 (12 EUR), 387 500 ppm.
+    // Slot order is not value order: from slot 1 (5 EUR) the next value up is slot 3 (12 EUR), 416 666 ppm.
     const shuffled: Edition = {
       ...EDITION,
       slots: [
@@ -338,8 +335,8 @@ describe('verify on an upgrade win', () => {
         editionFingerprint: await editionFingerprint(shuffled),
         drawnSlotIndex: 3,
         stakedSlotIndex: 1,
-        stepChancePpm: 387_500,
-        stepChanceCompact: '38.75%',
+        stepChancePpm: 416_666,
+        stepChanceCompact: '41.66%',
       },
     });
     assert.equal(report.status, 'verified', report.summary);
@@ -395,11 +392,11 @@ describe('verify on an upgrade win', () => {
   });
 
   it('fails an upgrade win shown at a chance text that is not the fair one, naming both texts', async () => {
-    for (const shown of ['41.00%', '37.2%', ' 37.20%']) {
+    for (const shown of ['41.00%', '40%', ' 40.00%']) {
       const report = await verify({ ...upgradeWin, expected: { ...upgradeWin.expected, stepChanceCompact: shown } });
       assert.equal(report.status, 'failed', JSON.stringify(shown));
       assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
-      assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `chance shown ${shown}`, computed: 'fair chance 37.20%' });
+      assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `chance shown ${shown}`, computed: 'fair chance 40.00%' });
     }
   });
 
@@ -408,7 +405,7 @@ describe('verify on an upgrade win', () => {
     const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '41.00%' } });
     assert.equal(report.status, 'failed', report.summary);
     assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
-    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.00%', computed: 'fair chance 37.20%' });
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.00%', computed: 'fair chance 40.00%' });
   });
 
   it('stays pending with the right shown chance while the seed is locked', async () => {
@@ -419,14 +416,14 @@ describe('verify on an upgrade win', () => {
   });
 
   it('takes the fair chance from the edition and the staked slot, never from the claimed ppm', async () => {
-    // The claim says 387 500 ppm and shows its text "38.75%"; the edition says 372 000 from slot 1.
+    // The claim says 416 666 ppm and shows its text "41.66%"; the edition says 400 000 from slot 1.
     const report = await verify({
       ...upgradeWin,
       serverSeedHex: null,
-      expected: { ...upgradeWin.expected, stepChancePpm: 387_500, stepChanceCompact: '38.75%' },
+      expected: { ...upgradeWin.expected, stepChancePpm: 416_666, stepChanceCompact: '41.66%' },
     });
     assert.equal(report.status, 'failed', report.summary);
-    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 38.75%', computed: 'fair chance 37.20%' });
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.66%', computed: 'fair chance 40.00%' });
   });
 
   // The other seed-free facts of a locked upgrade win fail too (owner ruling, KAN-1154): none needs the seed.
@@ -464,20 +461,20 @@ describe('verify on an upgrade win', () => {
     const report = await verify({
       ...upgradeWin,
       serverSeedHex: null,
-      expected: { ...upgradeWin.expected, stepChancePpm: 387_500, stepChanceCompact: '37.20%' },
+      expected: { ...upgradeWin.expected, stepChancePpm: 416_666, stepChanceCompact: '40.00%' },
     });
     assert.equal(report.status, 'failed', report.summary);
     assert.deepEqual(report.checks.drawnSlotIndex, {
       ok: false,
-      expected: 'chance recorded 387500 ppm',
-      computed: 'fair chance 372000 ppm',
+      expected: 'chance recorded 416666 ppm',
+      computed: 'fair chance 400000 ppm',
     });
   });
 
   it('fails a locked upgrade win whose shown text only differs by a trailing space', async () => {
-    const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '37.20% ' } });
+    const report = await verify({ ...upgradeWin, serverSeedHex: null, expected: { ...upgradeWin.expected, stepChanceCompact: '40.00% ' } });
     assert.equal(report.status, 'failed', report.summary);
-    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 37.20% ', computed: 'fair chance 37.20%' });
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 40.00% ', computed: 'fair chance 40.00%' });
   });
 
   it('draws no box range for a locked upgrade win, and the step table with its outcome once revealed', async () => {
@@ -512,18 +509,18 @@ describe('verify on an upgrade win', () => {
 /**
  * Version 2 of the upgrade engine (KAN-1567, ADR-KAN-1154 amendment 4): a step may name any strictly higher
  * value of the box at 1 % or more. The worked box on version 2, the same seed pair: nonce 5 draws 133 803
- * (this library's derive, which the draw family pins), under the 155 000 ppm of 5 -> 30 EUR, so the jump
+ * (this library's derive, which the draw family pins), under the 166 666 ppm of 5 -> 30 EUR, so the jump
  * from slot 0 to slot 2 wins; nonce 1 (186 669) loses it.
  */
 describe('version 2: a jump', () => {
   const EDITION_V2: Edition = { ...EDITION, engineVersion: 2 };
-  /** 1.08 -> 100.44 EUR is exactly 10 000 ppm at 93 %; 1.08 -> 100.45 EUR is 9 999 ppm. */
+  /** 1 -> 100 EUR is exactly 10 000 ppm; 1 -> 100.01 EUR is 9 999 ppm. */
   const EDGES_V2: Edition = {
     ...EDITION_V2,
     slots: [
-      { slotIndex: 0, probabilityPpm: 980_000, requiredBuyBackValueCents: 108n, requiredMarketValueCents: 108n },
-      { slotIndex: 1, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_045n, requiredMarketValueCents: 10_045n },
-      { slotIndex: 2, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_044n, requiredMarketValueCents: 10_044n },
+      { slotIndex: 0, probabilityPpm: 980_000, requiredBuyBackValueCents: 100n, requiredMarketValueCents: 100n },
+      { slotIndex: 1, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_001n, requiredMarketValueCents: 10_001n },
+      { slotIndex: 2, probabilityPpm: 10_000, requiredBuyBackValueCents: 10_000n, requiredMarketValueCents: 10_000n },
     ],
   };
   let jump: UpgradeStepInput;
@@ -541,8 +538,8 @@ describe('version 2: a jump', () => {
         editionFingerprint: v2Fingerprint,
         stakedSlotIndex: 0,
         targetSlotIndex: 2,
-        chancePpm: 155_000,
-        chanceCompact: '15.50%',
+        chancePpm: 166_666,
+        chanceCompact: '16.66%',
         drawnPpmValue: 133_803,
         outcome: 'won',
         stepNo: 1,
@@ -561,8 +558,8 @@ describe('version 2: a jump', () => {
         drawnSlotIndex: 2,
         upgradeStepId: '9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e11',
         stakedSlotIndex: 0,
-        stepChancePpm: 155_000,
-        stepChanceCompact: '15.50%',
+        stepChancePpm: 166_666,
+        stepChanceCompact: '16.66%',
         stepOutcome: 'won',
       },
     };
@@ -574,7 +571,7 @@ describe('version 2: a jump', () => {
     assert.deepEqual(report.notRun, []);
     assert.deepEqual(report.checks.engineVersion, { ok: true, expected: '2', computed: '2' });
     assert.deepEqual(report.checks.upgradeTarget, { ok: true, expected: '2', computed: '2' });
-    assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 155_000 });
+    assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 166_666 });
     assert.equal(report.trace.computedOutcome, 'won');
   });
 
@@ -645,9 +642,9 @@ describe('version 2: a jump', () => {
   });
 
   it('checks the chance of a jump against the formula, never the next value\'s chance', async () => {
-    const nextValueChance = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, chancePpm: 387_500, chanceCompact: '38.75%' } });
+    const nextValueChance = await verifyUpgradeStep({ ...jump, expected: { ...jump.expected, chancePpm: 416_666, chanceCompact: '41.66%' } });
     assert.equal(nextValueChance.firstFailure?.check, 'upgradeChance');
-    assert.deepEqual(nextValueChance.checks.upgradeChance, { ok: false, expected: '387500', computed: '155000' });
+    assert.deepEqual(nextValueChance.checks.upgradeChance, { ok: false, expected: '416666', computed: '166666' });
   });
 
   it('refuses the same jump on version 1, as before: version 1 checks the next value up only', async () => {
@@ -710,28 +707,28 @@ describe('version 2: a jump', () => {
   it('fails a won jump recorded at a chance that is not the formula\'s, even one that wins', async () => {
     const report = await verify({ ...jumpWin, expected: { ...jumpWin.expected, stepChancePpm: 170_000, stepChanceCompact: '17.00%' } });
     assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
-    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 155000 ppm, not 170000/);
+    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 166666 ppm, not 170000/);
   });
 
   it('reads a version 1 win by the next value up, as before, whatever slot it records', async () => {
     const report = await verify({ ...jumpWin, edition: EDITION, expected: { ...jumpWin.expected, editionFingerprint: fingerprint } });
     assert.equal(report.firstFailure?.check, 'drawnSlotIndex');
-    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 387500 ppm, not 155000/);
+    assert.match(report.checks.drawnSlotIndex?.computed ?? '', /the step from slot 0 has a chance of 416666 ppm, not 166666/);
   });
 
   it('stays pending on a locked jump with the right shown chance, and fails a wrong one', async () => {
     const pending = await verify({ ...jumpWin, serverSeedHex: null });
     assert.equal(pending.status, 'pending', pending.summary);
-    const shownWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChanceCompact: '38.75%' } });
-    assert.deepEqual(shownWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 38.75%', computed: 'fair chance 15.50%' });
-    const recordedWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChancePpm: 155_001 } });
-    assert.deepEqual(recordedWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance recorded 155001 ppm', computed: 'fair chance 155000 ppm' });
+    const shownWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChanceCompact: '41.66%' } });
+    assert.deepEqual(shownWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 41.66%', computed: 'fair chance 16.66%' });
+    const recordedWrong = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, stepChancePpm: 166_667 } });
+    assert.deepEqual(recordedWrong.checks.drawnSlotIndex, { ok: false, expected: 'chance recorded 166667 ppm', computed: 'fair chance 166666 ppm' });
   });
 
   it('fails a locked jump whose recorded slot is no target, before the reveal', async () => {
     const report = await verify({ ...jumpWin, serverSeedHex: null, expected: { ...jumpWin.expected, drawnSlotIndex: 9 } });
     assert.equal(report.status, 'failed', report.summary);
-    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 15.50%', computed: 'fair chance none, slot 0 cannot step to slot 9' });
+    assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 16.66%', computed: 'fair chance none, slot 0 cannot step to slot 9' });
   });
 
   it('fails closed on a win of version 3, revealed or locked', async () => {
@@ -744,7 +741,7 @@ describe('version 2: a jump', () => {
     assert.equal(locked.status, 'failed', locked.summary);
     assert.deepEqual(locked.checks.drawnSlotIndex, {
       ok: false,
-      expected: 'chance shown 15.50%',
+      expected: 'chance shown 16.66%',
       computed: 'fair chance none, version 3 of the upgrade rules is not checked here',
     });
   });

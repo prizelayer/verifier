@@ -11,7 +11,7 @@ import { App } from "./App"
 import { lookUpStep, stepFromFragment, API_BASE } from "./lookup"
 import { checkProof, joinStepProof, NOT_A_PROOF, PROOF_FORMAT, STEP_PROOF_FORMAT } from "./proof"
 import { fakeServer } from "./test/fakeServer"
-import { LOST_STEP, UPGRADE_EDITION, UPGRADED_OPEN, UPGRADED_OPEN_0_TO_1, upgradeAnswers, WON_STEP, WON_STEP_2_TO_3 } from "./test/upgradeExample"
+import { LOST_STEP, UPGRADE_EDITION, UPGRADED_OPEN, UPGRADED_OPEN_0_TO_1, upgradeAnswers, WON_STEP, WON_STEP_0_TO_1 } from "./test/upgradeExample"
 import { EXAMPLE_PROOF } from "./example"
 import { editionFingerprint, parseEdition } from "@verifier"
 import {
@@ -134,18 +134,18 @@ describe("the step page", () => {
     await waitFor(() => expect(verdictWord()).toBe("PASS"))
     expect(verdictLine()).toBe(UPGRADE_VERDICT.won)
     expect(document.querySelector("[data-check='upgradeChance']")?.getAttribute("data-state")).toBe("match")
-    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("372,000 in 1,000,000 (37.20%)")
+    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("400,000 in 1,000,000 (40.00%)")
     // Card 2 names where it reads the step's own claims: the step record's, never the box record's (S2).
     const source = document.querySelector("[data-step='2'] [data-source]")?.textContent ?? ""
     for (const field of ["step.engineType", "step.editionFingerprint", "step.chanceCompact"]) expect(source).toContain(field)
     expect(source).not.toContain("edition.engineType")
   })
 
-  it("shows a step's chance rounded down on card 2: 348,750 ppm is 34.87%, never 34.88%", async () => {
-    const { user } = openWithHash(`#step=${WON_STEP_2_TO_3.stepId}`)
+  it("shows a step's chance rounded down on card 2: 416,666 ppm is 41.66%, never 41.67%", async () => {
+    const { user } = openWithHash(`#step=${WON_STEP_0_TO_1.stepId}`)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdictWord()).toBe("PASS"))
-    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("348,750 in 1,000,000 (34.87%)")
+    expect(document.querySelector("[data-upgrade-values]")?.textContent).toContain("416,666 in 1,000,000 (41.66%)")
   })
 
   // The address the player's overlay writes (S5 of the review of #16): (a) to (e).
@@ -196,7 +196,7 @@ describe("the step page", () => {
     expect(document.querySelector("[data-status]")?.getAttribute("data-outcome")).toBe("lost")
     const marked = document.querySelector("[data-contains-v='yes']")
     expect(marked?.textContent).toContain("lost")
-    expect(marked?.textContent).toContain("372,000 to 999,999")
+    expect(marked?.textContent).toContain("400,000 to 999,999")
   })
 
   it("fails a forged outcome at step 4, with the step's own words", async () => {
@@ -274,7 +274,7 @@ describe("the step page", () => {
 
   it("checks a version 2 jump past the next item up, and names its item 'Target item'", async () => {
     // The worked box on version 2, with its own true fingerprint: 12 EUR (slot 1) staked for 80 EUR (slot 3),
-    // past 30 EUR, at 930,000 x 1200 / 8000 = 139,500 ppm (KAN-1685). Nonce 1 draws 186,669, so the jump is lost.
+    // past 30 EUR, at 1200 / 8000 = 150,000 ppm. Nonce 1 draws 186,669, so the jump is lost.
     const editionV2 = { ...UPGRADE_EDITION, editionId: "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a12", engineVersion: 2 }
     const fp = await editionFingerprint(parseEdition(editionV2))
     const jump = {
@@ -286,8 +286,8 @@ describe("the step page", () => {
       nonce: 1,
       drawnPpmValue: 186669,
       targetSlotIndex: 3,
-      chancePpm: 139500,
-      chanceCompact: "13.95%",
+      chancePpm: 150000,
+      chanceCompact: "15.00%",
     }
     const answers = upgradeAnswers()
     const ok = (body: unknown) => ({ status: 200, body: JSON.stringify(body) })
@@ -302,7 +302,7 @@ describe("the step page", () => {
     expect(document.querySelector("[data-check='upgradeTarget']")?.getAttribute("data-state")).toBe("match")
     const values = document.querySelector("[data-upgrade-values]")?.textContent ?? ""
     expect(values).toContain(`${UPGRADE_TARGET_ROW.target}slot 3, buy-back value 8000 cents`)
-    expect(values).toContain("139,500 in 1,000,000 (13.95%)")
+    expect(values).toContain("150,000 in 1,000,000 (15.00%)")
     expect(values).not.toContain(UPGRADE_TARGET_ROW.nextUp)
     // Card 2 and its checks in version 2's words: no sentence says the item is the next one up, or 10 %.
     const card = document.querySelector("[data-step='2']")?.textContent ?? ""
@@ -335,7 +335,7 @@ describe("the step page", () => {
     const card = document.querySelector("[data-step='2']")?.textContent ?? ""
     for (const sentence of [
       "An upgrade gives up the item you hold for a chance at the next item up in the same box: the next higher buy-back value, never a slot further on.",
-      "The chance is fixed by the two buy-back values: 93% of the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 37.20% chance. On average you get back 93% of what you staked, and never more.",
+      "The chance is fixed by the two buy-back values: the value you give up, divided by the value you could win, rounded down. Giving up 12.00 for a chance at 30.00 is a 40% chance. On average you get back what you staked, and never more, so an upgrade does not change what the box returns.",
       "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is the next one up from yours, and that the chance is exactly that value. There is no upgrade below a 10% chance, and at most 3 in a row.",
     ]) expect(card).toContain(sentence)
     expect(document.querySelector("[data-check='engineVersion']")?.textContent).toContain(
@@ -418,7 +418,7 @@ describe("the step page", () => {
     return user
   }
 
-  it("marks the winning range of an upgraded win from slot 0 to slot 1, at 387,500 ppm", async () => {
+  it("marks the winning range of an upgraded win from slot 0 to slot 1, at 416,666 ppm", async () => {
     const user = openZeroToOne(false)
     await user.click(screen.getByRole("button", { name: "Look up" }))
     await waitFor(() => expect(verdictWord()).toBe("PASS"))
@@ -426,7 +426,7 @@ describe("the step page", () => {
     const marked = card?.querySelectorAll("[data-contains-v='yes']")
     expect(marked?.length).toBe(1)
     expect(marked?.[0]?.textContent).toContain("won")
-    expect(marked?.[0]?.textContent).toContain("0 to 387,499")
+    expect(marked?.[0]?.textContent).toContain("0 to 416,665")
     // The rows are the step's results, never named as box slots.
     expect(Array.from(card?.querySelectorAll("th") ?? []).map((th) => th.textContent)).toEqual(["Result", "Numbers it owns", "Contains v"])
     expect(card?.textContent).toContain(UPGRADE_WIN_STEP4.text[0])
@@ -455,7 +455,7 @@ describe("the step page", () => {
     render(<App fetchFn={fakeServer(answers).fetchFn} />)
     return user
   }
-  const chanceWords = wrongChanceWords({ kind: "shown", shown: "41.00%", fair: "37.20%" })
+  const chanceWords = wrongChanceWords({ kind: "shown", shown: "41.00%", fair: "40.00%" })
 
   it("fails an upgraded win shown at a wrong chance, on the chance's words and not the slot's", async () => {
     const user = openWrongChance(false)
@@ -503,17 +503,17 @@ describe("the step page", () => {
   })
 
   it("fails a locked upgraded win whose recorded chance is not the fair one, under the recorded chance's labels", async () => {
-    await lockedOpen({ stepChancePpm: 387500 })
-    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "recorded", recorded: 387500, fair: 372000 })}`)
+    await lockedOpen({ stepChancePpm: 416666 })
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "recorded", recorded: 416666, fair: 400000 })}`)
     expect(document.body.textContent).toContain("Chance we recorded")
     expect(document.body.textContent).not.toContain("Chance shown to you")
   })
 
   // A hand-made proof may carry numbers our server never sends; the FAIL still speaks of the chance (NIT-N1).
   it("words a fractional recorded chance of a locked upgraded win as the chance's fault", async () => {
-    await lockedOpen({ stepChancePpm: 372000.5 })
+    await lockedOpen({ stepChancePpm: 400000.5 })
     expect(verdictLine()).toBe(
-      "Step 4 does not match: The chance recorded with this upgraded win, 372,000.5 in 1,000,000, is not its fair chance, 372,000 in 1,000,000.",
+      "Step 4 does not match: The chance recorded with this upgraded win, 400,000.5 in 1,000,000, is not its fair chance, 400,000 in 1,000,000.",
     )
     expect(document.body.textContent).not.toContain("Slot we recorded")
   })
@@ -538,21 +538,21 @@ describe("the step page", () => {
   }
 
   it("waits on a locked version 2 win that jumped past the next item up, at its fair chance", async () => {
-    await lockedOpenOn(2, { drawnSlotIndex: 3, stepChancePpm: 139500, stepChanceCompact: "13.95%" }, "CANNOT CHECK YET")
+    await lockedOpenOn(2, { drawnSlotIndex: 3, stepChancePpm: 150000, stepChanceCompact: "15.00%" }, "CANNOT CHECK YET")
   })
 
   it("fails a locked version 2 win whose recorded item is not a step up, saying from which item to which", async () => {
     await lockedOpenOn(2, { drawnSlotIndex: 0 }, "FAIL")
-    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "jump", shown: "37.20%", slot: "1", target: "0" })}`)
+    expect(verdictLine()).toBe(`Step 4 does not match: ${wrongChanceWords({ kind: "jump", shown: "40.00%", slot: "1", target: "0" })}`)
     expect(verdictLine()).toBe(
-      "Step 4 does not match: The chance shown with this upgraded win, 37.20%, cannot be a fair chance: this box allows no upgrade from the item in slot 1 to the item in slot 0.",
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be a fair chance: this box allows no upgrade from the item in slot 1 to the item in slot 0.",
     )
   })
 
   it("fails a locked win of a version the page does not check, naming the version", async () => {
     await lockedOpenOn(3, {}, "FAIL")
     expect(verdictLine()).toBe(
-      "Step 4 does not match: The chance shown with this upgraded win, 37.20%, cannot be checked: this box uses version 3 of the upgrade rules, and this page checks versions 1 and 2 only.",
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 3 of the upgrade rules, and this page checks versions 1 and 2 only.",
     )
   })
 
@@ -560,7 +560,7 @@ describe("the step page", () => {
     it(`words a staked slot of ${slot} of a locked upgraded win as a slot the box does not have`, async () => {
       await lockedOpen({ stakedSlotIndex: slot })
       expect(verdictLine()).toBe(
-        `Step 4 does not match: The chance shown with this upgraded win, 37.20%, cannot be a fair chance: the item given up names slot ${slot}, and this box has no slot ${slot}.`,
+        `Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be a fair chance: the item given up names slot ${slot}, and this box has no slot ${slot}.`,
       )
     })
   }

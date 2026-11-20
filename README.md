@@ -187,9 +187,9 @@ prize.
 
 A player who holds a win of an upgrade edition (engine type `single_draw_weighted_table_fair_upgrade`)
 may stake it for the next strictly higher buy-back value of the same edition (ties: the lowest slot
-index). The chance is `p = floor(930 000 × staked / target)` ppm, so a step returns 93 % of the value
-staked in expectation. It is computed from the two values the edition fingerprint binds; there is no
-offer below 100 000 ppm (10 %), from the top value, or past the third step. The step draws one `v` on the player's next nonce, exactly as in section 2, and reads it
+index). The chance is `p = floor(1 000 000 × staked / target)` ppm, computed from the two values the
+edition fingerprint binds; there is no offer below 100 000 ppm (10 %), from the top value, or past the
+third step. The step draws one `v` on the player's next nonce, exactly as in section 2, and reads it
 over the two-entry table `[p, 1 000 000 − p]` with the lookup of section 3: slot 0 is **won**, so a
 step is won exactly when `v < p`. A won step makes a new win in the target slot; a lost step makes
 nothing, and is verified the same way. `verifyUpgradeStep()` checks all of this from the published
@@ -198,7 +198,7 @@ the box table.
 
 That is version 1 of the upgrade engine (`engineVersion` 1). On version 2, a step may name **any**
 slot of the same edition whose buy-back value is strictly higher than the staked one, at the same
-`p = floor(930 000 × staked / target)`, with no step below 10 000 ppm (1 %); the third-step cap and
+`p = floor(1 000 000 × staked / target)`, with no step below 10 000 ppm (1 %); the third-step cap and
 the draw are unchanged. `upgradeTargets()` lists every target a win may name, ordered by value, then
 by slot index. A version 2 step and a version 2 win are checked against the target they record; a
 version 1 step that names any slot other than the next value up still fails. `UPGRADE_RULES` lists
@@ -268,7 +268,7 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `upgradeTarget(edition, slotIndex)` | The step a win in that slot is offered, `{ targetSlotIndex, chancePpm }`, or `null`. |
 | `upgradeTargets(edition, slotIndex, engineVersion)` | Every target a win in that slot may name on that version (section 3b), each `{ targetSlotIndex, chancePpm }`. The cap on steps is not applied here: a win at the cap still gets its list. Throws for a version it does not check. |
 | `UPGRADE_RULES` / `upgradeRule(engineVersion)` | The versions of the upgrade engine this library checks, each with its minimum chance and whether a step may jump; `undefined` for any other version. |
-| `upgradeChancePpm(current, next)` | `floor(930 000 × current / next)` (`UPGRADE_STEP_RTP_BPS` 9 300), exact in `BigInt`. |
+| `upgradeChancePpm(current, next)` | `floor(1 000 000 × current / next)`, exact in `BigInt`. |
 | `stepTable(p)` / `stepOutcome(v, p)` | The step's two-entry table, and `won` or `lost` for `v` over it. |
 
 Everything is `async`, because Web Crypto is. There's no synchronous variant on purpose: a second

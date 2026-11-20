@@ -1,7 +1,6 @@
 /**
  * The upgrade step's maths (rng-fairness §4b), pinned by literals: the chance, the target and the
- * won/lost reading. The worked box of KAN-1154 plan v1.2: buy-back 5 / 12 / 30 / 80 €. Each step
- * returns 93 % of the value staked (KAN-1685), so every chance is floor(930 000 × current / next).
+ * won/lost reading. The worked box of KAN-1154 plan v1.2: buy-back 5 / 12 / 30 / 80 €.
  * The cross-check against the platform's golden vectors comes with A2's fixture.
  */
 import assert from 'node:assert/strict';
@@ -38,15 +37,12 @@ function edition(values: number[], ppm: number[]): Pick<Edition, 'slots'> {
 const WORKED = edition([500, 1200, 3000, 8000], [319_199, 470_000, 110_000, 100_801]);
 
 describe('upgrade chance', () => {
-  it('is the floor of 930 000 × current / next', () => {
-    assert.equal(upgradeChancePpm(1200n, 3000n), 372_000);
-    assert.equal(upgradeChancePpm(500n, 1200n), 387_500);
-    // 930 000 × 500 / 1189 leaves a remainder: the floor, never the rounded 391 085.
-    assert.equal(upgradeChancePpm(500n, 1189n), 391_084);
-    assert.equal(upgradeChancePpm(3000n, 8000n), 348_750);
-    assert.equal(upgradeChancePpm(1000n, 9300n), 100_000);
-    assert.equal(upgradeChancePpm(999n, 9300n), 99_900);
-    assert.equal(upgradeChancePpm(799n, 8000n), 92_883);
+  it('is the floor of 1 000 000 × current / next', () => {
+    assert.equal(upgradeChancePpm(1200n, 3000n), 400_000);
+    assert.equal(upgradeChancePpm(500n, 1200n), 416_666);
+    assert.equal(upgradeChancePpm(3000n, 8000n), 375_000);
+    assert.equal(upgradeChancePpm(800n, 8000n), 100_000);
+    assert.equal(upgradeChancePpm(799n, 8000n), 99_875);
   });
 
   it('refuses a step that does not go up', () => {
@@ -58,7 +54,7 @@ describe('upgrade chance', () => {
     assert.equal(UPGRADE_MIN_CHANCE_PPM, 100_000);
     assert.equal(UPGRADE_MAX_STEPS, 3);
     assert.equal(UPGRADE_ENGINE_VERSION, 1);
-    assert.equal(UPGRADE_STEP_RTP_BPS, 9_300);
+    assert.equal(UPGRADE_STEP_RTP_BPS, 10_000);
   });
 });
 
@@ -88,9 +84,9 @@ describe('the chance a player reads (stepChanceText, contract §6)', () => {
 
 describe('upgrade target', () => {
   it('climbs the worked box one value at a time and stops at the top', () => {
-    assert.deepEqual(upgradeTarget(WORKED, 0), { targetSlotIndex: 1, chancePpm: 387_500 });
-    assert.deepEqual(upgradeTarget(WORKED, 1), { targetSlotIndex: 2, chancePpm: 372_000 });
-    assert.deepEqual(upgradeTarget(WORKED, 2), { targetSlotIndex: 3, chancePpm: 348_750 });
+    assert.deepEqual(upgradeTarget(WORKED, 0), { targetSlotIndex: 1, chancePpm: 416_666 });
+    assert.deepEqual(upgradeTarget(WORKED, 1), { targetSlotIndex: 2, chancePpm: 400_000 });
+    assert.deepEqual(upgradeTarget(WORKED, 2), { targetSlotIndex: 3, chancePpm: 375_000 });
     assert.equal(upgradeTarget(WORKED, 3), null);
   });
 
@@ -100,24 +96,23 @@ describe('upgrade target', () => {
 
   it('follows value order, never slot order', () => {
     const reordered = edition([3000, 500, 8000, 1200], [110_000, 319_199, 100_801, 470_000]);
-    assert.deepEqual(upgradeTarget(reordered, 1), { targetSlotIndex: 3, chancePpm: 387_500 });
-    assert.deepEqual(upgradeTarget(reordered, 3), { targetSlotIndex: 0, chancePpm: 372_000 });
+    assert.deepEqual(upgradeTarget(reordered, 1), { targetSlotIndex: 3, chancePpm: 416_666 });
+    assert.deepEqual(upgradeTarget(reordered, 3), { targetSlotIndex: 0, chancePpm: 400_000 });
   });
 
   it('breaks a tie on the next value by the lowest slot index', () => {
     const tied = edition([1200, 3000, 3000, 500], [400_000, 100_000, 100_000, 400_000]);
-    assert.deepEqual(upgradeTarget(tied, 0), { targetSlotIndex: 1, chancePpm: 372_000 });
+    assert.deepEqual(upgradeTarget(tied, 0), { targetSlotIndex: 1, chancePpm: 400_000 });
     const tiedReversed = edition([1200, 500, 3000, 3000], [400_000, 400_000, 100_000, 100_000]);
-    assert.deepEqual(upgradeTarget(tiedReversed, 0), { targetSlotIndex: 2, chancePpm: 372_000 });
+    assert.deepEqual(upgradeTarget(tiedReversed, 0), { targetSlotIndex: 2, chancePpm: 400_000 });
   });
 
   it('offers at exactly 10 % and not below, even when a higher value would pass', () => {
-    // 10 -> 93 € is exactly 100 000 ppm at 93 %; 9.99 -> 93 € is 99 900.
-    assert.deepEqual(upgradeTarget(edition([1000, 9300], [500_000, 500_000]), 0), {
+    assert.deepEqual(upgradeTarget(edition([800, 8000], [500_000, 500_000]), 0), {
       targetSlotIndex: 1,
       chancePpm: 100_000,
     });
-    assert.equal(upgradeTarget(edition([999, 9300], [500_000, 500_000]), 0), null);
+    assert.equal(upgradeTarget(edition([799, 8000], [500_000, 500_000]), 0), null);
   });
 
   it('refuses a slot that is not in the edition', () => {
@@ -146,18 +141,18 @@ describe('the version table (KAN-1567)', () => {
 describe('upgrade targets', () => {
   it('lists every higher value on version 2, in value order, and only the offer on version 1', () => {
     assert.deepEqual(upgradeTargets(WORKED, 0, 2), [
-      { targetSlotIndex: 1, chancePpm: 387_500 },
-      { targetSlotIndex: 2, chancePpm: 155_000 },
-      { targetSlotIndex: 3, chancePpm: 58_125 },
+      { targetSlotIndex: 1, chancePpm: 416_666 },
+      { targetSlotIndex: 2, chancePpm: 166_666 },
+      { targetSlotIndex: 3, chancePpm: 62_500 },
     ]);
-    assert.deepEqual(upgradeTargets(WORKED, 0, 1), [{ targetSlotIndex: 1, chancePpm: 387_500 }]);
+    assert.deepEqual(upgradeTargets(WORKED, 0, 1), [{ targetSlotIndex: 1, chancePpm: 416_666 }]);
     assert.deepEqual(upgradeTargets(WORKED, 3, 2), []);
     assert.deepEqual(upgradeTargets(WORKED, 3, 1), []);
   });
 
   it('lists a target at exactly 1 % and stops at the first one under it on version 2', () => {
-    // 1.08 -> 100.44 EUR is 10 000 ppm; 1.08 -> 100.45 EUR is 9 999 ppm, and 1.08 -> 200 EUR is past it.
-    const edges = edition([108, 10_045, 10_044, 20_000], [250_000, 250_000, 250_000, 250_000]);
+    // 1 -> 100 EUR is 10 000 ppm; 1 -> 100.01 EUR is 9 999 ppm, and 1 -> 200 EUR is past it.
+    const edges = edition([100, 10_001, 10_000, 20_000], [250_000, 250_000, 250_000, 250_000]);
     assert.deepEqual(upgradeTargets(edges, 0, 2), [{ targetSlotIndex: 2, chancePpm: 10_000 }]);
     assert.deepEqual(upgradeTargets(edges, 0, 1), []);
   });
@@ -165,11 +160,11 @@ describe('upgrade targets', () => {
   it('lists each slot of a tied value, the lower index first, and never a value equal to the held one', () => {
     const tied = edition([1200, 500, 1200, 3000], [250_000, 250_000, 250_000, 250_000]);
     assert.deepEqual(upgradeTargets(tied, 1, 2), [
-      { targetSlotIndex: 0, chancePpm: 387_500 },
-      { targetSlotIndex: 2, chancePpm: 387_500 },
-      { targetSlotIndex: 3, chancePpm: 155_000 },
+      { targetSlotIndex: 0, chancePpm: 416_666 },
+      { targetSlotIndex: 2, chancePpm: 416_666 },
+      { targetSlotIndex: 3, chancePpm: 166_666 },
     ]);
-    assert.deepEqual(upgradeTargets(tied, 0, 2), [{ targetSlotIndex: 3, chancePpm: 372_000 }]);
+    assert.deepEqual(upgradeTargets(tied, 0, 2), [{ targetSlotIndex: 3, chancePpm: 400_000 }]);
   });
 
   it('lists nothing from a held value of 0', () => {
