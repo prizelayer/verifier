@@ -90,7 +90,7 @@ const STEP_9636 = {
 }
 
 describe("the version 3 words", () => {
-  it("carry the four approved texts word for word, on a box whose rate is 96.36 %", () => {
+  it("carry the four approved texts and the approved title word for word, on a box whose rate is 96.36 %", () => {
     // Written out here, not taken from the table: a change of one character in the table fails this test.
     const text3 =
       "The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %; on this box it is 96.36 %, and it is never under 93 %. The chance is 96.36 % times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.18% chance. On average you get back at least 96.36 % of what you staked."
@@ -101,7 +101,10 @@ describe("the version 3 words", () => {
     const text6 =
       "The box's upgrade rate, 96.36 %, is worked out by your browser from the box's chances and its price: the box's return, rounded down to 0.01 %, and at most 99.90 %."
     const text6UnderFloor = "this box returns less than 93 %, which is not allowed for a box with upgrades"
+    const title = "The chance of your upgrade comes from this box's upgrade rate."
     const words = upgradeStep2(3, 9636)
+    expect(words.title).toBe(title)
+    expect(upgradeStep2(3, undefined).title).toBe(title)
     expect(words.text[1]).toBe(text3)
     expect(words.text[2]).toBe(text4)
     const checks = UPGRADE_V3_WORDS.checks(9636)

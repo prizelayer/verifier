@@ -613,9 +613,9 @@ export const UPGRADE_MAX_STEPS = 3;
 export const UPGRADE_MAX_CHAIN = 29;
 
 /**
- * The caveats this library writes only for a version 3 step or win. They are not among the texts of the
- * owner's decision of 2026-11-20 (KAN-1751); they go to the owner with the other new sentences before anything
- * public carries them. The site's table (`site/src/words.ts`, `UPGRADE_V3_WORDS`) lists them too.
+ * The caveats this library writes only for a version 3 step or win, approved word for word with the page's
+ * other new sentences in the owner's decisions of 2026-11-20 (KAN-1751). The site's table
+ * (`site/src/words.ts`, `UPGRADE_V3_WORDS`) lists them too; a change to either is a new decision.
  * Refs: KAN-1751
  */
 export const UPGRADE_V3_CAVEATS = Object.freeze({

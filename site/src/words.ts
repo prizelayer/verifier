@@ -493,8 +493,8 @@ export function wrongChanceLabels(engineVersion: number | undefined): { recorded
 
 /**
  * The note on a step checked under the demo rules of 17 and 18 November 2026 (KAN-1751 plan v1.2 D3 A). Only a dev
- * build has a list of such steps (demo-steps.json), so no production page can show it. The engineer's
- * proposal, dev only; it is deleted with the list at dev's next reset.
+ * build has a list of such steps (demo-steps.json), so no production page can show it. Approved in the owner's
+ * decisions of 2026-11-20 (KAN-1751); dev only, it is deleted with the list at dev's next reset.
  */
 export const DEMO_STEP_NOTE =
   "This upgrade was checked under the demo rules of 17 and 18 November 2026. On those two days the dev site drew some upgrades at 93 % of their usual chance, and this dev page has the list of them. Every other upgrade is checked under its own version's rule."
@@ -505,16 +505,15 @@ export const DEMO_STEP_NOTE =
 // Every sentence a person reads only for a version 3 step or win is in this one table, with the library's
 // two version 3 caveats (UPGRADE_V3_CAVEATS), so the whole list can be read in one place.
 //
-// What the owner approved (the owner's decision of 2026-11-20, KAN-1751) is four texts, and only these:
-// text 3 is card 2's second paragraph; text 4 its third paragraph; text 5 the first sentence of the
-// `upgradeChance` check line and its fail line; text 6 the second sentence of that check line, and
-// `underFloorCause`, which the page shows after its own prefix "Step 2 cannot be checked: ". The example in
-// text 3 keeps "96.36 %" whatever the box. upgrade-v3.test.tsx pins the four texts word for word.
-//
-// Every other sentence here (the title, the first paragraph's use on version 3, the other check and fail
-// lines, the compare labels, the win causes, the variant of text 3 for a box whose rate cannot be read, the
-// card 4 source line) and the library's two caveats are the engineer's words. They go to the owner as one
-// list before anything public carries them; a later change to any sentence here is the same.
+// Every sentence here is the owner's, approved word for word in two decisions of 2026-11-20 (KAN-1751).
+// The first approved four texts: text 3 is card 2's second paragraph; text 4 its third paragraph; text 5
+// the first sentence of the `upgradeChance` check line and its fail line; text 6 the second sentence of that
+// check line, and `underFloorCause`, which the page shows after its own prefix "Step 2 cannot be checked: ".
+// The example in text 3 keeps "96.36 %" whatever the box. The second approved every other new or changed
+// sentence of this series, 19 in all: among them card 2's title, the other check and fail lines, the compare
+// labels, the win causes, the variant of text 3 for a box whose rate cannot be read, the card 4 source line,
+// the library's two caveats and the dev page's demo note. upgrade-v3.test.tsx pins the four texts and the
+// title word for word. A change to any sentence here is a new decision of the owner.
 //
 // The rule of every sentence (plan §19): the rate is the box's return rounded down to 0.01 %, and
 // at most 99.90 %; an upgrade gives back at least the RATE, never "the box's return".
@@ -550,7 +549,7 @@ export const UPGRADE_V3_WORDS = {
   step2: (rateBps: number | undefined): { title: string; text: readonly string[] } => {
     const rate = rateBps === undefined ? undefined : rateText(rateBps)
     return {
-      title: "The chance of your upgrade is this box's chance.",
+      title: "The chance of your upgrade comes from this box's upgrade rate.",
       text: [
         "An upgrade gives up the item you hold for a chance at a more valuable item in the same box: the item you chose, not only the next one up.",
         rate === undefined
