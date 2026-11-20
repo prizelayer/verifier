@@ -1,0 +1,11 @@
+diff --git a/site/scripts/environments.ts b/site/scripts/environments.ts
+index 7e962bc..cc7c15d 100644
+--- a/site/scripts/environments.ts
++++ b/site/scripts/environments.ts
+@@ -101,5 +101,5 @@ export function demoStepsFor(environment: string, text: string = readFileSync(DE
+   if (ids.length > 0 && (typeof dev.read !== "string" || dev.read === "")) {
+     throw new Error("demo-steps.json: a list with steps names the read that made it in dev.read")
+   }
+-  return environment === "dev" ? (ids as string[]) : []
++  return ids as string[]
+ }

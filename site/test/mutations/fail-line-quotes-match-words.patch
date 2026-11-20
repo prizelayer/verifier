@@ -1,13 +1,13 @@
 diff --git a/site/src/verdict.ts b/site/src/verdict.ts
-index ca5667f..664a761 100644
+index 2a7c78f..0d2daac 100644
 --- a/site/src/verdict.ts
 +++ b/site/src/verdict.ts
-@@ -34,7 +34,7 @@ export function verdictOf(report: VerificationReport): { word: string; line: str
+@@ -34,7 +34,7 @@ export function verdictOf(report: VerificationReport, engineVersion?: number): {
            ? report.summary
            : failure.field !== undefined
              ? `Step ${failure.step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
--            : `Step ${failure.step} does not match: ${slotOrChanceWords(report, failure.check)}`,
-+            : `Step ${failure.step} does not match: ${CHECK_WORDS[failure.check]} ${slotOrChanceWords(report, failure.check)}`,
+-            : `Step ${failure.step} does not match: ${slotOrChanceWords(report, failure.check, engineVersion)}`,
++            : `Step ${failure.step} does not match: ${CHECK_WORDS[failure.check]} ${slotOrChanceWords(report, failure.check, engineVersion)}`,
        }
      }
      case "pending":

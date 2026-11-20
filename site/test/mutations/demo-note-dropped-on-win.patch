@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 67a2573..5fd0148 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -198,7 +198,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
+           {UPGRADE_WIN.note} {report.status === "verified" ? `${passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
+         </p>
+       ) : null}
+-      {report.trace.ruleSet === "DEMO_RULES_2026_11_17" ? <p data-demo="yes">{DEMO_STEP_NOTE}</p> : null}
++      {report.trace.ruleSet === "DEMO_RULES" ? <p data-demo="yes">{DEMO_STEP_NOTE}</p> : null}
+     </div>
+   )
+ }

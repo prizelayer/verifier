@@ -1,4 +1,4 @@
-import { upgradeRule, type Check, type CheckName, type UpgradeStepCheckName } from "@verifier"
+import { UPGRADE_V3_CAVEATS, upgradeRule, type Check, type CheckName, type UpgradeStepCheckName } from "@verifier"
 
 /** The four steps, in the words a player reads. Step 1 and step 2 never say when a value was published. */
 export const STEPS = [
@@ -297,6 +297,7 @@ export type WrongChance =
   | { kind: "none"; shown: string; slot: string; why: "offered no step" | "not in the box" }
   | { kind: "jump"; shown: string; slot: string; target: string }
   | { kind: "version"; shown: string; version: string }
+  | { kind: "rate"; shown: string; why: string }
   | { kind: "recorded"; recorded: number; fair: number }
 
 const NUMBER = String.raw`(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)`
@@ -316,11 +317,15 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
   if (jump) return { kind: "jump", shown, slot: jump[1], target: jump[2] }
   const version = /^fair chance none, version (.*) of the upgrade rules is not checked here$/.exec(computed)
   if (version) return { kind: "version", shown, version: version[1] }
+  // Version 3 (KAN-1751): the box's upgrade rate could not be read from the edition, so no chance exists.
+  const rate = /^fair chance none, (the box returns .*|version \d+ reads the box's rate .*)$/.exec(computed)
+  if (rate) return { kind: "rate", shown, why: rate[1] }
   if (!computed.startsWith("fair chance ")) return null
   return { kind: "shown", shown, fair: computed.slice("fair chance ".length) }
 }
 
-export function wrongChanceWords(cause: WrongChance): string {
+export function wrongChanceWords(cause: WrongChance, engineVersion?: number): string {
+  if (engineVersion === 3) return UPGRADE_V3_WORDS.wrongChance(cause)
   switch (cause.kind) {
     case "shown":
       return `The chance shown with this upgraded win, ${cause.shown}, is not its fair chance rounded down to 0.01 %, which is ${cause.fair}.`
@@ -331,7 +336,9 @@ export function wrongChanceWords(cause: WrongChance): string {
     case "jump":
       return `The chance shown with this upgraded win, ${cause.shown}, cannot be a fair chance: this box allows no upgrade from the item in slot ${cause.slot} to the item in slot ${cause.target}.`
     case "version":
-      return `The chance shown with this upgraded win, ${cause.shown}, cannot be checked: this box uses version ${cause.version} of the upgrade rules, and this page checks versions 1 and 2 only.`
+      return UPGRADE_V3_WORDS.unknownVersionChance(cause.shown, cause.version)
+    case "rate":
+      return UPGRADE_V3_WORDS.rateChance(cause.shown, cause.why)
     case "recorded":
       return `The chance recorded with this upgraded win, ${cause.recorded.toLocaleString("en")} in 1,000,000, is not its fair chance, ${cause.fair.toLocaleString("en")} in 1,000,000.`
   }
@@ -382,13 +389,16 @@ export const UPGRADE_CHECK_WORDS: Record<UpgradeStepName, string> = {
 }
 
 /** What each step check means when it does not match. */
+/** KAN-1751 (listed in UPGRADE_V3_WORDS). One of the two sentences for a version this page does not check: they name version 3 since KAN-1751. */
+const UPGRADE_UNKNOWN_VERSION_FAIL =
+  "This box uses another version of the upgrade rules. This page checks versions 1, 2 and 3 only, so it cannot confirm this upgrade."
+
 export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
   commitment: FAIL_WORDS.commitment,
   editionFingerprint:
     "The chances shown here do not match the fingerprint recorded on your upgrade. The step below was checked against a table we cannot confirm.",
   engineType: "This box is not an upgrade box, so it offers no upgrade.",
-  engineVersion:
-    "This box uses another version of the upgrade rules. This page checks versions 1 and 2 only, so it cannot confirm this upgrade.",
+  engineVersion: UPGRADE_UNKNOWN_VERSION_FAIL,
   upgradeTarget: "The item offered is not the next one up from the item you gave up.",
   upgradeChance: "The chance we recorded is not the fair chance of this upgrade.",
   chanceCompact: "The percent you were shown is not this fair chance, rounded down to 0.01 %.",
@@ -442,11 +452,22 @@ export function stepJumps(engineVersion: number | undefined): boolean {
 }
 
 /** The labels and words of a step's checks for an edition on `engineVersion`: version 2's where they differ. */
-export function upgradeCheckWords(engineVersion: number | undefined): {
+export function upgradeCheckWords(
+  engineVersion: number | undefined,
+  rateBps?: number,
+): {
   labels: Record<UpgradeStepName, string>
   ok: Record<UpgradeStepName, string>
   fail: Record<UpgradeStepName, string>
 } {
+  if (engineVersion === 3) {
+    const v3 = UPGRADE_V3_WORDS.checks(rateBps)
+    return {
+      labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
+      ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords, ...v3.ok },
+      fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords, ...v3.fail },
+    }
+  }
   return stepJumps(engineVersion)
     ? {
         labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
@@ -454,6 +475,142 @@ export function upgradeCheckWords(engineVersion: number | undefined): {
         fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords },
       }
     : { labels: UPGRADE_CHECK_LABELS, ok: UPGRADE_CHECK_WORDS, fail: UPGRADE_FAIL_WORDS }
+}
+
+/**
+ * Card 2 of a step on `engineVersion`: its title and its text. Version 3 has its own; version 2
+ * its jump text under version 1's title; version 1, and any version this page does not check, version 1's.
+ */
+export function upgradeStep2(engineVersion: number | undefined, rateBps?: number): { title: string; text: readonly string[] } {
+  if (engineVersion === 3) return UPGRADE_V3_WORDS.step2(rateBps)
+  return { title: UPGRADE_STEPS[1].title, text: stepJumps(engineVersion) ? UPGRADE_JUMP_WORDS.step2Text : UPGRADE_STEPS[1].text }
+}
+
+/** The labels of the two chances an upgraded win's slot check compares, by version. */
+export function wrongChanceLabels(engineVersion: number | undefined): { recorded: string; shown: string } {
+  return engineVersion === 3 ? UPGRADE_V3_WORDS.compareLabels : { recorded: "Fair chance", shown: "Fair chance, rounded down" }
+}
+
+/**
+ * The note on a step checked under the demo rules of 17 and 18 November 2026 (KAN-1751 plan v1.2 D3 A). Only a dev
+ * build has a list of such steps (demo-steps.json), so no production page can show it. The engineer's
+ * proposal, dev only; it is deleted with the list at dev's next reset.
+ */
+export const DEMO_STEP_NOTE =
+  "This upgrade was checked under the demo rules of 17 and 18 November 2026. On those two days the dev site drew some upgrades at 93 % of their usual chance, and this dev page has the list of them. Every other upgrade is checked under its own version's rule."
+
+// ---------------------------------------------------------------------------
+// Version 3 of the upgrade (KAN-1751).
+//
+// Every sentence a person reads only for a version 3 step or win is in this one table, with the library's
+// two version 3 caveats (UPGRADE_V3_CAVEATS), so the whole list can be read in one place.
+//
+// What the owner approved (the owner's decision of 2026-11-20, KAN-1751) is four texts, and only these:
+// text 3 is card 2's second paragraph; text 4 its third paragraph; text 5 the first sentence of the
+// `upgradeChance` check line and its fail line; text 6 the second sentence of that check line, and
+// `underFloorCause`, which the page shows after its own prefix "Step 2 cannot be checked: ". The example in
+// text 3 keeps "96.36 %" whatever the box. upgrade-v3.test.tsx pins the four texts word for word.
+//
+// Every other sentence here (the title, the first paragraph's use on version 3, the other check and fail
+// lines, the compare labels, the win causes, the variant of text 3 for a box whose rate cannot be read, the
+// card 4 source line) and the library's two caveats are the engineer's words. They go to the owner as one
+// list before anything public carries them; a later change to any sentence here is the same.
+//
+// The rule of every sentence (plan §19): the rate is the box's return rounded down to 0.01 %, and
+// at most 99.90 %; an upgrade gives back at least the RATE, never "the box's return".
+// ---------------------------------------------------------------------------
+
+/** A step rate in basis points as the page writes it: two decimals and a space, "96.36 %" (plan O-6 A). */
+export function rateText(rateBps: number): string {
+  return `${Math.trunc(rateBps / 100)}.${String(rateBps % 100).padStart(2, "0")} %`
+}
+
+export const UPGRADE_V3_WORDS = {
+  libraryCaveats: UPGRADE_V3_CAVEATS,
+  unknownVersionFail: UPGRADE_UNKNOWN_VERSION_FAIL,
+  unknownVersionChance: (shown: string, version: string): string =>
+    `The chance shown with this upgraded win, ${shown}, cannot be checked: this box uses version ${version} of the upgrade rules, and this page checks versions 1, 2 and 3 only.`,
+  rateChance: (shown: string, why: string): string =>
+    UPGRADE_V3_WORDS.underFloor(why)
+      ? `The chance shown with this upgraded win, ${shown}, cannot be checked: ${UPGRADE_V3_WORDS.underFloorCause}.`
+      : `The chance shown with this upgraded win, ${shown}, cannot be checked: this box's upgrade rate cannot be read from its chances and its price (${why}).`,
+
+  /**
+   * A box under 93 % (the library's "the box returns <n> bps, under the 9300 bps floor"): one plain cause
+   * for the sentences a person reads; the number stays in the check row, which shows the library's text.
+   * A version 3 box whose price is not positive is a broken record, and keeps the library's own message.
+   */
+  underFloor: (message: string | undefined): boolean => message !== undefined && /^the box returns \d+ bps, under the \d+ bps floor of version 3/.test(message),
+  underFloorCause: "this box returns less than 93 %, which is not allowed for a box with upgrades",
+
+  /**
+   * Card 2. Item 1 of §19 with the box's rate; when the rate could not be read (a box under 93 %), the same
+   * rule with "that rate" in place of the number, so no sentence states a rate the page does not have.
+   */
+  step2: (rateBps: number | undefined): { title: string; text: readonly string[] } => {
+    const rate = rateBps === undefined ? undefined : rateText(rateBps)
+    return {
+      title: "The chance of your upgrade is this box's chance.",
+      text: [
+        "An upgrade gives up the item you hold for a chance at a more valuable item in the same box: the item you chose, not only the next one up.",
+        rate === undefined
+          ? "The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %, and it is never under 93 %. The chance is that rate times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.18% chance. On average you get back at least that rate of what you staked."
+          : `The chance is fixed by the two buy-back values and the box's upgrade rate. The upgrade rate is the box's return, rounded down to 0.01 %, and at most 99.90 %; on this box it is ${rate}, and it is never under 93 %. The chance is ${rate} times the value you give up, divided by the value you could win, rounded up to a millionth. On a box whose upgrade rate is 96.36 %, giving up 10.00 for a chance at 20.00 is a 48.18% chance. On average you get back at least ${rate} of what you staked.`,
+        "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, that the item offered is a more valuable one in the same box, and that the chance is the box's upgrade rate times the value staked, divided by the value of the item offered, rounded up to a millionth. Your browser works out the upgrade rate itself, from the box's chances and its price: it is the box's return, rounded down to 0.01 %, and at most 99.90 %. There is no upgrade below a 0.10% chance. There is no limit on upgrades in a row: a chain ends at the most valuable prize of the box.",
+      ],
+    }
+  },
+
+  /** The check lines that differ from version 2's (items 3 and 4 of §19 for the chance). */
+  checks: (rateBps: number | undefined): { ok: Partial<Record<UpgradeStepName, string>>; fail: Partial<Record<UpgradeStepName, string>> } => ({
+    ok: {
+      engineVersion: "The box uses version 3 of the upgrade rules, a version this page checks.",
+      upgradeTarget: "The item you chose is worth more than the item you gave up, at a chance of 0.10% or more.",
+      upgradeChance:
+        rateBps === undefined
+          ? "The chance is this box's upgrade rate times the value you gave up, divided by the value offered, rounded up to a millionth."
+          : `The chance is this box's upgrade rate, ${rateText(rateBps)}, times the value you gave up, divided by the value offered, rounded up to a millionth. The box's upgrade rate, ${rateText(rateBps)}, is worked out by your browser from the box's chances and its price: the box's return, rounded down to 0.01 %, and at most 99.90 %.`,
+      chanceCompact: "The percent you were shown is this chance, rounded down to 0.01 %.",
+      stepNo: "This upgrade's number is at most 29: there is no limit on upgrades in a row, and a box of at most 30 items allows no longer chain.",
+    },
+    fail: {
+      upgradeTarget: "The item you chose is not one this upgrade allows: it must be worth more than the item you gave up, at a chance of 0.10% or more.",
+      upgradeChance: "The chance we recorded is not this box's chance for this upgrade.",
+      chanceCompact: "The percent you were shown is not this chance, rounded down to 0.01 %.",
+      stepNo: "This would be more upgrades in a row than a box of at most 30 items allows.",
+      upgradeOutcome: "With this box's chance, this number gives a different result than the one we recorded.",
+    },
+  }),
+
+  /**
+   * Card 4's source line of an upgraded win: on version 3 the price and the chances fix the chance too,
+   * through the rate, and the chance is not the fair one.
+   */
+  winStep4Source:
+    "Read from the open record: `open.stakedSlotIndex`, `open.stepChancePpm`, `open.stepChanceCompact`, `open.drawnSlotIndex` and `open.snapshotHash`; from the box record: the price, the chances and the buy-back values of `edition`, which fix the chance of the upgrade; from the prize list record: `snapshot.body`.",
+
+  /** The two chances an upgraded win's slot check compares. */
+  compareLabels: { recorded: "This box's chance", shown: "This box's chance, rounded down" },
+
+  /** Why an upgraded win's chance failed, on version 3: "this box's chance", never "the fair chance". */
+  wrongChance: (cause: WrongChance): string => {
+    switch (cause.kind) {
+      case "shown":
+        return `The chance shown with this upgraded win, ${cause.shown}, is not this box's chance rounded down to 0.01 %, which is ${cause.fair}.`
+      case "none":
+        return cause.why === "offered no step"
+          ? `The chance shown with this upgraded win, ${cause.shown}, cannot be this box's chance: the item given up, in slot ${cause.slot}, has no item above it in this box, so no upgrade is offered from it.`
+          : `The chance shown with this upgraded win, ${cause.shown}, cannot be this box's chance: the item given up names slot ${cause.slot}, and this box has no slot ${cause.slot}.`
+      case "jump":
+        return `The chance shown with this upgraded win, ${cause.shown}, cannot be this box's chance: this box allows no upgrade from the item in slot ${cause.slot} to the item in slot ${cause.target}.`
+      case "version":
+        return UPGRADE_V3_WORDS.unknownVersionChance(cause.shown, cause.version)
+      case "rate":
+        return UPGRADE_V3_WORDS.rateChance(cause.shown, cause.why)
+      case "recorded":
+        return `The chance recorded with this upgraded win, ${cause.recorded.toLocaleString("en")} in 1,000,000, is not this box's chance, ${cause.fair.toLocaleString("en")} in 1,000,000.`
+    }
+  },
 }
 
 /** The verdict lines of a step. A lost step that checks out is a PASS of the check, never a celebration. */
@@ -472,6 +629,11 @@ export const UPGRADE_WIN_STEP4 = {
     "Read from the open record: `open.stakedSlotIndex`, `open.stepChancePpm`, `open.stepChanceCompact`, `open.drawnSlotIndex` and `open.snapshotHash`; from the box record: the buy-back values of `edition`, which fix the fair chance; from the prize list record: `snapshot.body`.",
   text: UPGRADE_STEPS[3].text,
 } as const
+
+/** Card 4 of an upgraded win on `engineVersion`: on version 3 its source line names what fixes that chance. */
+export function upgradeWinStep4(engineVersion: number | undefined): { title: string; source: string; text: readonly string[] } {
+  return engineVersion === 3 ? { ...UPGRADE_WIN_STEP4, source: UPGRADE_V3_WORDS.winStep4Source } : UPGRADE_WIN_STEP4
+}
 
 /** Under the open verdict, when the win was made by an upgrade. */
 export const UPGRADE_WIN = {

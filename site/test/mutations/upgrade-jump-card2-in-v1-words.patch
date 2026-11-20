@@ -1,13 +1,13 @@
 diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
-index f4c4f81..2ad2865 100644
+index 5253d12..79f5269 100644
 --- a/site/src/upgradeSteps.tsx
 +++ b/site/src/upgradeSteps.tsx
-@@ -42,7 +42,7 @@ export function UpgradeStepCards({ report, input }: Props) {
-       {UPGRADE_STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
-         const failed = failedSteps.has(step)
-         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
--        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 2 ? UPGRADE_JUMP_WORDS.step2Text : stepText
-+        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 4 ? UPGRADE_JUMP_WORDS.step2Text : stepText
-         return (
-           <section
-             key={step}
+@@ -35,7 +35,7 @@ export function UpgradeStepCards({ report, input }: Props) {
+   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
+   // Each version's words where they differ (version 2: KAN-1567; version 3, with the box's rate: KAN-1751).
+   const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps)
+-  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps)
++  const step2 = upgradeStep2(input.edition.engineVersion === 2 ? 1 : input.edition.engineVersion, report.trace.stepRateBps)
+ 
+   return (
+     <div className="space-y-6">

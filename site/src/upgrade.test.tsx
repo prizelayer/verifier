@@ -221,11 +221,11 @@ describe("the step page", () => {
     [
       "engineVersion",
       async (a) => {
-        // A version-3 box whose fingerprint is its own true one: only the version can fail. Version 3, since the
-        // page checks versions 1 and 2 (KAN-1567).
-        const v3 = { ...UPGRADE_EDITION, engineVersion: 3 }
-        const fp = await editionFingerprint(parseEdition(v3))
-        a.edition = { ...v3, editionFingerprint: fp }
+        // A version-4 box whose fingerprint is its own true one: only the version can fail. Version 4, since the
+        // page checks versions 1, 2 and 3 (KAN-1567, KAN-1751).
+        const v4 = { ...UPGRADE_EDITION, engineVersion: 4 }
+        const fp = await editionFingerprint(parseEdition(v4))
+        a.edition = { ...v4, editionFingerprint: fp }
         a.step = { ...a.step, editionFingerprint: fp }
       },
     ],
@@ -550,9 +550,9 @@ describe("the step page", () => {
   })
 
   it("fails a locked win of a version the page does not check, naming the version", async () => {
-    await lockedOpenOn(3, {}, "FAIL")
+    await lockedOpenOn(4, {}, "FAIL")
     expect(verdictLine()).toBe(
-      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 3 of the upgrade rules, and this page checks versions 1 and 2 only.",
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 4 of the upgrade rules, and this page checks versions 1, 2 and 3 only.",
     )
   })
 
