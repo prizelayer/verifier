@@ -5,17 +5,17 @@ import { SourceLine } from "./steps"
 import {
   DEPENDENT_NOTE,
   DEPENDS_ON,
+  DEMO_STEP_NOTE,
   SEED_LOCKED,
   STEP1_PENDING,
   UPGRADE_STEP_OF,
   UPGRADE_STEPS,
-  UPGRADE_JUMP_WORDS,
   UPGRADE_TARGET_ROW,
   type StepNumber,
   type UpgradeStepName,
   percentDown,
-  stepJumps,
   upgradeCheckWords,
+  upgradeStep2,
   unusableWords,
 } from "./words"
 
@@ -33,16 +33,16 @@ export function UpgradeStepCards({ report, input }: Props) {
   const failedSteps = new Set(names.filter((n) => report.checks[n]?.ok === false).map((n) => UPGRADE_STEP_OF[n]))
   const pending = input.serverSeedHex === null
   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
-  // Version 2 (KAN-1567) words where they differ; version 1's otherwise.
-  const words = upgradeCheckWords(input.edition.engineVersion)
-  const jumps = stepJumps(input.edition.engineVersion)
+  // Each version's words where they differ (version 2: KAN-1567; version 3, with the box's rate: KAN-1751).
+  const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps)
+  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps)
 
   return (
     <div className="space-y-6">
       {UPGRADE_STEPS.map(({ step, title: stepTitle, method, text: stepText, source }) => {
         const failed = failedSteps.has(step)
-        const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
-        const text = pending && step === 1 ? STEP1_PENDING.text : jumps && step === 2 ? UPGRADE_JUMP_WORDS.step2Text : stepText
+        const title = pending && step === 1 ? STEP1_PENDING.title : step === 2 ? step2.title : stepTitle
+        const text = pending && step === 1 ? STEP1_PENDING.text : step === 2 ? step2.text : stepText
         return (
           <section
             key={step}
@@ -59,6 +59,11 @@ export function UpgradeStepCards({ report, input }: Props) {
             {text.map((p) => (
               <p key={p}>{p}</p>
             ))}
+            {step === 2 && report.trace.ruleSet === "DEMO_RULES_2026_11_17" ? (
+              <p className="font-semibold" data-demo="yes">
+                {DEMO_STEP_NOTE}
+              </p>
+            ) : null}
             {dependsOnFailed(step) ? (
               <p className="font-semibold" data-dependent="yes">
                 {DEPENDENT_NOTE}

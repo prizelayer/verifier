@@ -1,0 +1,13 @@
+diff --git a/site/src/proof.ts b/site/src/proof.ts
+index 9c009f5..d4bc4f6 100644
+--- a/site/src/proof.ts
++++ b/site/src/proof.ts
+@@ -183,7 +183,7 @@ export async function checkProof(text: string, demoSteps: ReadonlySet<string> =
+     }
+     // A step on this build's demo list (dev only) is checked under the demo rules of 17 and 18 November 2026.
+     const stepId = section(readProof(text) as Json, "step").stepId
+-    return { kind: "stepReport", report: await verifyUpgradeStep(input, stepOptions(stepId, demoSteps)), input }
++    return { kind: "stepReport", report: await verifyUpgradeStep(input, stepOptions(stepId, new Set())), input }
+   }
+   const read: { input: VerificationInput | null } = { input: null }
+   // An upgraded win whose step is on this build's demo list (dev only) is read under the same demo rules.

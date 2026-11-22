@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 45faafc..57a36da 100644
+index 65c17d6..44ff041 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -645,7 +645,7 @@ export function upgradeChancePpm(currentCents: bigint, nextCents: bigint): numbe
-   if (currentCents <= 0n || nextCents <= currentCents) {
-     throw new Error(`a step needs 0 < current < next, was ${currentCents} → ${nextCents}`);
+@@ -827,7 +827,7 @@ export function upgradeChancePpm(
    }
--  return Number((BigInt(UPGRADE_STEP_RTP_BPS) * BigInt(PPM_TOTAL) * currentCents) / (10_000n * nextCents));
-+  return Number((BigInt(UPGRADE_STEP_RTP_BPS) * BigInt(PPM_TOTAL) * currentCents + 5_000n * nextCents) / (10_000n * nextCents));
+   const numerator = BigInt(rateBps) * BigInt(PPM_TOTAL) * currentCents;
+   const denominator = 10_000n * nextCents;
+-  return Number(roundsUp ? (numerator + denominator - 1n) / denominator : numerator / denominator);
++  return Number(roundsUp ? (numerator + denominator - 1n) / denominator : (numerator + denominator / 2n) / denominator);
  }
  
  /**

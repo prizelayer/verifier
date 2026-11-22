@@ -6,7 +6,7 @@ import { LookupBox } from "./LookupBox"
 import { checkProof, type Checked } from "./proof"
 import { SourceLine, StepCards } from "./steps"
 import { UpgradeStepCards } from "./upgradeSteps"
-import { COULD_NOT_FINISH, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_JUMP_WORDS, UPGRADE_STEP_OF, UPGRADE_WIN, stepJumps, type UpgradeStepName } from "./words"
+import { COULD_NOT_FINISH, DEMO_STEP_NOTE, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_JUMP_WORDS, UPGRADE_STEP_OF, UPGRADE_WIN, stepJumps, type UpgradeStepName } from "./words"
 import { caveatOf, stepVerdictOf, verdictOf } from "./verdict"
 
 export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
@@ -180,7 +180,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
 }
 
 function Verdict({ report, input }: { report: VerificationReport; input: VerificationInput | null }) {
-  const { word, line } = verdictOf(report)
+  const { word, line } = verdictOf(report, input?.edition.engineVersion)
   const caveat = caveatOf(report)
   const stepId = input?.gameKind === "upgrade" ? input.expected.upgradeStepId : undefined
   // The version comes from the fingerprinted edition, as on the step page (KAN-1567).
@@ -198,6 +198,7 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
           {UPGRADE_WIN.note} {report.status === "verified" ? `${passCaveat} ` : ""}<a href={`#step=${encodeURIComponent(stepId)}`} className="underline">{UPGRADE_WIN.link}</a>.
         </p>
       ) : null}
+      {report.trace.ruleSet === "DEMO_RULES_2026_11_17" ? <p data-demo="yes">{DEMO_STEP_NOTE}</p> : null}
     </div>
   )
 }

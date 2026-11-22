@@ -37,6 +37,7 @@ import {
   stepTable,
   upgradeChancePpm,
   upgradeRule,
+  upgradeStepRateBps,
   upgradeTarget,
   upgradeTargets,
   verify,
@@ -259,8 +260,9 @@ export async function runConformance(fixture) {
   // upgradeTargets, and the worst path is built from that list alone.
   for (const section of [fixture.upgradeTargets, fixture.upgradeWorstPath]) {
     eq('upgradeV2.constants.engineType', section.constants.engineType, UPGRADE_ENGINE_TYPE);
+    // The version 1 and 2 sections state versions 1 and 2; version 3's families state their own constants.
     eq('upgradeV2.constants.engineVersions', section.constants.engineVersions.join(','),
-      UPGRADE_RULES.map((rule) => rule.engineVersion).join(','));
+      UPGRADE_RULES.filter((rule) => rule.engineVersion <= 2).map((rule) => rule.engineVersion).join(','));
     eq('upgradeV2.constants.maxSteps', section.constants.maxSteps, UPGRADE_MAX_STEPS);
     eq('upgradeV2.constants.minChancePpm', section.constants.minChancePpm, upgradeRule(1)?.minChancePpm);
     eq('upgradeV2.constants.jumpMinChancePpm', section.constants.jumpMinChancePpm, upgradeRule(2)?.minChancePpm);
@@ -350,11 +352,11 @@ export async function runConformance(fixture) {
     eq(`${label}.payout`, lowestTerms(worst, scale), fraction(vector.worstPathPayoutCents));
     eq(`${label}.rtp`, lowestTerms(worst, scale * price), fraction(vector.worstPathRtp));
     eq(`${label}.rtpText`, percentFloor6(worst, scale * price), vector.worstPathRtpText);
-    // The box returns the sum of ppm x value over 1 000 000 x price, and it alone must reach the floor: each
-    // step returns 93 % of its stake, so the worst path is shown, not checked (KAN-1685).
+    // The box returns the sum of ppm x value over 1 000 000 x price; it and the worst path must both reach the floor.
     const box = slots.reduce((sum, slot) => sum + BigInt(slot.probabilityPpm) * slot.requiredBuyBackValueCents, 0n);
     eq(`${label}.verdicts`,
-      vector.verdicts.map(({ floorBps }) => `${floorBps}:${box * 10_000n >= BigInt(floorBps) * MILLION * price}`).join(','),
+      vector.verdicts.map(({ floorBps }) => `${floorBps}:${
+        box * 10_000n >= BigInt(floorBps) * MILLION * price && worst * 10_000n >= BigInt(floorBps) * scale * price}`).join(','),
       vector.verdicts.map(({ floorBps, meetsFloor }) => `${floorBps}:${meetsFloor}`).join(','));
   }
 
@@ -412,6 +414,104 @@ export async function runConformance(fixture) {
     eq(`${label}.verifyUpgradeStep`, report.status, 'verified');
   }
 
+  // --- version 3 of the upgrade engine: each family is a box, and its rate is computed from that box ---
+  // The same recomputations as the version 3 blocks of test/vectors.test.ts, from the built file, so
+  // each engine's own BigInt arithmetic computes the rate, the targets, the single offer and every
+  // step. The family's written rate is compared, never read: a family whose number and box disagree
+  // is a failure here too.
+  const rateStep = fixture.upgradeRateStep;
+  const rateRule = upgradeRule(3);
+  eq('upgradeRateStep.constants.engineType', rateStep.constants.engineType, UPGRADE_ENGINE_TYPE);
+  eq('upgradeRateStep.constants.engineVersion', rateStep.constants.engineVersion, rateRule?.engineVersion);
+  eq('upgradeRateStep.constants.maxSteps', rateStep.constants.maxSteps, rateRule?.maxSteps);
+  eq('upgradeRateStep.constants.minChancePpm', rateStep.constants.minChancePpm, rateRule?.minChancePpm);
+  eq('upgradeRateStep.constants.offerMinChancePpm', rateStep.constants.offerMinChancePpm, rateRule?.offerMinChancePpm);
+  eq('upgradeRateStep.constants.stepRtpCapBps', rateStep.constants.stepRtpCapBps, rateRule?.stepRtpCapBps);
+  eq('upgradeRateStep.constants.stepRtpFloorBps', rateStep.constants.stepRtpFloorBps, rateRule?.stepRtpFloorBps);
+  const rateSeed = bytesFromHex(rateStep.serverSeedHex);
+  eq('upgradeRateStep.commitment', await commitment(rateSeed), rateStep.commitmentHex);
+  const rateEdition = (family, engineVersion) => ({
+    engineId: '17511751-0000-4000-8000-000000000003',
+    engineVersion,
+    priceCents: BigInt(family.priceCents),
+    slots: family.slots.map((slot) => ({
+      slotIndex: slot.slotIndex,
+      probabilityPpm: slot.probabilityPpm,
+      requiredBuyBackValueCents: BigInt(slot.buyBackValueCents),
+      requiredMarketValueCents: 0n,
+    })),
+  });
+  for (const family of rateStep.families) {
+    asserted.add(`upgradeRateStep/${family.id}`);
+    const edition = rateEdition(family, 3);
+    // S and boxBps from the box, in this engine's BigInt; the written values are compared, never read.
+    const sum = family.slots.reduce((acc, slot) => acc + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
+    eq(`upgradeRateStep:${family.id}.S`, typeof family.payoutTimesMillion === 'string' ? sum : 'S is not a string', family.payoutTimesMillion);
+    const boxBps = (10_000n * sum) / (BigInt(PPM_TOTAL) * BigInt(family.priceCents));
+    eq(`upgradeRateStep:${family.id}.boxBps`, boxBps, family.boxBps);
+    const cap = BigInt(rateStep.constants.stepRtpCapBps);
+    const rate = upgradeStepRateBps(edition, 3);
+    eq(`upgradeRateStep:${family.id}.rate`, rate, family.stepRtpBps);
+    eq(`upgradeRateStep:${family.id}.rateIsBoxBpsUnderCap`, rate, boxBps < cap ? boxBps : cap);
+    const valueOf = (slotIndex) => edition.slots.find((slot) => slot.slotIndex === slotIndex)?.requiredBuyBackValueCents;
+    family.queries.forEach((query, i) => {
+      asserted.add(`upgradeRateStep/${family.id}/query-${i}`);
+      const label = `upgradeRateStep:${family.id}/query-${i}`;
+      eq(`${label}.targets`,
+        upgradeTargets(edition, query.heldSlotIndex, 3).map((t) => `${t.targetSlotIndex}@${t.chancePpm}=${stepChanceText(t.chancePpm)}`).join(','),
+        query.targets.map((t) => `${t.targetSlotIndex}@${t.chancePpm}=${t.chanceCompact}`).join(','));
+      const offer = upgradeTarget(edition, query.heldSlotIndex, 3);
+      let actual = offer === null ? null : `${offer.targetSlotIndex}@${offer.chancePpm}`;
+      if (offer === null) {
+        const held = valueOf(query.heldSlotIndex);
+        const higher = edition.slots.filter((slot) => slot.requiredBuyBackValueCents > held);
+        if (higher.length === 0) actual = 'none:top_value';
+        else {
+          const next = higher.reduce((a, b) => (b.requiredBuyBackValueCents < a.requiredBuyBackValueCents ? b : a));
+          const under = upgradeChancePpm(held, next.requiredBuyBackValueCents, rate, true) < rateStep.constants.offerMinChancePpm;
+          actual = under ? 'none:under_minimum' : 'none:no_reason';
+        }
+      }
+      eq(`${label}.offer`, actual,
+        query.offer === undefined ? `none:${query.noOfferReason}` : `${query.offer.targetSlotIndex}@${query.offer.chancePpm}`);
+    });
+    for (const vector of family.steps) {
+      asserted.add(`upgradeRateStep/${family.id}/${vector.id}`);
+      const label = `upgradeRateStep:${family.id}/${vector.id}`;
+      eq(`${label}.stakedValue`, valueOf(vector.heldSlotIndex), vector.stakedBuyBackValueCents);
+      eq(`${label}.targetValue`, valueOf(vector.targetSlotIndex), vector.targetBuyBackValueCents);
+      const chance = upgradeChancePpm(BigInt(vector.stakedBuyBackValueCents), BigInt(vector.targetBuyBackValueCents), rate, true);
+      eq(`${label}.chance`, chance, vector.chancePpm);
+      eq(`${label}.table`, stepTable(chance).map((row) => row.probabilityPpm).join(','), vector.stepTablePpm.join(','));
+      const v = (await derive(rateSeed, vector.clientSeed, vector.nonce)).value;
+      eq(`${label}.v`, v, vector.v);
+      const outcome = stepOutcome(v, chance);
+      eq(`${label}.outcome`, outcome, vector.outcome);
+      eq(`${label}.slotIndex`, outcome === 'won' ? 0 : 1, vector.slotIndex);
+      eq(`${label}.chanceCompact`, stepChanceText(chance), vector.chanceCompact);
+      const report = await verifyUpgradeStep({
+        serverSeedHex: rateStep.serverSeedHex,
+        commitmentHex: rateStep.commitmentHex,
+        clientSeed: vector.clientSeed,
+        nonce: vector.nonce,
+        edition,
+        engineType: rateStep.constants.engineType,
+        expected: {
+          editionFingerprint: await editionFingerprint(edition),
+          stakedSlotIndex: vector.heldSlotIndex,
+          targetSlotIndex: vector.targetSlotIndex,
+          chancePpm: vector.chancePpm,
+          chanceCompact: vector.chanceCompact,
+          drawnPpmValue: vector.v,
+          outcome: vector.outcome,
+          stepNo: vector.stepNo + 1,
+        },
+      });
+      eq(`${label}.verifyUpgradeStep`, report.status, 'verified');
+      eq(`${label}.trace.stepRateBps`, report.trace.stepRateBps, family.stepRtpBps);
+    }
+  }
+
   // --- the same fail-closed completeness check the Node suite makes ---
   // Without it the guarantee would hold in Node only: a family added on the platform side would
   // redden `npm test` while this pass went on silently proving less, in the three engines a player
@@ -422,6 +522,17 @@ export async function runConformance(fixture) {
   const expected = [];
   for (const [key, body] of Object.entries(fixture)) {
     if (METADATA_KEYS.includes(key)) continue;
+    // Version 3's section holds families of a box each: every family, every query by its place and
+    // every step by its id is one entry, as in the Node suite.
+    const families = body && body.families;
+    if (families) {
+      for (const family of families) {
+        expected.push(`${key}/${family.id}`);
+        family.queries.forEach((_, i) => expected.push(`${key}/${family.id}/query-${i}`));
+        for (const step of family.steps) expected.push(`${key}/${family.id}/${step.id}`);
+      }
+      continue;
+    }
     const vectors = body && body.vectors;
     if (!vectors || vectors.length === 0) {
       failures.push(

@@ -16,9 +16,10 @@ import {
   STEPS,
   type StepNumber,
   UPGRADE_JUMP_WORDS,
-  UPGRADE_WIN_STEP4,
+  upgradeWinStep4,
   stepJumps,
   unusableWords,
+  wrongChanceLabels,
   wrongChanceShown,
   wrongChanceWords,
 } from "./words"
@@ -44,7 +45,7 @@ export function StepCards({ report, input }: Props) {
       {STEPS.map((card) => {
         // An upgraded win's number is read over the step's two ranges, so its card 4 is the step's.
         const { step, method } = card
-        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? UPGRADE_WIN_STEP4 : card
+        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? upgradeWinStep4(input.edition.engineVersion) : card
         const failed = failedSteps.has(step)
         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
@@ -107,7 +108,7 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
             : check.error !== undefined
               ? inputWords(check.field, check.error, input)
               : name === "drawnSlotIndex" && wrongChanceShown(check)
-                ? wrongChanceWords(wrongChanceShown(check)!)
+                ? wrongChanceWords(wrongChanceShown(check)!, input.edition.engineVersion)
                 : FAIL_WORDS[name]
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
@@ -265,9 +266,9 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
           ) : null}
           {checks.drawnSlotIndex ? (
             wrongChanceShown(checks.drawnSlotIndex)?.kind === "recorded" ? (
-              <Compare label="drawnSlotIndex" expectedLabel="Chance we recorded" computedLabel="Fair chance" check={checks.drawnSlotIndex} />
+              <Compare label="drawnSlotIndex" expectedLabel="Chance we recorded" computedLabel={wrongChanceLabels(input.edition.engineVersion).recorded} check={checks.drawnSlotIndex} />
             ) : wrongChanceShown(checks.drawnSlotIndex) ? (
-              <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel="Fair chance, rounded down" check={checks.drawnSlotIndex} />
+              <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel={wrongChanceLabels(input.edition.engineVersion).shown} check={checks.drawnSlotIndex} />
             ) : (
               <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel={slotLabel} check={checks.drawnSlotIndex} />
             )

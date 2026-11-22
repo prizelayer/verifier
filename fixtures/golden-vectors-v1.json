@@ -864,7 +864,7 @@
   },
   "upgradeStep": {
     "specification": "specs/rng-fairness.md §4b — the upgrade step",
-    "note": "p = floor(STEP_RTP_BPS · 1,000,000 · staked / (10000 · target)); at STEP_RTP_BPS = 9300 that is floor(930,000 · staked / target), the only integer with 10000·p·target <= STEP_RTP_BPS·1,000,000·staked < 10000·(p+1)·target. The step draws §3 over the two-entry table [p, 1,000,000 − p] and maps it by §4: slotIndex 0 is won, slotIndex 1 is lost, so won ⇔ v < p. slotIndex here is the step table's index, not an edition slot. chanceCompact is p shown floored to 0.01%, never above the true chance. The boundary cases use values chosen to land p on a v that nonce 1 already produces; they are not real prices.",
+    "note": "p = floor(1,000,000 · staked / target), the only integer with 10000·p·target <= STEP_RTP_BPS·1,000,000·staked < 10000·(p+1)·target. The step draws §3 over the two-entry table [p, 1,000,000 − p] and maps it by §4: slotIndex 0 is won, slotIndex 1 is lost, so won ⇔ v < p. slotIndex here is the step table's index, not an edition slot. chanceCompact is p shown floored to 0.01%, never above the true chance. The boundary cases use values chosen to land p on a v that nonce 1 already produces; they are not real prices.",
     "serverSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
     "commitmentHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
     "constants": {
@@ -872,7 +872,7 @@
       "engineVersion": 1,
       "maxSteps": 3,
       "minChancePpm": 100000,
-      "stepRtpBps": 9300
+      "stepRtpBps": 10000
     },
     "vectors": [
       {
@@ -881,7 +881,7 @@
         "clientSeed": "alice-seed",
         "nonce": 1,
         "stakedBuyBackValueCents": 186669,
-        "targetBuyBackValueCents": 930000,
+        "targetBuyBackValueCents": 1000000,
         "chancePpm": 186669,
         "chanceCompact": "18.66%",
         "stepTablePpm": [
@@ -898,7 +898,7 @@
         "clientSeed": "alice-seed",
         "nonce": 1,
         "stakedBuyBackValueCents": 186670,
-        "targetBuyBackValueCents": 930000,
+        "targetBuyBackValueCents": 1000000,
         "chancePpm": 186670,
         "chanceCompact": "18.66%",
         "stepTablePpm": [
@@ -911,16 +911,16 @@
       },
       {
         "id": "worked-12-to-30",
-        "note": "The worked box's 12 → 30 EUR step: p = 372000 exactly, no remainder.",
+        "note": "The worked box's 12 → 30 EUR step: p = 400000 exactly, no remainder.",
         "clientSeed": "alice-seed",
         "nonce": 1,
         "stakedBuyBackValueCents": 1200,
         "targetBuyBackValueCents": 3000,
-        "chancePpm": 372000,
-        "chanceCompact": "37.20%",
+        "chancePpm": 400000,
+        "chanceCompact": "40.00%",
         "stepTablePpm": [
-          372000,
-          628000
+          400000,
+          600000
         ],
         "v": 186669,
         "slotIndex": 0,
@@ -928,16 +928,16 @@
       },
       {
         "id": "worked-5-to-12-remainder",
-        "note": "A 5 → 11.89 EUR step: 930,000 · 500 / 1189 leaves a remainder, so p is the floor 391084 and the shown chance is 39.10%, not 39.11%. The worked box's own 5 → 12 EUR step is exact at 93 % (387500), so the remainder case uses 11.89 EUR.",
+        "note": "The worked box's 5 → 12 EUR step: 1,000,000 · 500 / 1200 leaves a remainder, so p is the floor 416666 and the shown chance is 41.66%, not 41.67%.",
         "clientSeed": "alice-seed",
         "nonce": 2,
         "stakedBuyBackValueCents": 500,
-        "targetBuyBackValueCents": 1189,
-        "chancePpm": 391084,
-        "chanceCompact": "39.10%",
+        "targetBuyBackValueCents": 1200,
+        "chancePpm": 416666,
+        "chanceCompact": "41.66%",
         "stepTablePpm": [
-          391084,
-          608916
+          416666,
+          583334
         ],
         "v": 459796,
         "slotIndex": 1,
@@ -945,16 +945,16 @@
       },
       {
         "id": "worked-30-to-80",
-        "note": "The worked box's 30 → 80 EUR step: p = 348750.",
+        "note": "The worked box's 30 → 80 EUR step: p = 375000.",
         "clientSeed": "alice-seed",
         "nonce": 3,
         "stakedBuyBackValueCents": 3000,
         "targetBuyBackValueCents": 8000,
-        "chancePpm": 348750,
-        "chanceCompact": "34.87%",
+        "chancePpm": 375000,
+        "chanceCompact": "37.50%",
         "stepTablePpm": [
-          348750,
-          651250
+          375000,
+          625000
         ],
         "v": 261902,
         "slotIndex": 0,
@@ -962,11 +962,11 @@
       },
       {
         "id": "minimum-chance-8-to-80",
-        "note": "8 → 74.40 EUR: p is exactly MIN_CHANCE_PPM (100000), the smallest chance that is offered (upgradeOffer minimum-is-offered). The id keeps its name from the step at 100 %, where the target was 80 EUR.",
+        "note": "8 → 80 EUR: p is exactly MIN_CHANCE_PPM (100000), the smallest chance that is offered (upgradeOffer minimum-is-offered).",
         "clientSeed": "alice-seed",
         "nonce": 2,
         "stakedBuyBackValueCents": 800,
-        "targetBuyBackValueCents": 7440,
+        "targetBuyBackValueCents": 8000,
         "chancePpm": 100000,
         "chanceCompact": "10.00%",
         "stepTablePpm": [
@@ -987,7 +987,7 @@
       "engineVersion": 1,
       "maxSteps": 3,
       "minChancePpm": 100000,
-      "stepRtpBps": 9300
+      "stepRtpBps": 10000
     },
     "vectors": [
       {
@@ -1018,22 +1018,22 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%"
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
           },
           {
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 2,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%"
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
           },
           {
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 348750,
-            "chanceCompact": "34.87%"
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%"
           },
           {
             "heldSlotIndex": 3,
@@ -1070,22 +1070,22 @@
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%"
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
           },
           {
             "heldSlotIndex": 3,
             "stepNo": 0,
             "targetSlotIndex": 0,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%"
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
           },
           {
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 2,
-            "chancePpm": 348750,
-            "chanceCompact": "34.87%"
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%"
           },
           {
             "heldSlotIndex": 2,
@@ -1122,34 +1122,34 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%"
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
           },
           {
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%"
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
           },
           {
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%"
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%"
           }
         ]
       },
       {
         "id": "under-minimum",
-        "note": "7.99 → 74.40 EUR is 99875 ppm, under the minimum: no offer.",
+        "note": "7.99 → 80 EUR is 99875 ppm, under the minimum: no offer.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 1,
         "slotsAsGiven": [
           {
             "slotIndex": 1,
-            "buyBackValueCents": 7440
+            "buyBackValueCents": 8000
           },
           {
             "slotIndex": 0,
@@ -1166,13 +1166,13 @@
       },
       {
         "id": "minimum-is-offered",
-        "note": "8 → 74.40 EUR is exactly MIN_CHANCE_PPM (100000): offered. With under-minimum, the minimum is pinned from both sides; an implementation that refuses p <= 100000 fails here.",
+        "note": "8 → 80 EUR is exactly MIN_CHANCE_PPM (100000): offered. With under-minimum, the minimum is pinned from both sides; an implementation that refuses p <= 100000 fails here.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 1,
         "slotsAsGiven": [
           {
             "slotIndex": 1,
-            "buyBackValueCents": 7440
+            "buyBackValueCents": 8000
           },
           {
             "slotIndex": 0,
@@ -1209,8 +1209,8 @@
             "heldSlotIndex": 0,
             "stepNo": 2,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%"
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%"
           },
           {
             "heldSlotIndex": 0,
@@ -1256,7 +1256,7 @@
       "maxSteps": 3,
       "minChancePpm": 100000,
       "jumpMinChancePpm": 10000,
-      "stepRtpBps": 9300,
+      "stepRtpBps": 10000,
       "rtpFloorBps": 9300
     },
     "vectors": [
@@ -1292,26 +1292,26 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%",
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%",
             "targets": [
               {
                 "targetSlotIndex": 1,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               },
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 155000,
-                "chanceCompact": "15.50%"
+                "chancePpm": 166666,
+                "chanceCompact": "16.66%"
               },
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 58125,
-                "chanceCompact": "5.81%"
+                "chancePpm": 62500,
+                "chanceCompact": "6.25%"
               }
             ]
           },
@@ -1319,20 +1319,20 @@
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 2,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%",
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%",
             "targets": [
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 372000,
-                "chanceCompact": "37.20%"
+                "chancePpm": 400000,
+                "chanceCompact": "40.00%"
               },
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 139500,
-                "chanceCompact": "13.95%"
+                "chancePpm": 150000,
+                "chanceCompact": "15.00%"
               }
             ]
           },
@@ -1340,14 +1340,14 @@
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 348750,
-            "chanceCompact": "34.87%",
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%",
             "targets": [
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 348750,
-                "chanceCompact": "34.87%"
+                "chancePpm": 375000,
+                "chanceCompact": "37.50%"
               }
             ]
           },
@@ -1391,14 +1391,14 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%",
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%",
             "targets": [
               {
                 "targetSlotIndex": 1,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               }
             ]
           },
@@ -1406,14 +1406,14 @@
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 2,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%",
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%",
             "targets": [
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 372000,
-                "chanceCompact": "37.20%"
+                "chancePpm": 400000,
+                "chanceCompact": "40.00%"
               }
             ]
           },
@@ -1421,14 +1421,14 @@
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 348750,
-            "chanceCompact": "34.87%",
+            "chancePpm": 375000,
+            "chanceCompact": "37.50%",
             "targets": [
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 348750,
-                "chanceCompact": "34.87%"
+                "chancePpm": 375000,
+                "chanceCompact": "37.50%"
               }
             ]
           },
@@ -1442,23 +1442,23 @@
       },
       {
         "id": "jump-minimum-edges",
-        "note": "1.08 → 100.44 EUR is exactly 10000 ppm: listed. 1.08 → 100.45 EUR is 9999 ppm: not listed, and the list stops there. The next value is under 10 %, so the same win has no offer.",
+        "note": "1 → 100 EUR is exactly 10000 ppm: listed. 1 → 100.01 EUR is 9999 ppm: not listed, and the list stops there. The next value is under 10 %, so the same win has no offer.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
         "slotsAsGiven": [
           {
             "slotIndex": 0,
-            "buyBackValueCents": 108,
+            "buyBackValueCents": 100,
             "kind": "item"
           },
           {
             "slotIndex": 1,
-            "buyBackValueCents": 10045,
+            "buyBackValueCents": 10001,
             "kind": "item"
           },
           {
             "slotIndex": 2,
-            "buyBackValueCents": 10044,
+            "buyBackValueCents": 10000,
             "kind": "item"
           }
         ],
@@ -1480,14 +1480,14 @@
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 929907,
-            "chanceCompact": "92.99%",
+            "chancePpm": 999900,
+            "chanceCompact": "99.99%",
             "targets": [
               {
                 "targetSlotIndex": 1,
                 "kind": "item",
-                "chancePpm": 929907,
-                "chanceCompact": "92.99%"
+                "chancePpm": 999900,
+                "chanceCompact": "99.99%"
               }
             ]
           }
@@ -1525,26 +1525,26 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%",
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%",
             "targets": [
               {
                 "targetSlotIndex": 1,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               },
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               },
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 155000,
-                "chanceCompact": "15.50%"
+                "chancePpm": 166666,
+                "chanceCompact": "16.66%"
               }
             ]
           },
@@ -1552,14 +1552,14 @@
             "heldSlotIndex": 1,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%",
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%",
             "targets": [
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 372000,
-                "chanceCompact": "37.20%"
+                "chancePpm": 400000,
+                "chanceCompact": "40.00%"
               }
             ]
           },
@@ -1567,14 +1567,14 @@
             "heldSlotIndex": 2,
             "stepNo": 0,
             "targetSlotIndex": 3,
-            "chancePpm": 372000,
-            "chanceCompact": "37.20%",
+            "chancePpm": 400000,
+            "chanceCompact": "40.00%",
             "targets": [
               {
                 "targetSlotIndex": 3,
                 "kind": "item",
-                "chancePpm": 372000,
-                "chanceCompact": "37.20%"
+                "chancePpm": 400000,
+                "chanceCompact": "40.00%"
               }
             ]
           }
@@ -1582,7 +1582,7 @@
       },
       {
         "id": "wallet-credit-target",
-        "note": "A 465 EUR wallet credit ticket is a target like an item: 5 → 465 EUR is exactly 10000 ppm.",
+        "note": "A 500 EUR wallet credit ticket is a target like an item: 5 → 500 EUR is exactly 10000 ppm.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
         "slotsAsGiven": [
@@ -1593,7 +1593,7 @@
           },
           {
             "slotIndex": 1,
-            "buyBackValueCents": 46500,
+            "buyBackValueCents": 50000,
             "kind": "wallet_credit"
           },
           {
@@ -1607,14 +1607,14 @@
             "heldSlotIndex": 0,
             "stepNo": 0,
             "targetSlotIndex": 2,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%",
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%",
             "targets": [
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               },
               {
                 "targetSlotIndex": 1,
@@ -1666,20 +1666,20 @@
             "heldSlotIndex": 0,
             "stepNo": 2,
             "targetSlotIndex": 1,
-            "chancePpm": 387500,
-            "chanceCompact": "38.75%",
+            "chancePpm": 416666,
+            "chanceCompact": "41.66%",
             "targets": [
               {
                 "targetSlotIndex": 1,
                 "kind": "item",
-                "chancePpm": 387500,
-                "chanceCompact": "38.75%"
+                "chancePpm": 416666,
+                "chanceCompact": "41.66%"
               },
               {
                 "targetSlotIndex": 2,
                 "kind": "item",
-                "chancePpm": 155000,
-                "chanceCompact": "15.50%"
+                "chancePpm": 166666,
+                "chanceCompact": "16.66%"
               }
             ]
           },
@@ -1695,7 +1695,7 @@
   },
   "upgradeWorstPath": {
     "specification": "specs/rng-fairness.md §4b — the worst path (validation)",
-    "note": "The worst path is the player who steps at every chance until MAX_STEPS and, on version 2, names at every step the target that leaves the least expected payout; on version 1 it is the always-climb player. worstPathPayoutCents is that payout per open, worstPathRtp is it over the price; both are exact fractions in lowest terms, written as decimal strings because they can exceed 2^53; priceCents is a decimal string, as in editionFingerprint. worstPathRtpText is the RTP floored to 6 decimals. meetsFloor is the validation at floorBps: the box alone must reach it; the worst path is shown, not checked.",
+    "note": "The worst path is the player who steps at every chance until MAX_STEPS and, on version 2, names at every step the target that leaves the least expected payout; on version 1 it is the always-climb player. worstPathPayoutCents is that payout per open, worstPathRtp is it over the price; both are exact fractions in lowest terms, written as decimal strings because they can exceed 2^53; priceCents is a decimal string, as in editionFingerprint. worstPathRtpText is the RTP floored to 6 decimals. meetsFloor is the validation at floorBps: the box and the worst path must both reach it.",
     "constants": {
       "engineType": "single_draw_weighted_table_fair_upgrade",
       "engineVersions": [
@@ -1705,7 +1705,7 @@
       "maxSteps": 3,
       "minChancePpm": 100000,
       "jumpMinChancePpm": 10000,
-      "stepRtpBps": 9300,
+      "stepRtpBps": 10000,
       "rtpFloorBps": 9300
     },
     "vectors": [
@@ -1738,14 +1738,14 @@
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "3458973150043",
-          "denominator": "2000000000"
+          "numerator": "2325009055801",
+          "denominator": "1250000000"
         },
         "worstPathRtp": {
-          "numerator": "3458973150043",
-          "denominator": "4000000000000"
+          "numerator": "2325009055801",
+          "denominator": "2500000000000"
         },
-        "worstPathRtpText": "86.474328%",
+        "worstPathRtpText": "93.000362%",
         "verdicts": [
           {
             "floorBps": 9300,
@@ -1755,7 +1755,7 @@
       },
       {
         "id": "worked-box-v2",
-        "note": "The same box on version 2: each step returns 93 % of its stake, so the worst path takes as many steps as it can, and here that is always climbing: the worst path equals always-climb. Valid, because the box alone reaches the floor.",
+        "note": "The same box on version 2: from a box win of 5 EUR the worst first target is 30 EUR, not 12 EUR, so the worst path pays less than always climbing, and still reaches the floor.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
         "priceCents": "2000",
@@ -1782,14 +1782,14 @@
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "3458973150043",
-          "denominator": "2000000000"
+          "numerator": "930003430801",
+          "denominator": "500000000"
         },
         "worstPathRtp": {
-          "numerator": "3458973150043",
-          "denominator": "4000000000000"
+          "numerator": "930003430801",
+          "denominator": "1000000000000"
         },
-        "worstPathRtpText": "86.474328%",
+        "worstPathRtpText": "93.000343%",
         "verdicts": [
           {
             "floorBps": 9300,
@@ -1799,7 +1799,7 @@
       },
       {
         "id": "exact-93-v1",
-        "note": "The box returns exactly 93.00 %: valid at 9300 bps on version 1, refused at 9301. The floor binds the box alone; the always-climb payout below it is shown, not checked.",
+        "note": "The box returns exactly 93.00 %, but 5 → 12 EUR leaves a remainder: refused on version 1.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 1,
         "priceCents": "2000",
@@ -1826,28 +1826,24 @@
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "4323697443",
-          "denominator": "2500000"
+          "numerator": "2906249601",
+          "denominator": "1562500"
         },
         "worstPathRtp": {
-          "numerator": "4323697443",
-          "denominator": "5000000000"
+          "numerator": "2906249601",
+          "denominator": "3125000000"
         },
-        "worstPathRtpText": "86.473948%",
+        "worstPathRtpText": "92.999987%",
         "verdicts": [
           {
             "floorBps": 9300,
-            "meetsFloor": true
-          },
-          {
-            "floorBps": 9301,
             "meetsFloor": false
           }
         ]
       },
       {
         "id": "exact-93-v2",
-        "note": "The same box on version 2: the same verdicts, as the worst path is not checked.",
+        "note": "The same box on version 2: refused too, by a wider margin.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
         "priceCents": "2000",
@@ -1874,28 +1870,24 @@
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "4323697443",
-          "denominator": "2500000"
+          "numerator": "1162499601",
+          "denominator": "625000"
         },
         "worstPathRtp": {
-          "numerator": "4323697443",
-          "denominator": "5000000000"
+          "numerator": "1162499601",
+          "denominator": "1250000000"
         },
-        "worstPathRtpText": "86.473948%",
+        "worstPathRtpText": "92.999968%",
         "verdicts": [
           {
             "floorBps": 9300,
-            "meetsFloor": true
-          },
-          {
-            "floorBps": 9301,
             "meetsFloor": false
           }
         ]
       },
       {
         "id": "operator-floor-94-v2",
-        "note": "The box returns exactly 94.00 %: an operator's floor binds the box alone, so it is valid at 9300 and at 9400 bps, though the worst path is far under both, and refused at 9401.",
+        "note": "The box returns exactly 94.00 %: an operator's floor of 9400 bps holds for the box but not for the worst path, so it is refused at 9400 and valid at 9300.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
         "priceCents": "2000",
@@ -1922,14 +1914,14 @@
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "1094492307",
-          "denominator": "625000"
+          "numerator": "293749899",
+          "denominator": "156250"
         },
         "worstPathRtp": {
-          "numerator": "1094492307",
-          "denominator": "1250000000"
+          "numerator": "293749899",
+          "denominator": "312500000"
         },
-        "worstPathRtpText": "87.559384%",
+        "worstPathRtpText": "93.999967%",
         "verdicts": [
           {
             "floorBps": 9300,
@@ -1937,41 +1929,47 @@
           },
           {
             "floorBps": 9400,
-            "meetsFloor": true
-          },
-          {
-            "floorBps": 9401,
             "meetsFloor": false
           }
         ]
       },
       {
         "id": "climb-passes-worst-fails-v1",
-        "note": "1 and 20 EUR at 11.28 EUR: 1 → 20 EUR is 46500 ppm, under 10 %, so version 1 has no offer and always climbing is the box, 93.085106 %. Valid.",
+        "note": "The worked values with 10 ppm moved from 12 EUR to 5 EUR: the box returns 93.000025 % and always climbing 93.000012 %, so the box is valid on version 1.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 1,
-        "priceCents": "1128",
+        "priceCents": "2000",
         "slots": [
           {
             "slotIndex": 0,
-            "probabilityPpm": 500000,
-            "buyBackValueCents": 100
+            "probabilityPpm": 319209,
+            "buyBackValueCents": 500
           },
           {
             "slotIndex": 1,
-            "probabilityPpm": 500000,
-            "buyBackValueCents": 2000
+            "probabilityPpm": 469990,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 110000,
+            "buyBackValueCents": 3000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 100801,
+            "buyBackValueCents": 8000
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "1050",
-          "denominator": "1"
+          "numerator": "2325000305791",
+          "denominator": "1250000000"
         },
         "worstPathRtp": {
-          "numerator": "175",
-          "denominator": "188"
+          "numerator": "2325000305791",
+          "denominator": "2500000000000"
         },
-        "worstPathRtpText": "93.085106%",
+        "worstPathRtpText": "93.000012%",
         "verdicts": [
           {
             "floorBps": 9300,
@@ -1981,44 +1979,54 @@
       },
       {
         "id": "climb-passes-worst-fails-v2",
-        "note": "The same box on version 2: always climbing still returns 93.085106 %, but 1 EUR may jump to 20 EUR at 46500 ppm, so the worst path returns 92.774822 %, under 93 %. Valid all the same: the floor reads the box alone. A floor that read the worst path would refuse it.",
+        "note": "The same box on version 2: always climbing still returns 93.000012 %, but from 5 EUR the worst target is 30 EUR and the worst path returns 92.999993 %, so it is refused. A floor that read always-climb on version 2 would accept it.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
-        "priceCents": "1128",
+        "priceCents": "2000",
         "slots": [
           {
             "slotIndex": 0,
-            "probabilityPpm": 500000,
-            "buyBackValueCents": 100
+            "probabilityPpm": 319209,
+            "buyBackValueCents": 500
           },
           {
             "slotIndex": 1,
-            "probabilityPpm": 500000,
-            "buyBackValueCents": 2000
+            "probabilityPpm": 469990,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 110000,
+            "buyBackValueCents": 3000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 100801,
+            "buyBackValueCents": 8000
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "2093",
-          "denominator": "2"
+          "numerator": "929999930791",
+          "denominator": "500000000"
         },
         "worstPathRtp": {
-          "numerator": "2093",
-          "denominator": "2256"
+          "numerator": "929999930791",
+          "denominator": "1000000000000"
         },
-        "worstPathRtpText": "92.774822%",
+        "worstPathRtpText": "92.999993%",
         "verdicts": [
           {
             "floorBps": 9300,
-            "meetsFloor": true
+            "meetsFloor": false
           }
         ]
       },
       {
         "id": "depth-greedy-cut-cap-v2",
-        "note": "Five values at 4.29 EUR, where each short cut gives another payout. The worst target depends on the steps left: from 1.20 EUR it is 7 EUR as a box win and 8 EUR after one step. The least one-step choice is not the worst: from 7 EUR it names 111.60 EUR, the worst path 8 EUR. The 1 % cut binds (1 → 111.60 EUR is 8333 ppm, not listed; 1.20 → 111.60 EUR is exactly 10000 ppm), and the cap stops a climb below the top. The box returns 93.146853 %: valid.",
+        "note": "Five values at 4.38 EUR, where each short cut gives another payout. The worst target depends on the steps left: from 1.20 EUR it is 7 EUR as a box win and 8 EUR after one step. The least one-step choice is not the worst: from 7 EUR it names 120 EUR, the worst path 8 EUR. The 1 % cut binds (1 → 120 EUR is 8333 ppm, not listed; 1.20 → 120 EUR is exactly 10000 ppm), and the cap stops a climb below the top.",
         "engineType": "single_draw_weighted_table_fair_upgrade",
         "engineVersion": 2,
-        "priceCents": "429",
+        "priceCents": "438",
         "slots": [
           {
             "slotIndex": 0,
@@ -2043,18 +2051,18 @@
           {
             "slotIndex": 4,
             "probabilityPpm": 10000,
-            "buyBackValueCents": 11160
+            "buyBackValueCents": 12000
           }
         ],
         "worstPathPayoutCents": {
-          "numerator": "2254840636537899",
-          "denominator": "6250000000000"
+          "numerator": "254998100001",
+          "denominator": "625000000"
         },
         "worstPathRtp": {
-          "numerator": "751613545512633",
-          "denominator": "893750000000000"
+          "numerator": "84999366667",
+          "denominator": "91250000000"
         },
-        "worstPathRtpText": "84.096620%",
+        "worstPathRtpText": "93.149990%",
         "verdicts": [
           {
             "floorBps": 9300,
@@ -2075,12 +2083,12 @@
       "maxSteps": 3,
       "minChancePpm": 100000,
       "jumpMinChancePpm": 10000,
-      "stepRtpBps": 9300
+      "stepRtpBps": 10000
     },
     "vectors": [
       {
         "id": "past-next-won",
-        "note": "Held 30 EUR, named 750 EUR: p = 37200, and v = 36491 is under it, so the step is won. The single offer of the same win is the next value, 80 EUR at 348750 ppm.",
+        "note": "Held 30 EUR, named 800 EUR: p = 37500, and v = 36491 is under it, so the step is won. The single offer of the same win is the next value, 80 EUR at 375000 ppm.",
         "clientSeed": "alice-seed",
         "nonce": 115,
         "slotsAsGiven": [
@@ -2094,19 +2102,19 @@
           },
           {
             "slotIndex": 1,
-            "buyBackValueCents": 75000
+            "buyBackValueCents": 80000
           }
         ],
         "heldSlotIndex": 0,
         "stepNo": 0,
         "targetSlotIndex": 1,
         "stakedBuyBackValueCents": 3000,
-        "targetBuyBackValueCents": 75000,
-        "chancePpm": 37200,
-        "chanceCompact": "3.72%",
+        "targetBuyBackValueCents": 80000,
+        "chancePpm": 37500,
+        "chanceCompact": "3.75%",
         "stepTablePpm": [
-          37200,
-          962800
+          37500,
+          962500
         ],
         "v": 36491,
         "slotIndex": 0,
@@ -2114,7 +2122,7 @@
       },
       {
         "id": "past-next-lost",
-        "note": "The same step at nonce 1: v = 186669 is not under p = 37200, so it is lost. Read at the next value's 348750 ppm, the same v would be won.",
+        "note": "The same step at nonce 1: v = 186669 is not under p = 37500, so it is lost. Read at the next value's 375000 ppm, the same v would be won.",
         "clientSeed": "alice-seed",
         "nonce": 1,
         "slotsAsGiven": [
@@ -2128,19 +2136,19 @@
           },
           {
             "slotIndex": 1,
-            "buyBackValueCents": 75000
+            "buyBackValueCents": 80000
           }
         ],
         "heldSlotIndex": 0,
         "stepNo": 0,
         "targetSlotIndex": 1,
         "stakedBuyBackValueCents": 3000,
-        "targetBuyBackValueCents": 75000,
-        "chancePpm": 37200,
-        "chanceCompact": "3.72%",
+        "targetBuyBackValueCents": 80000,
+        "chancePpm": 37500,
+        "chanceCompact": "3.75%",
         "stepTablePpm": [
-          37200,
-          962800
+          37500,
+          962500
         ],
         "v": 186669,
         "slotIndex": 1,
@@ -2148,13 +2156,13 @@
       },
       {
         "id": "jump-minimum-won",
-        "note": "Held 1 EUR, named 93 EUR: p = 10000, exactly jumpMinChancePpm, and v = 9997 is under it, so the step is won. Version 1 has no step under 100000 ppm.",
+        "note": "Held 1 EUR, named 100 EUR: p = 10000, exactly jumpMinChancePpm, and v = 9997 is under it, so the step is won. Version 1 has no step under 100000 ppm.",
         "clientSeed": "alice-seed",
         "nonce": 93,
         "slotsAsGiven": [
           {
             "slotIndex": 1,
-            "buyBackValueCents": 9300
+            "buyBackValueCents": 10000
           },
           {
             "slotIndex": 0,
@@ -2169,7 +2177,7 @@
         "stepNo": 0,
         "targetSlotIndex": 1,
         "stakedBuyBackValueCents": 100,
-        "targetBuyBackValueCents": 9300,
+        "targetBuyBackValueCents": 10000,
         "chancePpm": 10000,
         "chanceCompact": "1.00%",
         "stepTablePpm": [
@@ -2292,6 +2300,1126 @@
         "preimageHex": "03290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f440000000200000000ffffffffffffffffffffffffffffffff8000000000000001000000036d696e00000001800000000000000080000000000000007fffffffffffffff000000036d6178",
         "snapshotHash": "6a8f12a5b7b0e0d28467baeb611c6eb4893f4afed195da0d9f4069bf588c72e8",
         "body": "{\"edition_fingerprint\":\"290fa403670d94b94b80d580c0b86ab79e7628d98421b4ff76ebf2f031a17f44\",\"format_version\":3,\"slots\":[{\"current_item_id\":\"ffffffff-ffff-ffff-ffff-ffffffffffff\",\"displayed_media\":\"min\",\"displayed_value_cents\":-9223372036854775807,\"slot_index\":0},{\"current_item_id\":\"80000000-0000-0000-8000-000000000000\",\"displayed_media\":\"max\",\"displayed_value_cents\":9223372036854775807,\"slot_index\":1}]}"
+      }
+    ]
+  },
+  "upgradeRateStep": {
+    "specification": "specs/rng-fairness.md §4b — version 3, the step at its box's rate",
+    "note": "R = min(floor(10000 · Σ probabilityPpm · buyBackValueCents / (1,000,000 · priceCents)), stepRtpCapBps), and a published box has R >= stepRtpFloorBps. p = the ceiling of R · 100 · staked / target, the only integer with 10000 · (p − 1) · target < R · 1,000,000 · staked <= 10000 · p · target. The list holds every strictly higher value, by value then slotIndex, while p >= minChancePpm; the single offer is the next higher value when its p >= offerMinChancePpm, so on version 3 it is always the list's first entry. maxSteps is null: a win made by any number of steps lists its targets. The draw and its reading are upgradeStep's: won ⇔ v < p. stepRtpBps is each family's R, written for the reader: compute it from the slots, never read it. payoutTimesMillion (S, a decimal string) and boxBps (the return before the cap and the floor) are written beside it the same way, so a reader whose R differs sees which of the two went wrong. stepNo is the held win's, 0 for a box win; the step itself has number stepNo + 1.",
+    "serverSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "commitmentHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+    "constants": {
+      "engineType": "single_draw_weighted_table_fair_upgrade",
+      "engineVersion": 3,
+      "maxSteps": null,
+      "minChancePpm": 1000,
+      "offerMinChancePpm": 1000,
+      "stepRtpCapBps": 9990,
+      "stepRtpFloorBps": 9300
+    },
+    "families": [
+      {
+        "id": "rate-9300",
+        "note": "A box at 93.0000176 %, so R = 9300. 10 -> 20 EUR is the table pin at 465000; 7 -> 9 EUR is 723333.33, rounded up to 723334. From 5 EUR the list reaches 500.00 and 500.01 EUR at 9300 (version 2 refuses 500.01: its fair chance is 9999) and 4654.65 EUR at exactly 1000, and stops before 4654.66 EUR at 999. A win made by 3 or 28 steps still lists its targets; the top value lists none.",
+        "priceCents": "750",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 107640,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 862356,
+            "buyBackValueCents": 700
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 900
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 1000
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 2000
+          },
+          {
+            "slotIndex": 5,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 50000
+          },
+          {
+            "slotIndex": 6,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 50001
+          },
+          {
+            "slotIndex": 7,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465465
+          },
+          {
+            "slotIndex": 8,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465466
+          }
+        ],
+        "payoutTimesMillion": "697500132",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 664286,
+                "chanceCompact": "66.42%"
+              },
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 516667,
+                "chanceCompact": "51.66%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 465000,
+                "chanceCompact": "46.50%"
+              },
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 232500,
+                "chanceCompact": "23.25%"
+              },
+              {
+                "targetSlotIndex": 5,
+                "chancePpm": 9300,
+                "chanceCompact": "0.93%"
+              },
+              {
+                "targetSlotIndex": 6,
+                "chancePpm": 9300,
+                "chanceCompact": "0.93%"
+              },
+              {
+                "targetSlotIndex": 7,
+                "chancePpm": 1000,
+                "chanceCompact": "0.10%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 664286,
+              "chanceCompact": "66.42%"
+            }
+          },
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 3,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 723334,
+                "chanceCompact": "72.33%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 651000,
+                "chanceCompact": "65.10%"
+              },
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 325500,
+                "chanceCompact": "32.55%"
+              },
+              {
+                "targetSlotIndex": 5,
+                "chancePpm": 13020,
+                "chanceCompact": "1.30%"
+              },
+              {
+                "targetSlotIndex": 6,
+                "chancePpm": 13020,
+                "chanceCompact": "1.30%"
+              },
+              {
+                "targetSlotIndex": 7,
+                "chancePpm": 1399,
+                "chanceCompact": "0.13%"
+              },
+              {
+                "targetSlotIndex": 8,
+                "chancePpm": 1399,
+                "chanceCompact": "0.13%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 723334,
+              "chanceCompact": "72.33%"
+            }
+          },
+          {
+            "heldSlotIndex": 3,
+            "stepNo": 28,
+            "targets": [
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 465000,
+                "chanceCompact": "46.50%"
+              },
+              {
+                "targetSlotIndex": 5,
+                "chancePpm": 18600,
+                "chanceCompact": "1.86%"
+              },
+              {
+                "targetSlotIndex": 6,
+                "chancePpm": 18600,
+                "chanceCompact": "1.86%"
+              },
+              {
+                "targetSlotIndex": 7,
+                "chancePpm": 1999,
+                "chanceCompact": "0.19%"
+              },
+              {
+                "targetSlotIndex": 8,
+                "chancePpm": 1998,
+                "chanceCompact": "0.19%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 4,
+              "chancePpm": 465000,
+              "chanceCompact": "46.50%"
+            }
+          },
+          {
+            "heldSlotIndex": 8,
+            "stepNo": 0,
+            "targets": [],
+            "noOfferReason": "top_value"
+          },
+          {
+            "heldSlotIndex": 8,
+            "stepNo": 28,
+            "targets": [],
+            "noOfferReason": "top_value"
+          }
+        ],
+        "steps": [
+          {
+            "id": "pin-won",
+            "note": "10 -> 20 EUR at 465000; v = 459796 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 3,
+            "stepNo": 0,
+            "targetSlotIndex": 4,
+            "stakedBuyBackValueCents": 1000,
+            "targetBuyBackValueCents": 2000,
+            "chancePpm": 465000,
+            "chanceCompact": "46.50%",
+            "stepTablePpm": [
+              465000,
+              535000
+            ],
+            "v": 459796,
+            "slotIndex": 0,
+            "outcome": "won"
+          },
+          {
+            "id": "pin-lost",
+            "note": "10 -> 20 EUR at 465000; v = 603723 is not",
+            "clientSeed": "alice-seed",
+            "nonce": 12,
+            "heldSlotIndex": 3,
+            "stepNo": 0,
+            "targetSlotIndex": 4,
+            "stakedBuyBackValueCents": 1000,
+            "targetBuyBackValueCents": 2000,
+            "chancePpm": 465000,
+            "chanceCompact": "46.50%",
+            "stepTablePpm": [
+              465000,
+              535000
+            ],
+            "v": 603723,
+            "slotIndex": 1,
+            "outcome": "lost"
+          },
+          {
+            "id": "rounded-up-fourth-step",
+            "note": "7 -> 9 EUR at 723334 as step 4",
+            "clientSeed": "alice-seed",
+            "nonce": 12,
+            "heldSlotIndex": 1,
+            "stepNo": 3,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 700,
+            "targetBuyBackValueCents": 900,
+            "chancePpm": 723334,
+            "chanceCompact": "72.33%",
+            "stepTablePpm": [
+              723334,
+              276666
+            ],
+            "v": 603723,
+            "slotIndex": 0,
+            "outcome": "won"
+          },
+          {
+            "id": "minimum-edge-step-29",
+            "note": "5 -> 4654.65 EUR at exactly 1000 as step 29; v = 1174 is not under it",
+            "clientSeed": "alice-seed",
+            "nonce": 7596,
+            "heldSlotIndex": 0,
+            "stepNo": 28,
+            "targetSlotIndex": 7,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 465465,
+            "chancePpm": 1000,
+            "chanceCompact": "0.10%",
+            "stepTablePpm": [
+              1000,
+              999000
+            ],
+            "v": 1174,
+            "slotIndex": 1,
+            "outcome": "lost"
+          }
+        ]
+      },
+      {
+        "id": "rate-9300-single-offer-8-to-80",
+        "note": "R = 9300. From 8 EUR the next value is 80 EUR at 93000, offered: the single offer's minimum on version 3 is 1000, not version 1's 100000.",
+        "priceCents": "900",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 50000,
+            "buyBackValueCents": 100
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 940000,
+            "buyBackValueCents": 800
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 8000
+          }
+        ],
+        "payoutTimesMillion": "837000000",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 93000,
+                "chanceCompact": "9.30%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 93000,
+              "chanceCompact": "9.30%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "8 -> 80 EUR at 93000; v = 60516 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 42,
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 800,
+            "targetBuyBackValueCents": 8000,
+            "chancePpm": 93000,
+            "chanceCompact": "9.30%",
+            "stepTablePpm": [
+              93000,
+              907000
+            ],
+            "v": 60516,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
+      },
+      {
+        "id": "rate-9300-single-offer-5-to-80",
+        "note": "R = 9300. From 5 EUR the next value is 80 EUR, offered at 58125 (\"5.81%\").",
+        "priceCents": "600",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 42500,
+            "buyBackValueCents": 100
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 947500,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 8000
+          }
+        ],
+        "payoutTimesMillion": "558000000",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 58125,
+                "chanceCompact": "5.81%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 58125,
+              "chanceCompact": "5.81%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "lost",
+            "note": "5 -> 80 EUR at 58125; v = 60516 is not under it",
+            "clientSeed": "alice-seed",
+            "nonce": 42,
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 8000,
+            "chancePpm": 58125,
+            "chanceCompact": "5.81%",
+            "stepTablePpm": [
+              58125,
+              941875
+            ],
+            "v": 60516,
+            "slotIndex": 1,
+            "outcome": "lost"
+          }
+        ]
+      },
+      {
+        "id": "rate-9300-single-offer-edge",
+        "note": "R = 9300. From 5 EUR the next value is 4654.65 EUR at exactly 1000: offered.",
+        "priceCents": "500",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 88662,
+            "buyBackValueCents": 100
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 911337,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465465
+          }
+        ],
+        "payoutTimesMillion": "465000165",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 1000,
+                "chanceCompact": "0.10%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 1000,
+              "chanceCompact": "0.10%"
+            }
+          }
+        ],
+        "steps": []
+      },
+      {
+        "id": "rate-9300-single-offer-under-minimum",
+        "note": "R = 9300. From 5 EUR the next value is 4654.66 EUR at 999: no offer (under_minimum), and an empty list.",
+        "priceCents": "500",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 88662,
+            "buyBackValueCents": 100
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 911337,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465466
+          }
+        ],
+        "payoutTimesMillion": "465000166",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [],
+            "noOfferReason": "under_minimum"
+          }
+        ],
+        "steps": []
+      },
+      {
+        "id": "rate-pin-worked-box",
+        "note": "The worked box of ADR-KAN-1154 returns 93.000375 %: R = 9300, rounded down, not 9301. 12 -> 30 EUR is 372000.",
+        "priceCents": "2000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 319199,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 470000,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 110000,
+            "buyBackValueCents": 3000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 100801,
+            "buyBackValueCents": 8000
+          }
+        ],
+        "payoutTimesMillion": "1860007500",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 372000,
+                "chanceCompact": "37.20%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 139500,
+                "chanceCompact": "13.95%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 372000,
+              "chanceCompact": "37.20%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "12 -> 30 EUR at 372000; v = 186669 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 1,
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 1200,
+            "targetBuyBackValueCents": 3000,
+            "chancePpm": 372000,
+            "chanceCompact": "37.20%",
+            "stepTablePpm": [
+              372000,
+              628000
+            ],
+            "v": 186669,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
+      },
+      {
+        "id": "rate-9400",
+        "note": "The casino_floor box of tools/rtp_upgrade_example.py, exactly 94.00 %: 3 -> 13 EUR is 216923.08, rounded up to 216924.",
+        "priceCents": "1000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 360000,
+            "buyBackValueCents": 300
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 640000,
+            "buyBackValueCents": 1300
+          }
+        ],
+        "payoutTimesMillion": "940000000",
+        "boxBps": 9400,
+        "stepRtpBps": 9400,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 216924,
+                "chanceCompact": "21.69%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 216924,
+              "chanceCompact": "21.69%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "3 -> 13 EUR at 216924; v = 100553 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 9,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 300,
+            "targetBuyBackValueCents": 1300,
+            "chancePpm": 216924,
+            "chanceCompact": "21.69%",
+            "stepTablePpm": [
+              216924,
+              783076
+            ],
+            "v": 100553,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
+      },
+      {
+        "id": "rate-9550",
+        "note": "A box at exactly 95.50 %: 10 -> 20 EUR is 477500 (\"47.75%\").",
+        "priceCents": "1000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 110000,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 880000,
+            "buyBackValueCents": 1000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 2000
+          }
+        ],
+        "payoutTimesMillion": "955000000",
+        "boxBps": 9550,
+        "stepRtpBps": 9550,
+        "queries": [
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 477500,
+                "chanceCompact": "47.75%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 477500,
+              "chanceCompact": "47.75%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "10 -> 20 EUR at 477500; v = 459796 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 1000,
+            "targetBuyBackValueCents": 2000,
+            "chancePpm": 477500,
+            "chanceCompact": "47.75%",
+            "stepTablePpm": [
+              477500,
+              522500
+            ],
+            "v": 459796,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
+      },
+      {
+        "id": "rate-9636",
+        "note": "The worked box of plan v2.4 section 3, 96.36875 %: R = 9636. 20 -> 45 EUR is 428266.67, rounded up to 428267; 12 -> 20 EUR is 578160.",
+        "priceCents": "2000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 444750,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 300000,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 140000,
+            "buyBackValueCents": 2000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 80000,
+            "buyBackValueCents": 4500
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 35250,
+            "buyBackValueCents": 20000
+          }
+        ],
+        "payoutTimesMillion": "1927375000",
+        "boxBps": 9636,
+        "stepRtpBps": 9636,
+        "queries": [
+          {
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 428267,
+                "chanceCompact": "42.82%"
+              },
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 96360,
+                "chanceCompact": "9.63%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 3,
+              "chancePpm": 428267,
+              "chanceCompact": "42.82%"
+            }
+          },
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 578160,
+                "chanceCompact": "57.81%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 256960,
+                "chanceCompact": "25.69%"
+              },
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 57816,
+                "chanceCompact": "5.78%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 2,
+              "chancePpm": 578160,
+              "chanceCompact": "57.81%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "20 -> 45 EUR at 428267; v = 426053 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 10,
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "stakedBuyBackValueCents": 2000,
+            "targetBuyBackValueCents": 4500,
+            "chancePpm": 428267,
+            "chanceCompact": "42.82%",
+            "stepTablePpm": [
+              428267,
+              571733
+            ],
+            "v": 426053,
+            "slotIndex": 0,
+            "outcome": "won"
+          },
+          {
+            "id": "lost",
+            "note": "20 -> 45 EUR at 428267; v = 459796 is not",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targetSlotIndex": 3,
+            "stakedBuyBackValueCents": 2000,
+            "targetBuyBackValueCents": 4500,
+            "chancePpm": 428267,
+            "chanceCompact": "42.82%",
+            "stepTablePpm": [
+              428267,
+              571733
+            ],
+            "v": 459796,
+            "slotIndex": 1,
+            "outcome": "lost"
+          }
+        ]
+      },
+      {
+        "id": "rate-9636-minimum-target",
+        "note": "The box of the contract's version 3 example (documentation specs/upgrade-step/targets-answer-v3.json), 96.369415 %: R = 9636. From 5 EUR, made by four steps, the list reaches 4818 EUR at exactly 1000 and lists it. Rounded up, the edge is not the next cent: 4822.82 EUR is still 1000, 4822.83 EUR is 999.",
+        "priceCents": "2000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 444773,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 300000,
+            "buyBackValueCents": 1200
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 140000,
+            "buyBackValueCents": 2000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 80000,
+            "buyBackValueCents": 4500
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 35226,
+            "buyBackValueCents": 20000
+          },
+          {
+            "slotIndex": 5,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 481800
+          }
+        ],
+        "payoutTimesMillion": "1927388300",
+        "boxBps": 9636,
+        "stepRtpBps": 9636,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 4,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 401500,
+                "chanceCompact": "40.15%"
+              },
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 240900,
+                "chanceCompact": "24.09%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 107067,
+                "chanceCompact": "10.70%"
+              },
+              {
+                "targetSlotIndex": 4,
+                "chancePpm": 24090,
+                "chanceCompact": "2.40%"
+              },
+              {
+                "targetSlotIndex": 5,
+                "chancePpm": 1000,
+                "chanceCompact": "0.10%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 401500,
+              "chanceCompact": "40.15%"
+            }
+          }
+        ],
+        "steps": []
+      },
+      {
+        "id": "rate-9990-above-cap",
+        "note": "A box at 99.95 %: R is capped at 9990. 5 -> 10 EUR is 499500.",
+        "priceCents": "1000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 1000,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 999000,
+            "buyBackValueCents": 1000
+          }
+        ],
+        "payoutTimesMillion": "999500000",
+        "boxBps": 9995,
+        "stepRtpBps": 9990,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 499500,
+                "chanceCompact": "49.95%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 499500,
+              "chanceCompact": "49.95%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won",
+            "note": "5 -> 10 EUR at 499500; v = 459796 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 1000,
+            "chancePpm": 499500,
+            "chanceCompact": "49.95%",
+            "stepTablePpm": [
+              499500,
+              500500
+            ],
+            "v": 459796,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
+      },
+      {
+        "id": "rate-9990-at-cap",
+        "note": "A box at exactly 99.90 % gets the same rate, 9990.",
+        "priceCents": "1000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 2000,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 998000,
+            "buyBackValueCents": 1000
+          }
+        ],
+        "payoutTimesMillion": "999000000",
+        "boxBps": 9990,
+        "stepRtpBps": 9990,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 499500,
+                "chanceCompact": "49.95%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 499500,
+              "chanceCompact": "49.95%"
+            }
+          }
+        ],
+        "steps": []
+      },
+      {
+        "id": "rate-9500-equal-values",
+        "note": "A box at exactly 95.00 % with two slots at 10 EUR. From 5 EUR the list holds both, slot 1 before slot 2 (by value, then slotIndex), and the single offer is slot 1. From either 10 EUR slot the other is not strictly higher, so it is no target: the list is 20 EUR alone, and it is the offer.",
+        "priceCents": "1000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 120000,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 435000,
+            "buyBackValueCents": 1000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 435000,
+            "buyBackValueCents": 1000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 2000
+          }
+        ],
+        "payoutTimesMillion": "950000000",
+        "boxBps": 9500,
+        "stepRtpBps": 9500,
+        "queries": [
+          {
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 1,
+                "chancePpm": 475000,
+                "chanceCompact": "47.50%"
+              },
+              {
+                "targetSlotIndex": 2,
+                "chancePpm": 475000,
+                "chanceCompact": "47.50%"
+              },
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 237500,
+                "chanceCompact": "23.75%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 1,
+              "chancePpm": 475000,
+              "chanceCompact": "47.50%"
+            }
+          },
+          {
+            "heldSlotIndex": 1,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 475000,
+                "chanceCompact": "47.50%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 3,
+              "chancePpm": 475000,
+              "chanceCompact": "47.50%"
+            }
+          },
+          {
+            "heldSlotIndex": 2,
+            "stepNo": 0,
+            "targets": [
+              {
+                "targetSlotIndex": 3,
+                "chancePpm": 475000,
+                "chanceCompact": "47.50%"
+              }
+            ],
+            "offer": {
+              "targetSlotIndex": 3,
+              "chancePpm": 475000,
+              "chanceCompact": "47.50%"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "id": "won-second-of-tie",
+            "note": "5 -> 10 EUR on slot 2, the second slot at 10 EUR, at 475000; v = 459796 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 1000,
+            "chancePpm": 475000,
+            "chanceCompact": "47.50%",
+            "stepTablePpm": [
+              475000,
+              525000
+            ],
+            "v": 459796,
+            "slotIndex": 0,
+            "outcome": "won"
+          }
+        ]
       }
     ]
   }

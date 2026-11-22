@@ -9,3 +9,10 @@ upgrade mark on `GET /verify/opens/{winId}`), at documentation main
 Their seeds, fingerprints and hashes are placeholders, so they prove nothing about a draw.
 `test/upgrade-verify.test.ts` reads them only to check that the library's input fields carry the same
 names as the published answers. Those names are the contract.
+
+`console-edition-check-upgrade-v3.json` and `console-edition-check-upgrade-v3-below-floor.json` are
+copied unchanged from the same folder at documentation main `3f7e85964c2432a2d5787025627e926f0f24af3d` (KAN-1751, documentation #968:
+the console's edition check on version 3). They are the answers for the worked box of ADR-KAN-1154
+amendment 8 §8.3 (9 636 bps) and for the draft at 91.98 % (§8.6). `test/upgrade-v3.test.ts` checks
+that this library computes the same step rate and the same single offers for those two boxes on its
+own, and refuses the box under the floor as the console check does.

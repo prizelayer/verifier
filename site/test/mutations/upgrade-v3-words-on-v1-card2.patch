@@ -1,0 +1,13 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index 9e41e86..a1dfde7 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -482,7 +482,7 @@ export function upgradeCheckWords(
+  * its jump text under version 1's title; version 1, and any version this page does not check, version 1's.
+  */
+ export function upgradeStep2(engineVersion: number | undefined, rateBps?: number): { title: string; text: readonly string[] } {
+-  if (engineVersion === 3) return UPGRADE_V3_WORDS.step2(rateBps)
++  if (engineVersion === 3 || engineVersion === 1) return UPGRADE_V3_WORDS.step2(rateBps)
+   return { title: UPGRADE_STEPS[1].title, text: stepJumps(engineVersion) ? UPGRADE_JUMP_WORDS.step2Text : UPGRADE_STEPS[1].text }
+ }
+ 

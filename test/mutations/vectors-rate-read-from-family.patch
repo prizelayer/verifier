@@ -1,0 +1,13 @@
+diff --git a/test/vectors.test.ts b/test/vectors.test.ts
+index fc84c21..6ec04e2 100644
+--- a/test/vectors.test.ts
++++ b/test/vectors.test.ts
+@@ -1465,7 +1465,7 @@ function checkRateFamily(family: RateFamily): number {
+   if (BigInt(family.boxBps) !== boxBps) {
+     throw new Error(`family ${family.id} writes boxBps ${family.boxBps}, its box gives ${boxBps}`);
+   }
+-  const rate = upgradeStepRateBps(rateEdition(family), 3);
++  const rate = family.stepRtpBps;
+   if (rate !== family.stepRtpBps) {
+     throw new Error(`family ${family.id} writes a rate of ${family.stepRtpBps} bps, its box gives ${rate}`);
+   }

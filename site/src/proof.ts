@@ -9,6 +9,7 @@ import {
   type VerificationInput,
   type VerificationReport,
 } from "@verifier"
+import { DEMO_STEP_IDS, stepOptions } from "./demoSteps"
 import { rawObjectText, structureProblem } from "./rawText"
 
 /** The one format both input paths produce: the public `/verify` answers, unchanged, in one block. */
@@ -160,7 +161,7 @@ export function joinStepProof(answers: { step: string; seedPair: string; edition
 }
 
 /** Check a pasted proof. Never throws: an unreadable proof is an `invalid` report with the reason. */
-export async function checkProof(text: string): Promise<Checked> {
+export async function checkProof(text: string, demoSteps: ReadonlySet<string> = DEMO_STEP_IDS): Promise<Checked> {
   const proof = readProof(text)
   if (proof === null) return { kind: "notAProof", message: NOT_A_PROOF }
   const problem = structureProblem(text)
@@ -180,10 +181,15 @@ export async function checkProof(text: string): Promise<Checked> {
       const message = error instanceof Error ? error.message : String(error)
       return { kind: "stepReport", report: unreadableStep(message), input: null }
     }
-    return { kind: "stepReport", report: await verifyUpgradeStep(input), input }
+    // A step on this build's demo list (dev only) is checked under the demo rules of 17 and 18 November 2026.
+    const stepId = section(readProof(text) as Json, "step").stepId
+    return { kind: "stepReport", report: await verifyUpgradeStep(input, stepOptions(stepId, demoSteps)), input }
   }
   const read: { input: VerificationInput | null } = { input: null }
-  const report = await verifyFrom(() => (read.input = proofInput(text)))
+  // An upgraded win whose step is on this build's demo list (dev only) is read under the same demo rules.
+  const open = (proof as Json).open
+  const winStepId = typeof open === "object" && open !== null && !Array.isArray(open) ? (open as Json).upgradeStepId : undefined
+  const report = await verifyFrom(() => (read.input = proofInput(text)), stepOptions(winStepId, demoSteps))
   return { kind: "report", report, input: read.input }
 }
 

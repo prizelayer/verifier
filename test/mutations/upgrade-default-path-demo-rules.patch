@@ -1,0 +1,13 @@
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 65c17d6..002b750 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -751,7 +751,7 @@ function ruleSetOf(options: UpgradeStepOptions): readonly UpgradeRule[] {
+   if (demo !== undefined && demo !== DEMO_RULES_2026_11_17) {
+     throw new Error('the only other rule set this library checks a step under is its own DEMO_RULES_2026_11_17');
+   }
+-  return demo?.rules ?? UPGRADE_RULES;
++  return demo?.rules ?? [...DEMO_RULES_2026_11_17.rules, UPGRADE_RULES[2]];
+ }
+ 
+ const DEMO_CAVEAT =

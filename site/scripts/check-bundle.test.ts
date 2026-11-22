@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { environments, type Environment } from "./environments"
+import { demoStepsFor, environments, type Environment } from "./environments"
 
 // Each case starts a shell and node; on a loaded machine that is slower than the default 5 s.
 vi.setConfig({ testTimeout: 30_000 })
@@ -121,5 +121,36 @@ describe("check-bundle.sh, per environment", () => {
     expect(r.status, r.out).toBe(1)
     expect(r.out).toContain(message)
     expect(r.out).toContain("Nothing was checked.")
+  })
+
+  describe("the dev list of demo steps (demo-steps.json)", () => {
+    const DEV_IDS = demoStepsFor("dev")
+
+    it("is the file the build reads, with steps in it, so these cases check something", () => {
+      expect(DEV_IDS.length).toBeGreaterThan(0)
+      expect(demoStepsFor("prod")).toEqual([])
+    })
+
+    it("passes a prod page with no demo id, and says how many it forbade", () => {
+      page()
+      const r = check("prod")
+      expect(r.status, r.out).toBe(0)
+      expect(r.out).toContain(`check-bundle: absent: ${DEV_IDS.length} demo step ids of dev's list in demo-steps.json (0 of ${DEV_IDS.length} are prod's own)`)
+    })
+
+    it("fails a prod page that carries one id of dev's list", () => {
+      const id = DEV_IDS[DEV_IDS.length - 1]
+      page({ extra: `var D=new Set(["${id}"]);` })
+      const r = check("prod")
+      expect(r.status, r.out).toBe(1)
+      expect(r.out).toContain(`FAIL: the bundle names demo step ${id} of dev's list (demo-steps.json), which is not prod's`)
+    })
+
+    it("passes a dev page that carries dev's own list", () => {
+      page({ env: DEV, extra: `var D=new Set(${JSON.stringify(DEV_IDS)});` })
+      const r = check("dev")
+      expect(r.status, r.out).toBe(0)
+      expect(r.out).toContain(`check-bundle: absent: 0 demo step ids of dev's list in demo-steps.json (${DEV_IDS.length} of ${DEV_IDS.length} are dev's own)`)
+    })
   })
 })

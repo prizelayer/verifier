@@ -1,0 +1,13 @@
+diff --git a/site/src/proof.ts b/site/src/proof.ts
+index df21782..9985374 100644
+--- a/site/src/proof.ts
++++ b/site/src/proof.ts
+@@ -189,7 +189,7 @@ export async function checkProof(text: string, demoSteps: ReadonlySet<string> =
+   // An upgraded win whose step is on this build's demo list (dev only) is read under the same demo rules.
+   const open = (proof as Json).open
+   const winStepId = typeof open === "object" && open !== null && !Array.isArray(open) ? (open as Json).upgradeStepId : undefined
+-  const report = await verifyFrom(() => (read.input = proofInput(text)), stepOptions(winStepId, demoSteps))
++  const report = await verifyFrom(() => (read.input = proofInput(text)), stepOptions(winStepId, new Set()))
+   return { kind: "report", report, input: read.input }
+ }
+ 

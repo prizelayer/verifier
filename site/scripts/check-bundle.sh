@@ -62,6 +62,28 @@ while read -r other_name other_api; do
 done <<OTHERS
 $others
 OTHERS
+# The dev list of demo steps (demo-steps.json) is compiled into a dev build only: every step id of that
+# file that is not this environment's own must be nowhere in the bundle. Read by the build's own reader
+# (demoStepsFor), so a file of the wrong shape stops here too. A file with no list says so.
+# Line 1 is "<ids in the file> <ids this environment may carry>", then one forbidden id per line.
+demo=$(node --experimental-strip-types --no-warnings --input-type=module -e '
+  const { demoStepsFor } = await import(process.argv[1])
+  const all = demoStepsFor("dev")
+  const own = new Set(demoStepsFor(process.argv[2]))
+  console.log(all.length + " " + own.size)
+  for (const id of all) if (!own.has(id)) console.log(id)
+' "$here/environments.ts" "$envname" 2>&1) || { echo "check-bundle: FAIL: $(printf '%s\n' "$demo" | sed -n 's/^[A-Za-z]*Error: //p' | head -1). The demo list was not checked."; exit 1; }
+listed=$(printf '%s\n' "$demo" | sed -n '1s/ .*//p')
+own_count=$(printf '%s\n' "$demo" | sed -n '1s/.* //p')
+forbidden_ids=$(printf '%s\n' "$demo" | sed -n '2,$p')
+forbidden_count=$(printf '%s\n' "$forbidden_ids" | grep -c . || true)
+found_ids=0
+for id in $forbidden_ids; do
+  if grep -F -q -- "$id" $files; then bad "the bundle names demo step $id of dev's list (demo-steps.json), which is not $envname's"; found_ids=1; fi
+done
+if [ "$listed" -eq 0 ]; then echo "check-bundle: demo-steps.json lists no demo step: nothing to forbid"
+elif [ "$found_ids" -eq 0 ]; then echo "check-bundle: absent: $forbidden_count demo step ids of dev's list in demo-steps.json ($own_count of $listed are $envname's own)"; fi
+
 # The footer links its environment's list of published files, on a host we do not run.
 grep -F -q -- "$sums" $js || bad "the script does not link its environment's list $sums"
 # The footer links to the code and to the build's two records, on GitHub: links, never fetched.

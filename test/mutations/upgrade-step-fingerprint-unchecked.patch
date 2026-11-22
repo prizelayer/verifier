@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index e346b3b..854155a 100644
+index 65c17d6..a3a8805 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1668,7 +1668,7 @@ async function verifyStepChecked(input: UpgradeStepInput): Promise<UpgradeStepRe
+@@ -1899,7 +1899,7 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
      const computedFingerprint = hexFromBytes(await sha256(preimage.value));
      trace.editionPreimageHex = hexFromBytes(preimage.value);
      trace.computedEditionFingerprint = computedFingerprint;
 -    checks.editionFingerprint = check(expectedFingerprint, computedFingerprint);
 +    checks.editionFingerprint = check(expectedFingerprint, expectedFingerprint);
      if (rule !== undefined) {
-       offer = attempt(() => stepFor(input.edition, rule, expected.stakedSlotIndex, expected.targetSlotIndex));
-     }
+       // The rate first, from the same edition: on version 3 a box whose rate cannot be read has no fair step.
+       rate = attempt(() => stepRate(input.edition, rule));
