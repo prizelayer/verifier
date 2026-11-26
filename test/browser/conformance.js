@@ -601,8 +601,8 @@ export async function runConformance(fixture) {
           outcome: vector.outcome,
           stepNo: vector.stepNo + 1,
         };
-        // The wire rule: the amount is present only when one was added.
-        if (vector.boostCents !== 0) expected.boostCents = vector.boostCents;
+        // The wire rule: the amount is present only when one was added, as a decimal string (cto 37069).
+        if (vector.boostCents !== 0) expected.boostCents = String(vector.boostCents);
         const report = await verifyUpgradeStep({
           serverSeedHex: fixture.upgradeBoostChance.serverSeedHex,
           commitmentHex: fixture.upgradeBoostChance.commitmentHex,

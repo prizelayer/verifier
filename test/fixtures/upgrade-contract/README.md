@@ -21,7 +21,7 @@ own, and refuses the box under the floor as the console check does.
 `verify-open-upgrade-win-v4-no-amount.json` are copied unchanged from the same folder at documentation commit
 `99cd89d6` (KAN-1569 P7, documentation draft pull request #1108; re-pinned to its merge commit on main before this
 pull request is ready). They are Ana's step on box C of ADR-KAN-1154 amendment 9 §9.8 with 21.28 EUR recorded
-(`boostCents` and `stepBoostCents` 2128, 288 016 ppm) and the same step with no amount (188 000 ppm, no amount
+(`boostCents` and `stepBoostCents` the decimal string `"2128"`, 288 016 ppm; cto ruling KAN-1569 37069) and the same step with no amount (188 000 ppm, no amount
 key), and the wins they made. Their ids, fingerprints and hashes are placeholders; their draws are the fixture
-seed's own. `test/upgrade-v4.test.ts` checks that each verifies on box C, and that the amount is a whole number
+seed's own. `test/upgrade-v4.test.ts` checks that each verifies on box C, and that the amount is a decimal string
 of cents with one and has no key without one.

@@ -24,6 +24,7 @@ import {
   boostStepLimits,
   bytesFromHex,
   derive,
+  recordedAmountCents,
   editionFingerprint,
   stepChanceText,
   stepOutcome,
@@ -186,7 +187,7 @@ describe('the chance with an amount (KAN-1569)', () => {
 
 describe('a version 4 step on the step page (KAN-1569 plan v1.1 T1)', () => {
   it('verifies Ana\'s step: 21.28 EUR recorded on box C, 288 016 ppm', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_C, 0, 1, 288_016, 2128));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_C, 0, 1, 288_016, '2128'));
     assert.equal(report.status, 'verified', report.summary);
     assert.deepEqual(report.checks.boostAmount, { ok: true, expected: '2128 cents within the limits of version 4', computed: '2128 cents within the limits of version 4' });
     assert.match(report.summary, /with an amount of 2128 cents recorded/);
@@ -208,9 +209,9 @@ describe('a version 4 step on the step page (KAN-1569 plan v1.1 T1)', () => {
 
   it('runs the cap\'s edge as a recorded step: 14.06 EUR verifies, 14.07 EUR at 500 001 ppm fails on the cap (SHOULD 2)', async () => {
     assert.equal(upgradeStepRateBps(CAP_EDGE, 4), 9300);
-    const under = await verifyUpgradeStep(await stepRecord(CAP_EDGE, 0, 1, 499_909, 1406));
+    const under = await verifyUpgradeStep(await stepRecord(CAP_EDGE, 0, 1, 499_909, '1406'));
     assert.equal(under.status, 'verified', under.summary);
-    const over = await verifyUpgradeStep(await stepRecord(CAP_EDGE, 0, 1, 500_001, 1407));
+    const over = await verifyUpgradeStep(await stepRecord(CAP_EDGE, 0, 1, 500_001, '1407'));
     assert.equal(over.status, 'failed');
     assert.deepEqual(over.checks.boostAmount, {
       ok: false,
@@ -223,7 +224,7 @@ describe('a version 4 step on the step page (KAN-1569 plan v1.1 T1)', () => {
 
   // The five failing steps of plan §4, one per limit; each fails on its own check with its own text.
   it('fails 1,000.01 EUR on 40 to 2,000 EUR: above the ceiling (M-S1)', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 3, 483_605, 100_001));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 3, 483_605, '100001'));
     assert.equal(report.status, 'failed');
     assert.deepEqual(report.checks.boostAmount, {
       ok: false,
@@ -234,31 +235,31 @@ describe('a version 4 step on the step page (KAN-1569 plan v1.1 T1)', () => {
   });
 
   it('fails 67.53 EUR on 40 to 200 EUR: 500 015 ppm, above the cap (M-S2)', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 1, 500_015, 6753));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 1, 500_015, '6753'));
     assert.equal(report.status, 'failed');
     assert.equal(report.checks.boostAmount?.computed, '6753 cents gives a chance of 500015 ppm, above the cap of 500000 ppm');
   });
 
   it('fails 0.10 EUR on 1,000 to 100,000 EUR: its last cent raises nothing (M-S3)', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 2, 4, 9301, 10));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 2, 4, 9301, '10'));
     assert.equal(report.status, 'failed');
     assert.equal(report.checks.boostAmount?.computed, 'the last cent of 10 cents raises nothing: 9 cents give 9301 ppm too');
   });
 
   it('fails 0.01 EUR on 5.00 to 4,654.66 EUR: the target is under the minimum with no amount (M-S4)', async () => {
     // p(0) = 999 and p(1) = 1 001: the minimum is read on the chance with no amount, in the target lookup.
-    const report = await verifyUpgradeStep(await stepRecord(MIN_EDGE, 0, 8, 1001, 1));
+    const report = await verifyUpgradeStep(await stepRecord(MIN_EDGE, 0, 8, 1001, '1'));
     assert.equal(report.status, 'failed');
     assert.equal(report.checks.upgradeTarget?.ok, false);
     assert.match(report.checks.upgradeTarget?.computed ?? '', /^none: /);
     assert.ok(report.notRun.some((n) => n.check === 'boostAmount'), 'the amount waits for a target');
     // The premise: one ppm more and the same amount verifies.
-    const edge = await verifyUpgradeStep(await stepRecord(MIN_EDGE, 0, 7, 1001, 1));
+    const edge = await verifyUpgradeStep(await stepRecord(MIN_EDGE, 0, 7, 1001, '1'));
     assert.equal(edge.status, 'verified', edge.summary);
   });
 
   it('fails 160.00 EUR on 40 to 200 EUR by name: the amount reaches the target, and the record is well formed (M-S5)', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 1, 999_999, 16_000));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_A, 0, 1, 999_999, '16000'));
     assert.equal(report.status, 'failed');
     assert.deepEqual(report.checks.boostAmount, {
       ok: false,
@@ -269,17 +270,17 @@ describe('a version 4 step on the step page (KAN-1569 plan v1.1 T1)', () => {
   });
 
   it('writes the step-number caveat of version 4', async () => {
-    const report = await verifyUpgradeStep(await stepRecord(BOX_C, 0, 1, 288_016, 2128));
+    const report = await verifyUpgradeStep(await stepRecord(BOX_C, 0, 1, 288_016, '2128'));
     assert.ok(report.caveats.includes(UPGRADE_V4_CAVEATS.stepNo(29)));
   });
 });
 
 describe('a version 4 win on the open page (KAN-1569 plan v1.1 L9)', () => {
   it('verifies Ana\'s win with 21.28 EUR recorded, and is pending with the seed locked (M-O1)', async () => {
-    const report = await verify(await winRecord(BOX_C, 0, 1, 288_016, 2128));
+    const report = await verify(await winRecord(BOX_C, 0, 1, 288_016, '2128'));
     assert.equal(report.status, 'verified', report.summary);
     assert.equal(report.trace.computedSlotIndex, 1);
-    const locked = await verify(await winRecord(BOX_C, 0, 1, 288_016, 2128, false));
+    const locked = await verify(await winRecord(BOX_C, 0, 1, 288_016, '2128', false));
     assert.equal(locked.status, 'pending', locked.summary);
   });
 
@@ -292,11 +293,11 @@ describe('a version 4 win on the open page (KAN-1569 plan v1.1 L9)', () => {
 
   // One failing input for each variant of the open page's amount sentence (SHOULD 4).
   const variants: [string, () => Promise<VerificationInput>, string][] = [
-    ['above the ceiling (M-O3)', () => winRecord(BOX_A, 0, 3, 483_605, 100_001), 'amount refused, 100001 cents is above the ceiling of 100000 cents'],
-    ['above the cap', () => winRecord(BOX_A, 0, 1, 500_015, 6753), 'amount refused, 6753 cents gives a chance of 500015 ppm, above the cap of 500000 ppm'],
-    ['its last cent raises nothing', () => winRecord(BOX_A, 2, 4, 9301, 10), 'amount refused, the last cent of 10 cents raises nothing: 9 cents give 9301 ppm too'],
-    ['reaches the target', () => winRecord(BOX_A, 0, 1, 999_999, 16_000), "amount refused, the value staked plus 16000 cents reaches the target's value"],
-    ['on version 3 (M-O2)', () => winRecord(familyBox('upgradeBoostChance', 'boost-box-c-9400', 3), 0, 1, 288_016, 2128), 'amount refused, version 3 of the upgrade rules has no amount'],
+    ['above the ceiling (M-O3)', () => winRecord(BOX_A, 0, 3, 483_605, '100001'), 'amount refused, 100001 cents is above the ceiling of 100000 cents'],
+    ['above the cap', () => winRecord(BOX_A, 0, 1, 500_015, '6753'), 'amount refused, 6753 cents gives a chance of 500015 ppm, above the cap of 500000 ppm'],
+    ['its last cent raises nothing', () => winRecord(BOX_A, 2, 4, 9301, '10'), 'amount refused, the last cent of 10 cents raises nothing: 9 cents give 9301 ppm too'],
+    ['reaches the target', () => winRecord(BOX_A, 0, 1, 999_999, '16000'), "amount refused, the value staked plus 16000 cents reaches the target's value"],
+    ['on version 3 (M-O2)', () => winRecord(familyBox('upgradeBoostChance', 'boost-box-c-9400', 3), 0, 1, 288_016, '2128'), 'amount refused, version 3 of the upgrade rules has no amount'],
   ];
   for (const [name, input, computed] of variants) {
     it(`fails an amount ${name}, revealed or locked, before the draw`, async () => {
@@ -304,14 +305,14 @@ describe('a version 4 win on the open page (KAN-1569 plan v1.1 L9)', () => {
         const record = await input();
         const report = await verify(revealed ? record : { ...record, serverSeedHex: null });
         assert.equal(report.status, 'failed', `${revealed ? 'revealed' : 'locked'}: ${report.summary}`);
-        assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `amount recorded ${(record.expected.stepBoostCents as number)} cents`, computed });
+        assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `amount recorded ${record.expected.stepBoostCents} cents`, computed });
         assert.equal(report.trace.computedSlotIndex, undefined);
       }
     });
   }
 
   it('writes version 4\'s win caveat, with the amount recorded (M-V2)', async () => {
-    const report = await verify(await winRecord(BOX_C, 0, 1, 288_016, 2128));
+    const report = await verify(await winRecord(BOX_C, 0, 1, 288_016, '2128'));
     assert.ok(report.caveats.includes(UPGRADE_V4_CAVEATS.win(0, 1, STEP_ID, 2128n)));
     assert.ok(report.caveats.some((c) => c.includes('on version 4 of the upgrade rules, with an amount of 21.28 recorded')));
     assert.ok(!report.caveats.includes(UPGRADE_V3_CAVEATS.win(0, 1, STEP_ID)));
@@ -335,11 +336,12 @@ describe('each version has its own words (KAN-1569 plan v1.1 L8)', () => {
 });
 
 describe('a recorded amount in a wrong shape is invalid, by name (KAN-1569 plan v1.1 T4)', () => {
-  // The wire rule (cto 37014): a whole JSON number of cents from 1, absent when none. Anything else is a
-  // record this library cannot read, so the status is invalid, never a pass and never "not checked yet".
-  const bad: unknown[] = [0, '2128', 21.5, -1];
+  // The wire rule (cto 37069, correcting 37014): on /verify an amount is a decimal string of whole cents from 1,
+  // as `priceCents` is, absent when none. Anything else is a record this library cannot read, so the status is
+  // invalid, never a pass and never "not checked yet". The JSON number 2128 is the right amount in the wrong shape.
+  const bad: unknown[] = [2128, 0, 21.5, '0', '-1', '+2128', '02128', '21.5', '', ' 2128', null];
 
-  it('refuses boostCents of 0, "2128", 21.5 and -1 on a step (M-W1, M-W2)', async () => {
+  it('refuses boostCents as the JSON number 2128, 0, "0", a sign, a leading zero, a fraction or empty text on a step (M-W1, M-W2, M-W3)', async () => {
     for (const value of bad) {
       const report = await verifyUpgradeStep(await stepRecord(BOX_C, 0, 1, 288_016, value));
       assert.equal(report.status, 'invalid', `boostCents ${JSON.stringify(value)}`);
@@ -347,7 +349,7 @@ describe('a recorded amount in a wrong shape is invalid, by name (KAN-1569 plan 
     }
   });
 
-  it('refuses stepBoostCents of 0, "2128", 21.5 and -1 on a win', async () => {
+  it('refuses stepBoostCents in the same shapes on a win', async () => {
     for (const value of bad) {
       const report = await verify(await winRecord(BOX_C, 0, 1, 288_016, value));
       assert.equal(report.status, 'invalid', `stepBoostCents ${JSON.stringify(value)}`);
@@ -355,8 +357,16 @@ describe('a recorded amount in a wrong shape is invalid, by name (KAN-1569 plan 
     }
   });
 
+  it('names the JSON number as a number, and reads the string "2128" as 2128 cents', () => {
+    assert.throws(() => recordedAmountCents(2128, 'expected.boostCents'), /was the JSON number 2128$/);
+    assert.throws(() => recordedAmountCents('02128', 'expected.boostCents'), /was the text '02128'$/);
+    assert.equal(recordedAmountCents('2128', 'expected.boostCents'), 2128n);
+    assert.equal(recordedAmountCents('100000', 'expected.boostCents'), 100_000n);
+    assert.equal(recordedAmountCents(undefined, 'expected.boostCents'), undefined);
+  });
+
   it('refuses stepBoostCents on an open that is not an upgrade win', async () => {
-    const { gameKind: _kind, ...boxOpen } = await winRecord(BOX_C, 0, 1, 288_016, 2128);
+    const { gameKind: _kind, ...boxOpen } = await winRecord(BOX_C, 0, 1, 288_016, '2128');
     const report = await verify(boxOpen);
     assert.equal(report.status, 'invalid');
     assert.match(report.invalid?.message ?? '', /stepBoostCents is recorded only with an upgrade win/);
@@ -364,7 +374,7 @@ describe('a recorded amount in a wrong shape is invalid, by name (KAN-1569 plan 
 
   it('fails an amount on a version 3 step (M-V1)', async () => {
     const v3 = familyBox('upgradeBoostChance', 'boost-box-c-9400', 3);
-    const report = await verifyUpgradeStep(await stepRecord(v3, 0, 1, 188_000, 2128));
+    const report = await verifyUpgradeStep(await stepRecord(v3, 0, 1, 188_000, '2128'));
     assert.equal(report.status, 'failed');
     assert.deepEqual(report.checks.boostAmount, { ok: false, expected: 'no amount: version 3 of the upgrade rules has none', computed: '2128 cents' });
   });
@@ -382,11 +392,11 @@ describe('the contract examples of version 4 (documentation specs/upgrade-step, 
   const OPEN_WITH = example('verify-open-upgrade-win-v4');
   const OPEN_NONE = example('verify-open-upgrade-win-v4-no-amount');
 
-  it('carries the amount as a whole number of cents with one, and no key without one', () => {
+  it('carries the amount as a decimal string of cents with one, and no key without one', () => {
     assert.equal(STEP_WITH.engineVersion, 4);
     assert.equal(STEP_NONE.engineVersion, 4);
-    assert.equal(STEP_WITH.boostCents, 2128);
-    assert.equal(OPEN_WITH.stepBoostCents, 2128);
+    assert.equal(STEP_WITH.boostCents, '2128');
+    assert.equal(OPEN_WITH.stepBoostCents, '2128');
     assert.ok(!('boostCents' in STEP_NONE), 'a step with no amount has no boostCents key');
     assert.ok(!('stepBoostCents' in OPEN_NONE), 'a win with no amount has no stepBoostCents key');
     assert.ok(!('boostCents' in OPEN_WITH), 'the open mark names the amount stepBoostCents');

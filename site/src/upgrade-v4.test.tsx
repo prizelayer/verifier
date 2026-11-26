@@ -337,7 +337,7 @@ describe("the version 4 sentences", () => {
 
 describe("a version 4 step on its page", () => {
   it("verifies box C's 21.28 step at 28.80%, with the amount's rows on card 2 (vector plus-10-won)", async () => {
-    await openStep(BOX_C, v4Step(0, 1, 288016, { boostCents: 2128 }), "PASS")
+    await openStep(BOX_C, v4Step(0, 1, 288016, { boostCents: "2128" }), "PASS")
     // Kills M-P4 (the step proof drops the amount: 188 000 would be the chance, and the step would fail).
     expect(card(2)).toContain("Step 2 — The chance of your upgrade comes from this box's upgrade rate and the amount recorded with it.")
     expect(card(2)).toContain(UPGRADE_V4_WORDS.rule)
@@ -366,31 +366,31 @@ describe("a version 4 step on its page", () => {
     [
       "above the ceiling (40.00 to 2,000.00, 1,000.01 at 483,605)",
       BOX_A,
-      v4Step(0, 3, 483605, { boostCents: 100001 }),
+      v4Step(0, 3, 483605, { boostCents: "100001" }),
       "The amount recorded with this upgrade, 1,000.01, is more than 1,000.00, the most the upgrade rules allow.",
     ],
     [
       "above the cap (40.00 to 200.00, 67.53 at 500,015)",
       BOX_A,
-      v4Step(0, 1, 500015, { boostCents: 6753 }),
+      v4Step(0, 1, 500015, { boostCents: "6753" }),
       "With the amount recorded with this upgrade, 67.53, the chance would be 50.0015%. That is more than 50%, the most the upgrade rules allow.",
     ],
     [
       "whose last cent raised nothing (1,000.00 to 100,000.00, 0.10 at 9,301)",
       BOX_A,
-      v4Step(2, 4, 9301, { boostCents: 10 }),
+      v4Step(2, 4, 9301, { boostCents: "10" }),
       "The last cent of the amount recorded with this upgrade, 0.10, did not raise the chance: 0.09 gives the same chance. The upgrade rules do not allow this.",
     ],
     [
       "that reaches the target's value (40.00 to 200.00, 160.00)",
       BOX_A,
-      v4Step(0, 1, 500000, { boostCents: 16000 }),
+      v4Step(0, 1, 500000, { boostCents: "16000" }),
       "The value you gave up plus the amount recorded with this upgrade, 160.00, is worth as much as the item you chose, or more. The upgrade rules do not allow this, so there is no chance to compute.",
     ],
     [
       "on version 3, which has none (box C, 21.28)",
       { ...BOX_C, editionId: "15690000-0000-4000-8000-0000000000c3", engineVersion: 3 },
-      v4Step(0, 1, 188000, { engineVersion: 3, boostCents: 2128 }),
+      v4Step(0, 1, 188000, { engineVersion: 3, boostCents: "2128" }),
       "This upgrade records an amount, 21.28, but version 3 of the upgrade rules has no amount.",
     ],
   ]
@@ -403,16 +403,17 @@ describe("a version 4 step on its page", () => {
   }
 
   it("fails a target under the minimum with no amount, even with an amount recorded (sentence 3b)", async () => {
-    await openStep(MIN_EDGE, v4Step(0, 8, 1001, { boostCents: 1 }), "FAIL")
+    await openStep(MIN_EDGE, v4Step(0, 8, 1001, { boostCents: "1" }), "FAIL")
     expect(verdictLine()).toBe(`Step 2 does not match: ${upgradeCheckWords(4, 9300, 1).fail.upgradeTarget}`)
     expect(checkText("boostAmount")).toContain("not run")
   })
 
-  for (const amount of ["150000", 0, 21.5, -1]) {
+  // The wire rule (cto 37069): a decimal string from "1"; the JSON number 2128 is the right amount in the wrong shape.
+  for (const amount of [2128, "0", "21.5", "-1", "02128", ""]) {
     it(`cannot check a step whose amount is ${JSON.stringify(amount)}, and says the record is wrongly formed`, async () => {
       await openStep(BOX_C, v4Step(0, 1, 288016, { boostCents: amount }), "CANNOT CHECK")
       expect(verdictLine()).toBe(
-        `${UPGRADE_V4_WORDS.malformed("upgrade")} (expected.boostCents is wrongly formed: an amount is recorded as a whole number of cents from 1 (a JSON number, never 0 and never text), was ${typeof amount === "string" ? `the text '${amount}'` : String(amount)})`,
+        `${UPGRADE_V4_WORDS.malformed("upgrade")} (expected.boostCents is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON number, never "0", no sign and no leading zero), was ${typeof amount === "string" ? `the text '${amount}'` : `the JSON number ${amount}`})`,
       )
     })
   }
@@ -426,7 +427,7 @@ describe("a version 4 step on its page", () => {
 describe("an upgraded win of version 4 on the open page", () => {
   it("verifies Ana's win with 21.28 recorded, and says the chance with the amount (O1, O2)", async () => {
     // Kills M-P5: the open proof drops the amount, and 288,016 is then not the chance of the step.
-    await openWin(BOX_C, v4Win(0, 1, 288016, { stepBoostCents: 2128 }), "PASS")
+    await openWin(BOX_C, v4Win(0, 1, 288016, { stepBoostCents: "2128" }), "PASS")
     expect(card(4)).toContain(upgradeWinStep4(4).source.replaceAll("`", ""))
     expect(document.querySelector("[data-amount-chance]")?.textContent).toBe(UPGRADE_V4_WORDS.winChance(2128, 288016))
   })
@@ -448,7 +449,7 @@ describe("an upgraded win of version 4 on the open page", () => {
 
   for (const revealed of [true, false]) {
     it(`fails a win whose amount is above the ceiling, as the step page would (O3, seed ${revealed ? "revealed" : "locked"})`, async () => {
-      await openWin(BOX_A, v4Win(0, 3, 483605, { stepBoostCents: 100001 }), "FAIL", revealed)
+      await openWin(BOX_A, v4Win(0, 3, 483605, { stepBoostCents: "100001" }), "FAIL", revealed)
       const sentence = "The amount recorded with this win, 1,000.01, is more than 1,000.00, the most the upgrade rules allow."
       expect(verdictLine()).toBe(`Step 4 does not match: ${sentence}`)
       expect(checkText("drawnSlotIndex")).toBe(`The slot: does not match. ${sentence}`)
@@ -457,14 +458,14 @@ describe("an upgraded win of version 4 on the open page", () => {
   }
 
   it("fails a version 3 win that records an amount (O3)", async () => {
-    await openWin({ ...BOX_C, editionId: "15690000-0000-4000-8000-0000000000c3", engineVersion: 3 }, v4Win(0, 1, 188000, { stepBoostCents: 2128 }), "FAIL")
+    await openWin({ ...BOX_C, editionId: "15690000-0000-4000-8000-0000000000c3", engineVersion: 3 }, v4Win(0, 1, 188000, { stepBoostCents: "2128" }), "FAIL")
     expect(verdictLine()).toBe("Step 4 does not match: This win records an amount, 21.28, but version 3 of the upgrade rules has no amount.")
   })
 
-  it("cannot check a win whose amount is text, and says the record is wrongly formed (O5)", async () => {
-    await openWin(BOX_C, v4Win(0, 1, 288016, { stepBoostCents: "2128" }), "CANNOT CHECK")
+  it("cannot check a win whose amount is a JSON number, and says the record is wrongly formed (O5)", async () => {
+    await openWin(BOX_C, v4Win(0, 1, 288016, { stepBoostCents: 2128 }), "CANNOT CHECK")
     expect(verdictLine()).toBe(
-      `${UPGRADE_V4_WORDS.malformed("win")} (expected.stepBoostCents is wrongly formed: an amount is recorded as a whole number of cents from 1 (a JSON number, never 0 and never text), was the text '2128')`,
+      `${UPGRADE_V4_WORDS.malformed("win")} (expected.stepBoostCents is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON number, never "0", no sign and no leading zero), was the JSON number 2128)`,
     )
   })
 })

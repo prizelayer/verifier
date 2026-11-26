@@ -1,6 +1,7 @@
 import {
   parseEdition,
   parseSnapshotBody,
+  recordedAmountCents,
   UPGRADE_STEP_CHECK_NAMES,
   verifyFrom,
   verifyUpgradeStep,
@@ -68,7 +69,7 @@ export function proofInput(text: string): VerificationInput {
   }
   // Version 4: the amount recorded with the step that made the win (contract §7), passed as it was written,
   // so the library refuses any other shape by name, and refuses it on an open that is not an upgraded win.
-  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as number
+  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as string
   return input
 }
 
@@ -98,7 +99,7 @@ export function stepProofInput(text: string): UpgradeStepInput {
       stepNo: number_(step.stepNo, "step.stepNo"),
       // Version 4: the amount recorded with the step (contract §6), passed as it was written, so the library
       // refuses any other shape by name; absent when none was recorded.
-      ...(step.boostCents === undefined ? {} : { boostCents: step.boostCents as number }),
+      ...(step.boostCents === undefined ? {} : { boostCents: step.boostCents as string }),
     },
   }
 }
@@ -234,4 +235,17 @@ function outcome_(value: unknown, field: string): "won" | "lost" {
 function number_(value: unknown, field: string): number {
   if (typeof value !== "number") throw new Error(`The proof has no ${field}.`)
   return value
+}
+
+/**
+ * A recorded amount in cents, read by the library's own wire rule (a decimal string from "1", cto 37069), or
+ * undefined when it is absent or wrongly formed: a wrongly formed one never reaches a sentence.
+ */
+export function amountCentsOf(value: unknown, field: string): number | undefined {
+  try {
+    const cents = recordedAmountCents(value, field)
+    return cents === undefined ? undefined : Number(cents)
+  } catch {
+    return undefined
+  }
 }

@@ -1764,10 +1764,13 @@ function checkBoostCase(family: BoostFamily, vector: BoostCaseVector, rate: numb
   );
 }
 
-/** A version 4 step record: the amount is present only when one was added, as the wire rule says. */
+/**
+ * A version 4 step record: the amount is present only when one was added, and written as the /verify route writes
+ * it, a decimal string (cto 37069). The vector itself keeps the engine's number: it is an algorithm input.
+ */
 function boostStepInput(family: BoostFamily, vector: BoostStepVector, edition: Edition, fingerprint: string): UpgradeStepInput {
   const input = rateStepInput(family, vector, edition, fingerprint, BOOST_CHANCE);
-  if (vector.boostCents !== 0) input.expected.boostCents = vector.boostCents;
+  if (vector.boostCents !== 0) input.expected.boostCents = String(vector.boostCents);
   return input;
 }
 
@@ -1937,7 +1940,7 @@ describe('the step check accepts exactly the amounts the engine accepts (SHOULD 
                 drawnPpmValue: v,
                 outcome: stepOutcome(v, chance),
                 stepNo: 1,
-                boostCents: b,
+                boostCents: String(b),
               },
             });
             assert.equal(

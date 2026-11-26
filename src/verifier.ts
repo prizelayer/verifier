@@ -212,10 +212,10 @@ export interface VerificationInput {
     /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
     stepOutcome?: 'won' | 'lost';
     /**
-     * On an upgrade win made by a version 4 step with an amount: that amount, a whole number of cents from 1
-     * (contract §7 `stepBoostCents`). Absent when none was added; any other shape makes the record unreadable.
+     * On an upgrade win made by a version 4 step with an amount: that amount, a decimal string of whole cents
+     * from 1 (contract §7 `stepBoostCents`). Absent when none was added; any other shape makes the record unreadable.
      */
-    stepBoostCents?: number;
+    stepBoostCents?: string;
   };
   /**
    * `upgrade` when the win was made by an upgrade step, not by a box draw. Its drawn value, nonce and
@@ -1314,19 +1314,29 @@ function boostStepOf(edition: UpgradeEditionOdds, rule: UpgradeRule, rateBps: nu
 }
 
 /**
- * The wire rule of a recorded amount (cto ruling KAN-1569 37014): a JSON whole number of cents from 1, never
- * 0 and never a decimal string, absent when no amount was added. Shared by the step and the open record, so
- * both fields are held by the same check. A value of any other shape makes the record unreadable (`invalid`):
- * it is never read as "no amount".
+ * The wire rule of a recorded amount (cto ruling KAN-1569 37069, which corrects 37014): on the public check every
+ * EUR amount in cents is a decimal string, so this one is too: whole cents from 1, written as `String(cents)`
+ * writes them, absent when no amount was added. It is read by the parser of `priceCents`; a JSON number, "0", a
+ * sign, a leading zero, a fraction or an empty text makes the record unreadable (`invalid`): it is never read as
+ * "no amount". Shared by the step and the open record, so both fields are held by the same check.
  */
-function requireRecordedAmount(value: unknown, field: string): void {
-  if (value === undefined) return;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
-    throw new Error(
-      `${field} is wrongly formed: an amount is recorded as a whole number of cents from 1 (a JSON number, ` +
-        `never 0 and never text), was ${typeof value === 'string' ? `the text '${value}'` : String(value)}`,
+export function recordedAmountCents(value: unknown, field: string): bigint | undefined {
+  if (value === undefined) return undefined;
+  const wrong = (was: string) =>
+    new Error(
+      `${field} is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON ` +
+        `number, never "0", no sign and no leading zero), was ${was}`,
     );
+  if (typeof value !== 'string') throw wrong(typeof value === 'number' ? `the JSON number ${value}` : String(value));
+  let cents: bigint;
+  try {
+    cents = toBigInt(value, field);
+  } catch {
+    throw wrong(`the text '${value}'`);
   }
+  // `toBigInt` takes a sign and leading zeros; a recorded amount is written one way only.
+  if (cents < 1n || cents.toString() !== value) throw wrong(`the text '${value}'`);
+  return cents;
 }
 
 /**
@@ -2150,7 +2160,7 @@ function requireShape(input: VerificationInput): void {
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
   }
   // The same wire rule as the step's own amount, through the same check (plan v1.1 L9, NOTE-5).
-  requireRecordedAmount(input.expected.stepBoostCents, 'expected.stepBoostCents');
+  recordedAmountCents(input.expected.stepBoostCents, 'expected.stepBoostCents');
   if (input.expected.stepBoostCents !== undefined && input.gameKind !== 'upgrade') {
     throw new Error('expected.stepBoostCents is recorded only with an upgrade win, and this open is not one');
   }
@@ -2233,10 +2243,10 @@ export interface UpgradeStepInput {
     outcome: 'won' | 'lost';
     stepNo: number;
     /**
-     * Version 4 only: the amount recorded as added to the value staked, a whole number of cents from 1.
-     * Absent when none was added; any other shape (0, text, a fraction) makes the step unreadable.
+     * Version 4 only: the amount recorded as added to the value staked, a decimal string of whole cents from 1.
+     * Absent when none was added; any other shape (a JSON number, "0", a fraction) makes the step unreadable.
      */
-    boostCents?: number;
+    boostCents?: string;
   };
 }
 
@@ -2552,5 +2562,5 @@ function requireStepShape(input: UpgradeStepInput): void {
   }
   need(e.outcome === 'won' || e.outcome === 'lost', 'expected.outcome');
   need(typeof e.chanceCompact === 'string', 'expected.chanceCompact');
-  requireRecordedAmount(e.boostCents, 'expected.boostCents');
+  recordedAmountCents(e.boostCents, 'expected.boostCents');
 }

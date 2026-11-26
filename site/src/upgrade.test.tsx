@@ -232,7 +232,7 @@ describe("the step page", () => {
     ["upgradeTarget", (a) => void (a.step = { ...a.step, targetSlotIndex: 3 })],
     ["upgradeChance", (a) => void (a.step = { ...a.step, chancePpm: 500000 })],
     // An amount on a version 1 step, which has none (KAN-1569).
-    ["boostAmount", (a) => void (a.step = { ...a.step, boostCents: 2128 })],
+    ["boostAmount", (a) => void (a.step = { ...a.step, boostCents: "2128" })],
     ["chanceCompact", (a) => void (a.step = { ...a.step, chanceCompact: "41.00%" })],
     ["stepNo", (a) => void (a.step = { ...a.step, stepNo: 4 })],
     ["drawnPpmValue", (a) => void (a.step = { ...a.step, drawnPpmValue: 186670 })],

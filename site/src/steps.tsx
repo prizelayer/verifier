@@ -1,6 +1,7 @@
 import { CHECK_NAMES, STEP_OF, type Check, type CheckName, type VerificationInput, type VerificationReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups, snapshotGroups } from "./preimage"
+import { amountCentsOf } from "./proof"
 import { Rows } from "./rows"
 import { TwoRanges } from "./upgradeSteps"
 import { CHECK_WORDS } from "./verdict"
@@ -251,6 +252,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
       // On a version where an upgrade names its target, the browser checks the slot the win records.
       const slotLabel =
         input.gameKind === "upgrade" && stepJumps(input.edition.engineVersion) ? UPGRADE_JUMP_WORDS.winSlotLabel : "Slot your browser found"
+      const winAmount = amountCentsOf(input.expected.stepBoostCents, "expected.stepBoostCents")
       return (
         <div className="space-y-2">
           {input.gameKind === "upgrade" ? (
@@ -301,9 +303,9 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
               <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel={slotLabel} check={checks.drawnSlotIndex} />
             )
           ) : null}
-          {input.gameKind === "upgrade" && checks.drawnSlotIndex?.ok && typeof input.expected.stepBoostCents === "number" && upgradeWords(input.edition.engineVersion).recordsAmount ? (
+          {input.gameKind === "upgrade" && checks.drawnSlotIndex?.ok && winAmount !== undefined && upgradeWords(input.edition.engineVersion).recordsAmount ? (
             <p className="text-sm" data-amount-chance>
-              {UPGRADE_V4_WORDS.winChance(input.expected.stepBoostCents, input.expected.stepChancePpm as number)}
+              {UPGRADE_V4_WORDS.winChance(winAmount, input.expected.stepChancePpm as number)}
             </p>
           ) : null}
           {input.snapshot ? (

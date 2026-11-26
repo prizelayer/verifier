@@ -1,6 +1,7 @@
 import { UPGRADE_STEP_CHECK_NAMES, upgradeRule, type UpgradeStepInput, type UpgradeStepReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups } from "./preimage"
+import { amountCentsOf } from "./proof"
 import { SourceLine } from "./steps"
 import {
   DEPENDENT_NOTE,
@@ -113,9 +114,9 @@ export function UpgradeStepCards({ report, input }: Props) {
   )
 }
 
-/** The amount the step records, when it is a number; a wrongly formed one never reaches a sentence. */
+/** The amount the step records, in cents; a wrongly formed one never reaches a sentence. */
 function amountOf(input: UpgradeStepInput): number | undefined {
-  return typeof input.expected.boostCents === "number" ? input.expected.boostCents : undefined
+  return amountCentsOf(input.expected.boostCents, "expected.boostCents")
 }
 
 function StepValues({ step, report, input }: Props & { step: StepNumber }) {

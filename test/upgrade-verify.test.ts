@@ -210,7 +210,7 @@ describe('verifyUpgradeStep', () => {
     upgradeTarget: async () => ({ ...wonStep, expected: { ...wonStep.expected, targetSlotIndex: 3 } }),
     upgradeChance: async () => ({ ...wonStep, expected: { ...wonStep.expected, chancePpm: 500_000 } }),
     // Version 1 has no amount to add, so an amount recorded with its step fails on its own.
-    boostAmount: async () => ({ ...wonStep, expected: { ...wonStep.expected, boostCents: 2128 } }),
+    boostAmount: async () => ({ ...wonStep, expected: { ...wonStep.expected, boostCents: '2128' } }),
     chanceCompact: async () => ({ ...wonStep, expected: { ...wonStep.expected, chanceCompact: '41.00%' } }),
     stepNo: async () => ({ ...wonStep, expected: { ...wonStep.expected, stepNo: 4 } }),
     drawnPpmValue: async () => ({ ...wonStep, expected: { ...wonStep.expected, drawnPpmValue: 186_670 } }),
