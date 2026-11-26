@@ -20,6 +20,11 @@ import {
   UPGRADE_MIN_CHANCE_PPM,
   UPGRADE_RULES,
   UPGRADE_STEP_RTP_BPS,
+  boostChancePpm,
+  boostDecision,
+  boostKeyFor,
+  boostKeys,
+  boostMaxCents,
   bytesFromHex,
   commitment,
   derive,
@@ -512,6 +517,108 @@ export async function runConformance(fixture) {
     }
   }
 
+  // --- version 4 of the upgrade engine: a step that records an amount (KAN-1569) ---
+  // The same recomputations as the version 4 blocks of test/vectors.test.ts: R from each family's box,
+  // then every case's chance with no amount, highest amount, decisions and keys, and every step through
+  // verifyUpgradeStep, in this engine's own BigInt. Nothing written in a family is read for a number.
+  const rule4 = upgradeRule(4);
+  const boostSections = [['upgradeBoostChance', fixture.upgradeBoostChance], ['upgradeBoostLimits', fixture.upgradeBoostLimits]];
+  for (const [name, body] of boostSections) {
+    const c = body.constants;
+    for (const field of ['engineVersion', 'maxSteps', 'minChancePpm', 'offerMinChancePpm', 'stepRtpCapBps', 'stepRtpFloorBps', 'boostCeilingCents', 'boostMaxChancePpm']) {
+      eq(`${name}.constants.${field}`, c[field], rule4?.[field]);
+    }
+    eq(`${name}.constants.engineType`, c.engineType, UPGRADE_ENGINE_TYPE);
+  }
+  const boostSeed = bytesFromHex(fixture.upgradeBoostChance.serverSeedHex);
+  eq('upgradeBoostChance.commitment', await commitment(boostSeed), fixture.upgradeBoostChance.commitmentHex);
+  for (const [name, body] of boostSections) {
+    for (const family of body.families) {
+      asserted.add(`${name}/${family.id}`);
+      const edition = rateEdition(family, 4);
+      const sum = family.slots.reduce((acc, slot) => acc + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
+      eq(`${name}:${family.id}.S`, typeof family.payoutTimesMillion === 'string' ? sum : 'S is not a string', family.payoutTimesMillion);
+      const boxBps = (10_000n * sum) / (BigInt(PPM_TOTAL) * BigInt(family.priceCents));
+      eq(`${name}:${family.id}.boxBps`, boxBps, family.boxBps);
+      const cap = BigInt(body.constants.stepRtpCapBps);
+      const rate = upgradeStepRateBps(edition, 4);
+      eq(`${name}:${family.id}.rate`, rate, family.stepRtpBps);
+      eq(`${name}:${family.id}.rateIsBoxBpsUnderCap`, rate, boxBps < cap ? boxBps : cap);
+      const valueOf = (slotIndex) => edition.slots.find((slot) => slot.slotIndex === slotIndex)?.requiredBuyBackValueCents;
+      const stepOf = (vector, label) => {
+        eq(`${label}.stakedValue`, valueOf(vector.heldSlotIndex), vector.stakedBuyBackValueCents);
+        eq(`${label}.targetValue`, valueOf(vector.targetSlotIndex), vector.targetBuyBackValueCents);
+        return { engineVersion: 4, rateBps: rate, stakedCents: valueOf(vector.heldSlotIndex), targetCents: valueOf(vector.targetSlotIndex) };
+      };
+      for (const vector of family.cases) {
+        const where = `${family.id}/${vector.id}`;
+        asserted.add(`${name}/${where}`);
+        const label = `${name}:${where}`;
+        const step = stepOf(vector, label);
+        const limits = { maxCents: BigInt(vector.casinoMaxCents), maxChancePpm: vector.casinoMaxChancePpm };
+        eq(`${label}.plainChance`, boostChancePpm(step, 0n), vector.plainChancePpm);
+        eq(`${label}.boostMaxCents`, boostMaxCents(step, limits), vector.boostMaxCents);
+        for (const amount of vector.amounts) {
+          asserted.add(`${name}/${where}/amount-${amount.boostCents}`);
+          const d = boostDecision(step, BigInt(amount.boostCents), limits);
+          const got = d.decision === 'accepted' ? `accepted@${d.chancePpm}=${stepChanceText(d.chancePpm)}` : `refused:${d.refusal}<=${d.boostMaxCents}`;
+          const want = amount.decision === 'accepted' ? `accepted@${amount.chancePpm}=${amount.chanceCompact}` : `refused:${amount.refusal}<=${amount.boostMaxCents}`;
+          eq(`${label}/amount-${amount.boostCents}`, got, want);
+        }
+        const keys = vector.keys ?? [];
+        for (const key of keys) eq(`${label}.key+${key.points}.listed`, (vector.keyPoints ?? []).includes(key.points), true);
+        for (const p of vector.keyPoints ?? []) {
+          asserted.add(`${name}/${where}/key-${p}`);
+          const key = boostKeyFor(step, p, limits);
+          const written = keys.find((k) => k.points === p);
+          eq(`${label}.key+${p}`,
+            key === null ? 'hidden' : `${key.boostCents}@${key.chancePpm}=${stepChanceText(key.chancePpm)}`,
+            written === undefined ? 'hidden' : `${written.boostCents}@${written.chancePpm}=${written.chanceCompact}`);
+        }
+        eq(`${label}.keys`, boostKeys(step, vector.keyPoints ?? [], limits).map((k) => `${k.points}:${k.boostCents}`).join(','),
+          keys.map((k) => `${k.points}:${k.boostCents}`).join(','));
+      }
+      for (const vector of family.steps ?? []) {
+        asserted.add(`${name}/${family.id}/${vector.id}`);
+        const label = `${name}:${family.id}/${vector.id}`;
+        const step = stepOf(vector, label);
+        const chance = boostChancePpm(step, BigInt(vector.boostCents));
+        eq(`${label}.chance`, chance, vector.chancePpm);
+        eq(`${label}.table`, stepTable(chance).map((row) => row.probabilityPpm).join(','), vector.stepTablePpm.join(','));
+        const v = (await derive(boostSeed, vector.clientSeed, vector.nonce)).value;
+        eq(`${label}.v`, v, vector.v);
+        const outcome = stepOutcome(v, chance);
+        eq(`${label}.outcome`, outcome, vector.outcome);
+        eq(`${label}.slotIndex`, outcome === 'won' ? 0 : 1, vector.slotIndex);
+        eq(`${label}.chanceCompact`, stepChanceText(chance), vector.chanceCompact);
+        const expected = {
+          editionFingerprint: await editionFingerprint(edition),
+          stakedSlotIndex: vector.heldSlotIndex,
+          targetSlotIndex: vector.targetSlotIndex,
+          chancePpm: vector.chancePpm,
+          chanceCompact: vector.chanceCompact,
+          drawnPpmValue: vector.v,
+          outcome: vector.outcome,
+          stepNo: vector.stepNo + 1,
+        };
+        // The wire rule: the amount is present only when one was added.
+        if (vector.boostCents !== 0) expected.boostCents = vector.boostCents;
+        const report = await verifyUpgradeStep({
+          serverSeedHex: fixture.upgradeBoostChance.serverSeedHex,
+          commitmentHex: fixture.upgradeBoostChance.commitmentHex,
+          clientSeed: vector.clientSeed,
+          nonce: vector.nonce,
+          edition,
+          engineType: body.constants.engineType,
+          expected,
+        });
+        eq(`${label}.verifyUpgradeStep`, report.status, 'verified');
+        eq(`${label}.boostAmount`, report.checks.boostAmount?.ok, true);
+        eq(`${label}.trace.stepRateBps`, report.trace.stepRateBps, family.stepRtpBps);
+      }
+    }
+  }
+
   // --- the same fail-closed completeness check the Node suite makes ---
   // Without it the guarantee would hold in Node only: a family added on the platform side would
   // redden `npm test` while this pass went on silently proving less, in the three engines a player
@@ -522,14 +629,31 @@ export async function runConformance(fixture) {
   const expected = [];
   for (const [key, body] of Object.entries(fixture)) {
     if (METADATA_KEYS.includes(key)) continue;
-    // Version 3's section holds families of a box each: every family, every query by its place and
-    // every step by its id is one entry, as in the Node suite.
+    // Versions 3 and 4 hold families of a box each: every family, every query by its place, every case
+    // with its amounts and key points, and every step by its id is one entry, as in the Node suite. A list
+    // on a family or a case that neither suite knows of is a failure by name, never passed over.
     const families = body && body.families;
     if (families) {
       for (const family of families) {
-        expected.push(`${key}/${family.id}`);
-        family.queries.forEach((_, i) => expected.push(`${key}/${family.id}/query-${i}`));
-        for (const step of family.steps) expected.push(`${key}/${family.id}/${step.id}`);
+        const where = `${key}/${family.id}`;
+        for (const [list, value] of Object.entries(family)) {
+          if (Array.isArray(value) && !['slots', 'queries', 'cases', 'steps'].includes(list)) {
+            failures.push(`family ${where} carries the list '${list}', which this browser pass never asserts`);
+          }
+        }
+        expected.push(where);
+        (family.queries ?? []).forEach((_, i) => expected.push(`${where}/query-${i}`));
+        for (const c of family.cases ?? []) {
+          for (const [list, value] of Object.entries(c)) {
+            if (Array.isArray(value) && !['amounts', 'keyPoints', 'keys'].includes(list)) {
+              failures.push(`case ${where}/${c.id} carries the list '${list}', which this browser pass never asserts`);
+            }
+          }
+          expected.push(`${where}/${c.id}`);
+          for (const amount of c.amounts) expected.push(`${where}/${c.id}/amount-${amount.boostCents}`);
+          for (const p of c.keyPoints ?? []) expected.push(`${where}/${c.id}/key-${p}`);
+        }
+        for (const step of family.steps ?? []) expected.push(`${where}/${step.id}`);
       }
       continue;
     }
@@ -545,6 +669,9 @@ export async function runConformance(fixture) {
     for (const vector of vectors) expected.push(`${key}/${vector.id}`);
   }
   checked++;
+  // Two vectors with one id would be reached once and counted once: the second would go unasserted.
+  const twice = expected.filter((key, i) => expected.indexOf(key) !== i);
+  if (twice.length > 0) failures.push(`the fixture names these vectors twice: ${twice.join(', ')}`);
   const missing = expected.filter((key) => !asserted.has(key));
   if (missing.length > 0) {
     failures.push(`vectors present in the fixture but never asserted here: ${missing.join(', ')}`);

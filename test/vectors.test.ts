@@ -24,6 +24,11 @@ import {
   UPGRADE_RULES,
   UPGRADE_STEP_RTP_BPS,
   bigEndianUint32,
+  boostChancePpm,
+  boostDecision,
+  boostKeyFor,
+  boostKeys,
+  boostMaxCents,
   bytesFromHex,
   commitment,
   derive,
@@ -47,6 +52,10 @@ import {
   verify,
   verifyFrom,
   verifyUpgradeStep,
+  type BoostDecision,
+  type BoostLimits,
+  type BoostRefusal,
+  type BoostStep,
   type Edition,
   type SlotOdds,
   type UpgradeStepInput,
@@ -1418,7 +1427,8 @@ interface RateStepVector extends JumpStepVector {
   stakedBuyBackValueCents: number;
 }
 
-interface RateFamily {
+/** A family that is a box: its slots and price, and the three numbers written about its return. */
+interface BoxFamily {
   id: string;
   note: string;
   priceCents: string;
@@ -1429,12 +1439,15 @@ interface RateFamily {
   boxBps: number;
   /** The family's rate, written for the reader. Never read for a chance: see checkRateFamily. */
   stepRtpBps: number;
+}
+
+interface RateFamily extends BoxFamily {
   queries: RateQuery[];
   steps: RateStepVector[];
 }
 
 /** A family's box as an edition: its own chances, buy-back values and price, so its rate is its own. */
-function rateEdition(family: RateFamily, engineVersion = 3): Edition {
+function rateEdition(family: BoxFamily, engineVersion = 3): Edition {
   return {
     engineId: '17511751-0000-4000-8000-000000000003',
     engineVersion,
@@ -1454,7 +1467,7 @@ function rateEdition(family: RateFamily, engineVersion = 3): Edition {
  * number is for the reader, and a family whose number and box disagree is a broken family, not a pass.
  * Refs: KAN-1751 plan v2.4 S-7
  */
-function checkRateFamily(family: RateFamily): number {
+function checkRateFamily(family: BoxFamily, constants: { engineVersion: number; stepRtpCapBps: number } = RATE_STEP.constants): number {
   // S and boxBps are worked out here from the box, in BigInt (S can pass 2^53 on a large box), and the
   // library's rate must be boxBps under the cap: the three written numbers are each compared, none is read.
   const sum = family.slots.reduce((acc, slot) => acc + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
@@ -1465,24 +1478,30 @@ function checkRateFamily(family: RateFamily): number {
   if (BigInt(family.boxBps) !== boxBps) {
     throw new Error(`family ${family.id} writes boxBps ${family.boxBps}, its box gives ${boxBps}`);
   }
-  const rate = upgradeStepRateBps(rateEdition(family), 3);
+  const rate = upgradeStepRateBps(rateEdition(family, constants.engineVersion), constants.engineVersion);
   if (rate !== family.stepRtpBps) {
     throw new Error(`family ${family.id} writes a rate of ${family.stepRtpBps} bps, its box gives ${rate}`);
   }
-  if (BigInt(rate) !== (boxBps < BigInt(RATE_STEP.constants.stepRtpCapBps) ? boxBps : BigInt(RATE_STEP.constants.stepRtpCapBps))) {
+  if (BigInt(rate) !== (boxBps < BigInt(constants.stepRtpCapBps) ? boxBps : BigInt(constants.stepRtpCapBps))) {
     throw new Error(`family ${family.id}: the library's rate ${rate} is not boxBps ${boxBps} under the cap`);
   }
   return rate;
 }
 
-function rateStepInput(family: RateFamily, vector: RateStepVector, edition: Edition, fingerprint: string): UpgradeStepInput {
+function rateStepInput(
+  family: BoxFamily,
+  vector: RateStepVector,
+  edition: Edition,
+  fingerprint: string,
+  section: { serverSeedHex: string; commitmentHex: string; constants: { engineType: string } } = RATE_STEP,
+): UpgradeStepInput {
   return {
-    serverSeedHex: RATE_STEP.serverSeedHex,
-    commitmentHex: RATE_STEP.commitmentHex,
+    serverSeedHex: section.serverSeedHex,
+    commitmentHex: section.commitmentHex,
     clientSeed: vector.clientSeed,
     nonce: vector.nonce,
     edition,
-    engineType: RATE_STEP.constants.engineType,
+    engineType: section.constants.engineType,
     expected: {
       editionFingerprint: fingerprint,
       stakedSlotIndex: vector.heldSlotIndex,
@@ -1642,13 +1661,412 @@ describe('every version 3 step, from its inputs and through verifyUpgradeStep', 
   }
 });
 
+const BOOST_CHANCE = FIXTURE.upgradeBoostChance;
+const BOOST_LIMITS = FIXTURE.upgradeBoostLimits;
+
+interface BoostAmountVector {
+  boostCents: number;
+  decision: 'accepted' | 'refused';
+  chancePpm?: number;
+  chanceCompact?: string;
+  refusal?: BoostRefusal;
+  boostMaxCents?: number;
+}
+
+interface BoostKeyVector {
+  points: number;
+  boostCents: number;
+  chancePpm: number;
+  chanceCompact: string;
+}
+
+interface BoostCaseVector {
+  id: string;
+  heldSlotIndex: number;
+  targetSlotIndex: number;
+  stakedBuyBackValueCents: number;
+  targetBuyBackValueCents: number;
+  casinoMaxCents: number;
+  casinoMaxChancePpm: number;
+  /** The chance with no amount. Compared, never read. */
+  plainChancePpm: number;
+  boostMaxCents: number;
+  keyPoints?: number[];
+  keys?: BoostKeyVector[];
+  amounts: BoostAmountVector[];
+}
+
+interface BoostStepVector extends RateStepVector {
+  /** 0 for a step with no amount; the record then carries no amount at all. */
+  boostCents: number;
+}
+
+interface BoostFamily extends BoxFamily {
+  cases: BoostCaseVector[];
+  steps?: BoostStepVector[];
+}
+
+/** Both version 4 bodies, by name, each with its own families. */
+const BOOST_SECTIONS: readonly [string, { constants: typeof BOOST_CHANCE.constants; families: BoostFamily[] }][] = [
+  ['upgradeBoostChance', BOOST_CHANCE],
+  ['upgradeBoostLimits', BOOST_LIMITS],
+];
+
+/** The step of a case or a step vector, from the family's box: the two values are the slots', never the vector's. */
+function boostStepFor(family: BoostFamily, vector: { heldSlotIndex: number; targetSlotIndex: number; stakedBuyBackValueCents: number; targetBuyBackValueCents: number }, rate: number): BoostStep {
+  const edition = rateEdition(family, 4);
+  const valueOf = (slotIndex: number) => edition.slots.find((slot) => slot.slotIndex === slotIndex)?.requiredBuyBackValueCents;
+  const staked = valueOf(vector.heldSlotIndex);
+  const target = valueOf(vector.targetSlotIndex);
+  assert.equal(staked, BigInt(vector.stakedBuyBackValueCents), "the staked value is the held slot's");
+  assert.equal(target, BigInt(vector.targetBuyBackValueCents), "the target value is the named slot's");
+  return { engineVersion: 4, rateBps: rate, stakedCents: staked as bigint, targetCents: target as bigint };
+}
+
+/**
+ * One case of a version 4 family, every number computed by the library and compared with the vector:
+ * the chance with no amount, the highest amount, each amount's decision and each key. Throws on the first
+ * difference, so a doctored copy of a case is refused (the self-tests below).
+ * Refs: KAN-1569 plan v1.1 T2
+ */
+function checkBoostCase(family: BoostFamily, vector: BoostCaseVector, rate: number): void {
+  const where = `${family.id}/${vector.id}`;
+  const step = boostStepFor(family, vector, rate);
+  const limits: BoostLimits = { maxCents: BigInt(vector.casinoMaxCents), maxChancePpm: vector.casinoMaxChancePpm };
+  assert.equal(boostChancePpm(step, 0n), vector.plainChancePpm, `${where}: the chance with no amount`);
+  assert.equal(boostMaxCents(step, limits), BigInt(vector.boostMaxCents), `${where}: the highest amount`);
+  for (const amount of vector.amounts) {
+    const expected: BoostDecision =
+      amount.decision === 'accepted'
+        ? { decision: 'accepted', boostCents: BigInt(amount.boostCents), chancePpm: amount.chancePpm as number }
+        : { decision: 'refused', refusal: amount.refusal as BoostRefusal, boostMaxCents: BigInt(amount.boostMaxCents as number) };
+    assert.deepEqual(boostDecision(step, BigInt(amount.boostCents), limits), expected, `${where}: ${amount.boostCents} cents`);
+    if (amount.decision === 'accepted') {
+      assert.equal(stepChanceText(amount.chancePpm as number), amount.chanceCompact, `${where}: ${amount.boostCents} cents, chanceCompact`);
+    }
+  }
+  const points = vector.keyPoints ?? [];
+  const keys = vector.keys ?? [];
+  for (const key of keys) assert.ok(points.includes(key.points), `${where}: key +${key.points} is not one of the case's keyPoints`);
+  for (const p of points) {
+    const written = keys.find((key) => key.points === p);
+    assert.deepEqual(
+      boostKeyFor(step, p, limits),
+      written === undefined ? null : { points: p, boostCents: BigInt(written.boostCents), chancePpm: written.chancePpm },
+      `${where}: key +${p}`,
+    );
+    if (written !== undefined) assert.equal(stepChanceText(written.chancePpm), written.chanceCompact, `${where}: key +${p}, chanceCompact`);
+  }
+  assert.deepEqual(
+    boostKeys(step, points, limits),
+    keys.map((key) => ({ points: key.points, boostCents: BigInt(key.boostCents), chancePpm: key.chancePpm })),
+    `${where}: the keys the step serves`,
+  );
+}
+
+/** A version 4 step record: the amount is present only when one was added, as the wire rule says. */
+function boostStepInput(family: BoostFamily, vector: BoostStepVector, edition: Edition, fingerprint: string): UpgradeStepInput {
+  const input = rateStepInput(family, vector, edition, fingerprint, BOOST_CHANCE);
+  if (vector.boostCents !== 0) input.expected.boostCents = vector.boostCents;
+  return input;
+}
+
+describe('the version 4 sections of the fixture (KAN-1569)', () => {
+  it('state version 4 and the constants this library uses for it', () => {
+    const rule = upgradeRule(4);
+    for (const [name, body] of BOOST_SECTIONS) {
+      const c = body.constants;
+      assert.equal(c.engineType, UPGRADE_ENGINE_TYPE, name);
+      assert.equal(c.engineVersion, rule?.engineVersion, name);
+      assert.equal(c.maxSteps, rule?.maxSteps, name);
+      assert.equal(c.minChancePpm, rule?.minChancePpm, name);
+      assert.equal(c.offerMinChancePpm, rule?.offerMinChancePpm, name);
+      assert.equal(c.stepRtpCapBps, rule?.stepRtpCapBps, name);
+      assert.equal(c.stepRtpFloorBps, rule?.stepRtpFloorBps, name);
+      assert.equal(c.boostCeilingCents, rule?.boostCeilingCents, name);
+      assert.equal(c.boostMaxChancePpm, rule?.boostMaxChancePpm, name);
+    }
+    assert.equal(rule?.roundsUp, true);
+    assert.equal(rule?.jumps, true);
+  });
+
+  it('carries a commitment that is the digest of its own server seed', async () => {
+    assert.equal(await commitment(bytesFromHex(BOOST_CHANCE.serverSeedHex)), BOOST_CHANCE.commitmentHex);
+  });
+
+  it('has the families platform P1 named', () => {
+    assert.deepEqual(
+      BOOST_SECTIONS.map(([name, body]) => [name, body.families.map((family) => family.id)]),
+      [
+        ['upgradeBoostChance', ['boost-box-c-9400', 'boost-box-a-9300', 'boost-9990']],
+        ['upgradeBoostLimits', ['boost-limits-box-a-9300', 'boost-limits-box-c-9400', 'boost-limits-minimum-edge-9300', 'boost-limits-exact-9300']],
+      ],
+    );
+  });
+
+  it('refuses a family whose written rate, S or boxBps is one off its box, either way', () => {
+    // As on version 3 (S-7): R comes from the box, never from the family's stepRtpBps.
+    for (const [, body] of BOOST_SECTIONS) {
+      for (const family of body.families) {
+        for (const delta of [-1, 1]) {
+          const rate = { ...family, stepRtpBps: family.stepRtpBps + delta };
+          assert.throws(() => checkRateFamily(rate, body.constants), new RegExp(`family ${family.id} writes a rate of ${rate.stepRtpBps} bps`));
+          const s = { ...family, payoutTimesMillion: String(BigInt(family.payoutTimesMillion) + BigInt(delta)) };
+          assert.throws(() => checkRateFamily(s, body.constants), new RegExp(`family ${family.id} writes S = ${s.payoutTimesMillion},`));
+          const box = { ...family, boxBps: family.boxBps + delta };
+          assert.throws(() => checkRateFamily(box, body.constants), new RegExp(`family ${family.id} writes boxBps ${box.boxBps},`));
+        }
+      }
+    }
+  });
+
+  it('refuses a case whose decision, refusal, highest amount or key price is changed', () => {
+    // The numbers are computed and compared, never read: a copy with one of them moved must be refused.
+    const family = BOOST_LIMITS.families[0] as BoostFamily;
+    const rate = checkRateFamily(family, BOOST_LIMITS.constants);
+    const vector = family.cases[0];
+    assert.doesNotThrow(() => checkBoostCase(family, vector, rate));
+    const accepted = vector.amounts.findIndex((amount) => amount.decision === 'accepted');
+    const refused = vector.amounts.findIndex((amount) => amount.decision === 'refused');
+    const doctor = (change: (copy: BoostCaseVector) => void): BoostCaseVector => {
+      const copy = structuredClone(vector);
+      change(copy);
+      return copy;
+    };
+    assert.throws(() => checkBoostCase(family, doctor((c) => { c.amounts[accepted] = { boostCents: c.amounts[accepted].boostCents, decision: 'refused', refusal: 'boost_too_high', boostMaxCents: vector.boostMaxCents }; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { c.amounts[refused].refusal = 'boost_cent_lost'; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { (c.amounts[accepted].chancePpm as number) += 1; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { c.boostMaxCents += 1; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { c.plainChancePpm += 1; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { (c.keys as BoostKeyVector[])[0].boostCents += 1; }), rate));
+    assert.throws(() => checkBoostCase(family, doctor((c) => { (c.keys as BoostKeyVector[]).pop(); }), rate));
+  });
+});
+
+describe('every version 4 case, from its box', () => {
+  for (const [name, body] of BOOST_SECTIONS) {
+    for (const family of body.families) {
+      it(`${name}/${family.id}`, () => {
+        record(name, family.id);
+        const rate = checkRateFamily(family, body.constants);
+        for (const vector of family.cases) {
+          record(name, `${family.id}/${vector.id}`);
+          for (const amount of vector.amounts) record(name, `${family.id}/${vector.id}/amount-${amount.boostCents}`);
+          for (const p of vector.keyPoints ?? []) record(name, `${family.id}/${vector.id}/key-${p}`);
+          checkBoostCase(family, vector, rate);
+        }
+      });
+    }
+  }
+});
+
+describe('every version 4 step, from its inputs and through verifyUpgradeStep', () => {
+  const seed = bytesFromHex(BOOST_CHANCE.serverSeedHex);
+  for (const family of BOOST_CHANCE.families as BoostFamily[]) {
+    for (const vector of family.steps ?? []) {
+      it(`${family.id}/${vector.id}`, async () => {
+        record('upgradeBoostChance', `${family.id}/${vector.id}`);
+        const rate = checkRateFamily(family, BOOST_CHANCE.constants);
+        const step = boostStepFor(family, vector, rate);
+        const chance = boostChancePpm(step, BigInt(vector.boostCents));
+        assert.equal(chance, vector.chancePpm, 'chance');
+        assert.deepEqual(stepTable(chance).map((row) => row.probabilityPpm), vector.stepTablePpm, 'step table');
+        const v = (await derive(seed, vector.clientSeed, vector.nonce)).value;
+        assert.equal(v, vector.v, 'drawn v');
+        const outcome = stepOutcome(v, chance);
+        assert.equal(outcome, vector.outcome, 'outcome');
+        assert.equal(outcome === 'won' ? 0 : 1, vector.slotIndex, 'slot index');
+        assert.equal(stepChanceText(chance), vector.chanceCompact, 'chanceCompact');
+
+        const edition = rateEdition(family, 4);
+        const report = await verifyUpgradeStep(boostStepInput(family, vector, edition, await editionFingerprint(edition)));
+        assert.equal(report.status, 'verified', report.summary);
+        assert.deepEqual(report.notRun, []);
+        assert.equal(report.checks.boostAmount?.ok, true);
+        assert.equal(report.trace.stepRateBps, family.stepRtpBps);
+        // The target is found at the chance with no amount; the amount moves the chance, not the target.
+        assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: vector.targetSlotIndex, chancePpm: boostChancePpm(step, 0n) });
+        assert.equal(report.trace.computedOutcome, vector.outcome);
+
+        // The same record on a version 3 edition of the same box: an amount fails there, and no amount verifies.
+        const asVersion3 = rateEdition(family, 3);
+        const onVersion3 = await verifyUpgradeStep(boostStepInput(family, vector, asVersion3, await editionFingerprint(asVersion3)));
+        if (vector.boostCents === 0) {
+          assert.equal(onVersion3.status, 'verified', onVersion3.summary);
+        } else {
+          assert.equal(onVersion3.status, 'failed', onVersion3.summary);
+          assert.equal(onVersion3.checks.boostAmount?.ok, false);
+        }
+      });
+    }
+  }
+});
+
+describe('the step check accepts exactly the amounts the engine accepts (SHOULD 2 of 37016)', () => {
+  // Every amount of every case, and one cent either side, recorded as a step with its honest chance: the
+  // step page verifies it exactly when the engine's own decision (its limits, no casino's) accepts it. The
+  // 0.1 % minimum is in the target lookup, so this runs through verifyUpgradeStep and not the limits alone.
+  const seed = bytesFromHex(BOOST_CHANCE.serverSeedHex);
+  for (const [name, body] of BOOST_SECTIONS) {
+    for (const family of body.families) {
+      it(`${name}/${family.id}`, async () => {
+        const rate = checkRateFamily(family, body.constants);
+        const edition = rateEdition(family, 4);
+        const fingerprint = await editionFingerprint(edition);
+        const v = (await derive(seed, 'alice-seed', 3)).value;
+        for (const vector of family.cases) {
+          const step = boostStepFor(family, vector, rate);
+          const amounts = new Set(vector.amounts.flatMap((a) => [a.boostCents - 1, a.boostCents, a.boostCents + 1]).filter((b) => b >= 1));
+          for (const b of amounts) {
+            const decision = boostDecision(step, BigInt(b));
+            const reaches = step.stakedCents + BigInt(b) >= step.targetCents;
+            const chance = reaches ? 999_999 : boostChancePpm(step, BigInt(b));
+            const report = await verifyUpgradeStep({
+              serverSeedHex: BOOST_CHANCE.serverSeedHex,
+              commitmentHex: BOOST_CHANCE.commitmentHex,
+              clientSeed: 'alice-seed',
+              nonce: 3,
+              edition,
+              engineType: body.constants.engineType,
+              expected: {
+                editionFingerprint: fingerprint,
+                stakedSlotIndex: vector.heldSlotIndex,
+                targetSlotIndex: vector.targetSlotIndex,
+                chancePpm: chance,
+                chanceCompact: stepChanceText(chance),
+                drawnPpmValue: v,
+                outcome: stepOutcome(v, chance),
+                stepNo: 1,
+                boostCents: b,
+              },
+            });
+            assert.equal(
+              report.status,
+              decision.decision === 'accepted' ? 'verified' : 'failed',
+              `${family.id}/${vector.id}, ${b} cents: the engine says ${decision.decision}, the step check says ${report.summary}`,
+            );
+          }
+        }
+      });
+    }
+  }
+});
+
+/** The lists a family or a case may carry, each asserted by a loop above. Any other list is a new kind of vector. */
+const FAMILY_LISTS = new Set(['slots', 'queries', 'cases', 'steps']);
+const CASE_LISTS = new Set(['amounts', 'keyPoints', 'keys']);
+
+interface AnyFamily {
+  id: string;
+  queries?: unknown[];
+  cases?: { id: string; amounts: { boostCents: number }[]; keyPoints?: number[] }[];
+  steps?: { id: string }[];
+}
+
+/**
+ * Every `family/id` a fixture carries, as the loops above record them. A function of the fixture, so a
+ * doctored copy can show that it fails closed (below). A body with families lists each family, each query
+ * by its place, each case with its amounts and key points, and each step; any list it does not know of,
+ * on a family or a case, is refused by name rather than passed over.
+ * Refs: KAN-1751, KAN-1569 plan v1.1 T2
+ */
+function expectedVectorIds(fixture: Record<string, unknown>): string[] {
+  const ids = Object.entries(fixture)
+    .filter(([key]) => !METADATA_KEYS.has(key))
+    .flatMap(([section, body]) => {
+      const families = (body as { families?: AnyFamily[] }).families;
+      if (families !== undefined) {
+        return families.flatMap((f) => {
+          const where = `${section}/${f.id}`;
+          for (const [key, value] of Object.entries(f)) {
+            if (Array.isArray(value) && !FAMILY_LISTS.has(key)) {
+              throw new Error(`family ${where} carries the list '${key}', which this suite never asserts`);
+            }
+          }
+          for (const c of f.cases ?? []) {
+            for (const [key, value] of Object.entries(c)) {
+              if (Array.isArray(value) && !CASE_LISTS.has(key)) {
+                throw new Error(`case ${where}/${c.id} carries the list '${key}', which this suite never asserts`);
+              }
+            }
+          }
+          return [
+            where,
+            ...(f.queries ?? []).map((_, i) => `${where}/query-${i}`),
+            ...(f.cases ?? []).flatMap((c) => [
+              `${where}/${c.id}`,
+              ...c.amounts.map((amount) => `${where}/${c.id}/amount-${amount.boostCents}`),
+              ...(c.keyPoints ?? []).map((p) => `${where}/${c.id}/key-${p}`),
+            ]),
+            ...(f.steps ?? []).map((step) => `${where}/${step.id}`),
+          ];
+        });
+      }
+      const vectors = (body as { vectors?: { id: string }[] }).vectors;
+      if (!vectors?.length) {
+        throw new Error(
+          `the fixture carries '${section}', which this suite never asserts. If it is a vector ` +
+            'family, write its conformance test — a family the verifier ignores is a claim it ' +
+            'cannot make. If it is new metadata, add it to METADATA_KEYS.',
+        );
+      }
+      return vectors.map((vector) => `${section}/${vector.id}`);
+    });
+  // Two vectors with one id would be counted once: the second would go unasserted in silence.
+  const twice = ids.filter((id, i) => ids.indexOf(id) !== i);
+  if (twice.length > 0) throw new Error(`the fixture names these vectors twice: ${twice.join(', ')}`);
+  return ids;
+}
+
+/** Throws unless `reached` is exactly the fixture's vectors, sorted so a failure names the missing ones. */
+function checkEveryVectorAsserted(fixture: Record<string, unknown>, reached: ReadonlySet<string>): void {
+  assert.deepEqual([...reached].sort(), expectedVectorIds(fixture).sort());
+}
+
+describe('the completeness check fails closed (KAN-1569 plan v1.1 T2)', () => {
+  // The check is a function of the fixture, so each doctored copy below must make it throw, against a
+  // ledger that holds exactly the real fixture's vectors.
+  const reached = new Set(expectedVectorIds(FIXTURE));
+  const withBody = (key: string, body: unknown) => ({ ...FIXTURE, [key]: body });
+
+  it('passes the real fixture', () => {
+    assert.doesNotThrow(() => checkEveryVectorAsserted(FIXTURE, reached));
+  });
+
+  it('refuses an extra version 4 family with cases and no steps', () => {
+    const families = [...BOOST_LIMITS.families, { ...BOOST_LIMITS.families[0], id: 'doctored-extra' }];
+    assert.throws(() => checkEveryVectorAsserted(withBody('upgradeBoostLimits', { ...BOOST_LIMITS, families }), reached));
+  });
+
+  it('refuses a new body whose family has only cases', () => {
+    const body = { families: [{ id: 'doctored', cases: [{ id: 'one', amounts: [{ boostCents: 1 }] }] }] };
+    assert.throws(() => checkEveryVectorAsserted(withBody('upgradeBoostDoctored', body), reached));
+  });
+
+  it('refuses an extra amount or key point in a case, and a list it does not know of', () => {
+    const doctor = (change: (copy: typeof BOOST_LIMITS) => void) => {
+      const copy = structuredClone(BOOST_LIMITS);
+      change(copy);
+      return withBody('upgradeBoostLimits', copy);
+    };
+    assert.throws(() => checkEveryVectorAsserted(doctor((c) => c.families[0].cases[0].amounts.push({ boostCents: 7, decision: 'accepted' })), reached));
+    assert.throws(() => checkEveryVectorAsserted(doctor((c) => c.families[0].cases[0].keyPoints.push(50)), reached));
+    assert.throws(() => checkEveryVectorAsserted(doctor((c) => { c.families[0].cases[0].openings = [1]; }), reached), /carries the list 'openings'/);
+    assert.throws(() => checkEveryVectorAsserted(doctor((c) => { c.families[0].openings = [1]; }), reached), /carries the list 'openings'/);
+  });
+
+  it('refuses two vectors with one id', () => {
+    const copy = structuredClone(BOOST_LIMITS);
+    copy.families[0].cases[0].amounts.push(structuredClone(copy.families[0].cases[0].amounts[0]));
+    assert.throws(() => checkEveryVectorAsserted(withBody('upgradeBoostLimits', copy), reached), /names these vectors twice/);
+  });
+});
+
 /**
  * Declared LAST on purpose. `node --test` runs top-level suites in definition order and does not
  * overlap them unless asked to, so by the time this runs the ledger above is complete.
  */
 describe('no vector in the fixture is left unasserted', () => {
-  const families = Object.entries(FIXTURE).filter(([key]) => !METADATA_KEYS.has(key));
-
   it('exercises every vector in every family the fixture carries', () => {
     // A NEW family is a hard failure, never a skip. This is the assertion that makes it impossible
     // to add vectors on the platform side and have this library quietly go on proving less: the
@@ -1656,29 +2074,7 @@ describe('no vector in the fixture is left unasserted', () => {
     //
     // One test rather than two (family coverage, then vector coverage) because a new family fails
     // both for the same cause, and one red per cause is easier to act on than two.
-    const expected = families.flatMap(([family, body]) => {
-      // Version 3's section holds families of a box each, with queries and steps (KAN-1751): every
-      // family, every query by its place and every step by its id is one entry.
-      const rateFamilies = (body as { families?: RateFamily[] }).families;
-      if (rateFamilies !== undefined) {
-        return rateFamilies.flatMap((f) => [
-          `${family}/${f.id}`,
-          ...f.queries.map((_, i) => `${family}/${f.id}/query-${i}`),
-          ...f.steps.map((step) => `${family}/${f.id}/${step.id}`),
-        ]);
-      }
-      const vectors = (body as { vectors?: { id: string }[] }).vectors;
-      assert.ok(
-        vectors?.length,
-        `the fixture carries '${family}', which this suite never asserts. If it is a vector ` +
-          'family, write its conformance test — a family the verifier ignores is a claim it ' +
-          'cannot make. If it is new metadata, add it to METADATA_KEYS.',
-      );
-      return vectors.map((vector) => `${family}/${vector.id}`);
-    });
-
-    // Sorted so a failure names the missing vectors rather than showing two shuffled lists.
-    assert.deepEqual([...asserted].sort(), expected.sort());
+    checkEveryVectorAsserted(FIXTURE, asserted);
   });
 
   it('replays the bulk sweep in full', () => {
