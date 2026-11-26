@@ -369,3 +369,84 @@ describe('a recorded amount in a wrong shape is invalid, by name (KAN-1569 plan 
     assert.deepEqual(report.checks.boostAmount, { ok: false, expected: 'no amount: version 3 of the upgrade rules has none', computed: '2128 cents' });
   });
 });
+
+// The documentation's four version 4 examples, copied byte for byte (plan v1.1 F3). Their ids, fingerprints and
+// hashes are placeholders, but their draws are the fixture seed's own (nonce 3: 261 902, nonce 1: 186 669), so
+// each one verifies on box C once its placeholder fingerprint is replaced by the real one.
+describe('the contract examples of version 4 (documentation specs/upgrade-step, plan v1.1 F3)', () => {
+  function example(name: string): Record<string, unknown> {
+    return JSON.parse(readFileSync(new URL(`../../test/fixtures/upgrade-contract/${name}.json`, import.meta.url), 'utf8'));
+  }
+  const STEP_WITH = example('verify-upgrade-step-won-v4');
+  const STEP_NONE = example('verify-upgrade-step-v4-no-amount');
+  const OPEN_WITH = example('verify-open-upgrade-win-v4');
+  const OPEN_NONE = example('verify-open-upgrade-win-v4-no-amount');
+
+  it('carries the amount as a whole number of cents with one, and no key without one', () => {
+    assert.equal(STEP_WITH.engineVersion, 4);
+    assert.equal(STEP_NONE.engineVersion, 4);
+    assert.equal(STEP_WITH.boostCents, 2128);
+    assert.equal(OPEN_WITH.stepBoostCents, 2128);
+    assert.ok(!('boostCents' in STEP_NONE), 'a step with no amount has no boostCents key');
+    assert.ok(!('stepBoostCents' in OPEN_NONE), 'a win with no amount has no stepBoostCents key');
+    assert.ok(!('boostCents' in OPEN_WITH), 'the open mark names the amount stepBoostCents');
+    // Each open example is the win of its step example.
+    assert.equal(OPEN_WITH.upgradeStepId, STEP_WITH.stepId);
+    assert.equal(OPEN_WITH.winId, STEP_WITH.newWinId);
+    assert.equal(OPEN_NONE.upgradeStepId, STEP_NONE.stepId);
+    assert.equal(OPEN_NONE.winId, STEP_NONE.newWinId);
+  });
+
+  it('verifies both step examples on box C', async () => {
+    for (const ex of [STEP_WITH, STEP_NONE]) {
+      const expected: Record<string, unknown> = {
+        editionFingerprint: await editionFingerprint(BOX_C),
+        stakedSlotIndex: ex.stakedSlotIndex,
+        targetSlotIndex: ex.targetSlotIndex,
+        chancePpm: ex.chancePpm,
+        chanceCompact: ex.chanceCompact,
+        drawnPpmValue: ex.drawnPpmValue,
+        outcome: ex.outcome,
+        stepNo: ex.stepNo,
+      };
+      if ('boostCents' in ex) expected.boostCents = ex.boostCents;
+      assert.equal(ex.drawnPpmValue, await drawn(ex.nonce as number), `${ex.stepId}: the draw is the seed's own`);
+      const report = await verifyUpgradeStep({
+        serverSeedHex: SEED,
+        commitmentHex: COMMITMENT,
+        clientSeed: 'alice-seed',
+        nonce: ex.nonce as number,
+        edition: BOX_C,
+        engineType: ex.engineType as string,
+        expected: expected as UpgradeStepInput['expected'],
+      });
+      assert.equal(report.status, 'verified', `${ex.stepId}: ${report.summary}`);
+    }
+  });
+
+  it('verifies both open examples on box C', async () => {
+    for (const ex of [OPEN_WITH, OPEN_NONE]) {
+      const expected: Record<string, unknown> = {
+        editionFingerprint: await editionFingerprint(BOX_C),
+        drawnPpmValue: ex.drawnPpmValue,
+        drawnSlotIndex: ex.drawnSlotIndex,
+        upgradeStepId: ex.upgradeStepId,
+        stakedSlotIndex: ex.stakedSlotIndex,
+        stepChancePpm: ex.stepChancePpm,
+        stepChanceCompact: ex.stepChanceCompact,
+        stepOutcome: ex.stepOutcome,
+      };
+      if ('stepBoostCents' in ex) expected.stepBoostCents = ex.stepBoostCents;
+      const report = await verify({
+        serverSeedHex: SEED,
+        commitmentHex: COMMITMENT,
+        clientSeed: 'alice-seed',
+        nonce: ex.nonce as number,
+        edition: BOX_C,
+        gameKind: 'upgrade',
+        expected: expected as VerificationInput['expected'],
+      });
+      assert.equal(report.status, 'verified', `${ex.winId}: ${report.summary}`);
+    }
+  });
+});
