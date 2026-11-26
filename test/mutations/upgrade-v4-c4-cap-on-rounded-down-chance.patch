@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-C4: the search for the highest amount compares the cap with a rounded-down chance.
+Killer: test/upgrade-v4.test.ts "refuses 14.07 EUR on 40.00 to 100.57 EUR at 93 %: 500 001 ppm is over the cap, 14.06 EUR is the highest (M-C4)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..ed06734 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1158,7 +1158,7 @@ function mostWithin(step: BoostStep, cap: number, highest: bigint): bigint | nul
+   let high = highest;
+   while (low < high) {
+     const middle = low + (high - low + 1n) / 2n;
+-    if (boostChancePpm(step, middle) <= cap) low = middle;
++    if (upgradeChancePpm(step.stakedCents + middle, step.targetCents, step.rateBps, false) <= cap) low = middle;
+     else high = middle - 1n;
+   }
+   return low;

@@ -1,0 +1,18 @@
+KAN-1569 planted bug M-F3: the amount is added at a fixed rate of 10000 bps instead of the box's rate R.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostChance/boost-box-c-9400 (21.28 EUR is 288016, the bug gives 294400) and upgradeBoostChance/boost-9990 (999.97 EUR is 26000, the bug gives 26025).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..4cfe2c4 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1122,7 +1122,8 @@ export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+         'so the step has no chance to compute',
+     );
+   }
+-  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, rule.roundsUp);
++  const plain = upgradeChancePpm(step.stakedCents, step.targetCents, step.rateBps, rule.roundsUp);
++  return boostCents === 0n ? plain : plain + Number((1_000_000n * boostCents + step.targetCents - 1n) / step.targetCents);
+ }
+ 
+ function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {

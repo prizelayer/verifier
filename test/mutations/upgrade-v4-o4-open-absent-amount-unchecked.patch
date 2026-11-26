@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-O4: the open path reads an absent amount on version 4 as "do not check the chance" instead of as 0.
+Killer: test/upgrade-v4.test.ts "fails the same win with the amount absent: 288 016 is not the 188 000 of no amount (M-O4)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..771f9e0 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1388,7 +1388,7 @@ function upgradeWinSlot(
+   const offer = stepFor(edition, rule, stakedSlot, recordedSlot);
+   if (offer === null) return { outcome, why: `none: ${noStepWhy(rule, stakedSlot, recordedSlot)}` };
+   const fair = winChancePpm(edition, rule, stakedSlot, offer, boostCents);
+-  if (fair !== chancePpm) {
++  if (fair !== chancePpm && !(rule.boostCeilingCents !== undefined && boostCents === 0n)) {
+     return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${fair} ppm, not ${chancePpm}` };
+   }
+   return { outcome, slotIndex: offer.targetSlotIndex, why: '' };

@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-C3: the step check applies the 50 % cap to a step with no amount too.
+Killer: test/upgrade-v4.test.ts "verifies a step with no amount above the cap: 40.00 to 41.00 EUR at exactly 93 %, 907 318 ppm (M-C3)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..a31e0b4 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1277,7 +1277,7 @@ export function boostStepLimits(step: BoostStep, boostCents: bigint): BoostLimit
+   }
+   if (step.stakedCents + boostCents >= step.targetCents) return { ok: false, limit: 'reachesTarget' };
+   const chancePpm = boostChancePpm(step, boostCents);
+-  if (boostCents === 0n) return { ok: true, chancePpm };
++  if (boostCents === 0n && chancePpm <= rule.boostMaxChancePpm) return { ok: true, chancePpm };
+   if (boostCents > BigInt(rule.boostCeilingCents)) return { ok: false, limit: 'ceiling', chancePpm, ceilingCents: rule.boostCeilingCents };
+   if (chancePpm > rule.boostMaxChancePpm) return { ok: false, limit: 'cap', chancePpm, capPpm: rule.boostMaxChancePpm };
+   if (chancePpm <= boostChancePpm(step, boostCents - 1n)) return { ok: false, limit: 'lastCent', chancePpm };

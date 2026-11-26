@@ -1,0 +1,18 @@
+KAN-1569 planted bug M-L3: the decision answers boost_cent_lost before boost_too_high.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostChance/boost-9990, case ninety-nine-ninety: 99998 cents is boost_too_high (its chance equals that of 99997; the bug says boost_cent_lost).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..1ff626b 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1209,6 +1209,9 @@ export function boostDecision(step: BoostStep, boostCents: bigint, limits?: Boos
+   }
+   const rule = boostRuleOf(step.engineVersion);
+   const max = boostMaxCents(step, limits);
++  if (step.stakedCents + boostCents < step.targetCents && boostChancePpm(step, boostCents) <= boostChancePpm(step, boostCents - 1n)) {
++    return { decision: 'refused', refusal: 'boost_cent_lost', boostMaxCents: max };
++  }
+   if (boostCents > max) return { decision: 'refused', refusal: 'boost_too_high', boostMaxCents: max };
+   const chancePpm = boostChancePpm(step, boostCents);
+   if (chancePpm <= boostChancePpm(step, boostCents - 1n)) {

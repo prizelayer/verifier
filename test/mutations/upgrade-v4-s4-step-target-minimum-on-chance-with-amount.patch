@@ -1,0 +1,50 @@
+KAN-1569 planted bug M-S4: the step check's target lookup reads the 0.1 % minimum on the chance with the recorded amount instead of with none.
+Killer: test/upgrade-v4.test.ts "fails 0.01 EUR on 5.00 to 4,654.66 EUR: the target is under the minimum with no amount (M-S4)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..3315c69 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -998,7 +998,7 @@ export function upgradeTargets(edition: UpgradeEditionOdds, slotIndex: number, e
+ }
+ 
+ /** {@link upgradeTargets} under a rule already chosen. */
+-function targetsFor(edition: UpgradeEditionOdds, slotIndex: number, rule: UpgradeRule): UpgradeOffer[] {
++function targetsFor(edition: UpgradeEditionOdds, slotIndex: number, rule: UpgradeRule, boostCents = 0n): UpgradeOffer[] {
+   if (!rule.jumps) {
+     const offer = offerFor(edition, slotIndex, rule);
+     return offer === null ? [] : [offer];
+@@ -1022,7 +1022,10 @@ function targetsFor(edition: UpgradeEditionOdds, slotIndex: number, rule: Upgrad
+   const targets: UpgradeOffer[] = [];
+   for (const slot of higher) {
+     const chancePpm = upgradeChancePpm(current, slot.requiredBuyBackValueCents, rate, rule.roundsUp);
+-    if (chancePpm < rule.minChancePpm) break;
++    const minimumOn = current + boostCents < slot.requiredBuyBackValueCents
++      ? upgradeChancePpm(current + boostCents, slot.requiredBuyBackValueCents, rate, rule.roundsUp)
++      : chancePpm;
++    if (minimumOn < rule.minChancePpm) break;
+     targets.push({ targetSlotIndex: slot.slotIndex, chancePpm });
+   }
+   return targets;
+@@ -1034,9 +1037,9 @@ function targetsFor(edition: UpgradeEditionOdds, slotIndex: number, rule: Upgrad
+  * slot fails on the target. Versions 2 and 3: the entry of {@link upgradeTargets} for the named slot, so a
+  * slot of the box worth more, at the version's minimum or above.
+  */
+-function stepFor(edition: UpgradeEditionOdds, rule: UpgradeRule, stakedSlot: number, targetSlot: number): UpgradeOffer | null {
++function stepFor(edition: UpgradeEditionOdds, rule: UpgradeRule, stakedSlot: number, targetSlot: number, boostCents = 0n): UpgradeOffer | null {
+   if (!rule.jumps) return offerFor(edition, stakedSlot, rule);
+-  return targetsFor(edition, stakedSlot, rule).find((t) => t.targetSlotIndex === targetSlot) ?? null;
++  return targetsFor(edition, stakedSlot, rule, boostCents).find((t) => t.targetSlotIndex === targetSlot) ?? null;
+ }
+ 
+ /** Why a step has no fair chance, in the words the reports use: version 1 names the staked slot alone. */
+@@ -2349,7 +2352,7 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
+       rate = attempt(() => stepRate(input.edition, rule));
+       if (rate.ok) {
+         trace.stepRateBps = rate.value;
+-        offer = attempt(() => stepFor(input.edition, rule, expected.stakedSlotIndex, expected.targetSlotIndex));
++        offer = attempt(() => stepFor(input.edition, rule, expected.stakedSlotIndex, expected.targetSlotIndex, BigInt(expected.boostCents ?? 0)));
+       }
+     }
+   } else {

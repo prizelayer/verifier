@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-O1: the open path ignores stepBoostCents when it decides the slot of a revealed upgraded win.
+Killer: test/upgrade-v4.test.ts "verifies Ana's win with 21.28 EUR recorded, and is pending with the seed locked (M-O1)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..c4db83d 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1852,7 +1852,7 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
+     const chancePpm = input.expected.stepChancePpm as number;
+     const expectedSlot = String(input.expected.drawnSlotIndex);
+     const stakedSlot = input.expected.stakedSlotIndex as number;
+-    const boostCents = BigInt(input.expected.stepBoostCents ?? 0);
++    const boostCents = 0n;
+     const step = attempt(() =>
+       upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule, boostCents),
+     );

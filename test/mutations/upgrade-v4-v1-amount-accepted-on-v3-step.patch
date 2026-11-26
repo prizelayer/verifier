@@ -1,0 +1,24 @@
+KAN-1569 planted bug M-V1: the step check accepts a recorded amount on a version with no amount (version 3).
+Killer: test/upgrade-v4.test.ts "fails an amount on a version 3 step (M-V1)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..01ef0b9 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -2373,14 +2373,7 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
+     if (boosts || rule === undefined) skip('boostAmount', why);
+   };
+   if (rule !== undefined && !boosts) {
+-    checks.boostAmount =
+-      recordedAmount === undefined
+-        ? check('no amount', 'no amount')
+-        : {
+-            ok: false,
+-            expected: `no amount: version ${rule.engineVersion} of the upgrade rules has none`,
+-            computed: `${recordedAmount} cents`,
+-          };
++    checks.boostAmount = check('no amount', 'no amount');
+   }
+ 
+   let chance: number | undefined;

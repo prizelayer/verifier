@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-F4: the numerator is computed in floating point (Number) instead of BigInt.
+Killer: test/upgrade-v4.test.ts "is exact past 2^53: R 9 300, s + b = 1,986,519,000, t = 1,234,110,000,000 gives 1 497 (M-F4)" (the bug gives 1498).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..ce813c4 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1122,7 +1122,7 @@ export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+         'so the step has no chance to compute',
+     );
+   }
+-  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, rule.roundsUp);
++  return Math.ceil((step.rateBps * 1e6 * Number(step.stakedCents + boostCents)) / (1e4 * Number(step.targetCents)));
+ }
+ 
+ function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {

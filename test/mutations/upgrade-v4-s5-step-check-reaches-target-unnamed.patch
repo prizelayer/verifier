@@ -1,0 +1,16 @@
+KAN-1569 planted bug M-S5: the step check no longer names an amount that makes the value staked reach the target's value.
+Killer: test/upgrade-v4.test.ts "fails 160.00 EUR on 40 to 200 EUR by name: the amount reaches the target, and the record is well formed (M-S5)" (the bug makes the record invalid instead of failed on boostAmount).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..2c3a261 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1275,7 +1275,6 @@ export function boostStepLimits(step: BoostStep, boostCents: bigint): BoostLimit
+   if (typeof boostCents !== 'bigint' || boostCents < 0n) {
+     throw new Error(`a recorded amount is a whole number of cents, 0 or more, was ${String(boostCents)}`);
+   }
+-  if (step.stakedCents + boostCents >= step.targetCents) return { ok: false, limit: 'reachesTarget' };
+   const chancePpm = boostChancePpm(step, boostCents);
+   if (boostCents === 0n) return { ok: true, chancePpm };
+   if (boostCents > BigInt(rule.boostCeilingCents)) return { ok: false, limit: 'ceiling', chancePpm, ceilingCents: rule.boostCeilingCents };

@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-R1: test side: the version 4 conformance reads R from the family's written stepRtpBps instead of the box.
+Killer: test/vectors.test.ts "the version 4 sections of the fixture (KAN-1569)" "refuses a family whose written rate, S or boxBps is one off its box, either way".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/test/vectors.test.ts b/test/vectors.test.ts
+index ed5f23e..310a6a0 100644
+--- a/test/vectors.test.ts
++++ b/test/vectors.test.ts
+@@ -1478,7 +1478,7 @@ function checkRateFamily(family: BoxFamily, constants: { engineVersion: number;
+   if (BigInt(family.boxBps) !== boxBps) {
+     throw new Error(`family ${family.id} writes boxBps ${family.boxBps}, its box gives ${boxBps}`);
+   }
+-  const rate = upgradeStepRateBps(rateEdition(family, constants.engineVersion), constants.engineVersion);
++  const rate = constants.engineVersion === 4 ? family.stepRtpBps : upgradeStepRateBps(rateEdition(family, constants.engineVersion), constants.engineVersion);
+   if (rate !== family.stepRtpBps) {
+     throw new Error(`family ${family.id} writes a rate of ${family.stepRtpBps} bps, its box gives ${rate}`);
+   }

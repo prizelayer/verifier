@@ -1,0 +1,18 @@
+KAN-1569 planted bug M-L1: the decision drops the lost-cent check: an amount whose last cent raises nothing is accepted.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostChance/boost-box-a-9300, case lost-cent-1000-to-100000: 2 and 10 cents are boost_cent_lost.
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..b00c328 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1211,9 +1211,6 @@ export function boostDecision(step: BoostStep, boostCents: bigint, limits?: Boos
+   const max = boostMaxCents(step, limits);
+   if (boostCents > max) return { decision: 'refused', refusal: 'boost_too_high', boostMaxCents: max };
+   const chancePpm = boostChancePpm(step, boostCents);
+-  if (chancePpm <= boostChancePpm(step, boostCents - 1n)) {
+-    return { decision: 'refused', refusal: 'boost_cent_lost', boostMaxCents: max };
+-  }
+   // The limits that only rise with the amount hold at max, so they hold here; checked again because an
+   // accepted amount past a limit is the one answer this function must never give.
+   if (boostCents > moneyCapOf(rule, limits) || chancePpm > chanceCapOf(rule, limits)) {

@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-O2: the open path accepts stepBoostCents on a version with no amount (version 3).
+Killer: test/upgrade-v4.test.ts "fails an amount on version 3 (M-O2), revealed or locked, before the draw".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..7023295 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1421,7 +1421,7 @@ function winAmountWrong(input: VerificationInput, rule: UpgradeRule | undefined)
+   const amount = BigInt(recorded);
+   const expected = `amount recorded ${amount} cents`;
+   if (rule.boostCeilingCents === undefined) {
+-    return { ok: false, expected, computed: `amount refused, version ${rule.engineVersion} of the upgrade rules has no amount` };
++    return undefined;
+   }
+   const stakedSlot = input.expected.stakedSlotIndex as number;
+   const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, input.expected.drawnSlotIndex));
