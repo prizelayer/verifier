@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 65c17d6..ef73dd1 100644
+index 53eb962..3cf319d 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -987,7 +987,7 @@ function upgradeWinSlot(
+@@ -1385,7 +1385,7 @@ function upgradeWinSlot(
    const outcome = stepOutcome(v, chancePpm);
    if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
    if (rule === undefined) return { outcome, why: `none: ${unknownVersionWhy(edition.engineVersion)}` };
 -  const offer = stepFor(edition, rule, stakedSlot, recordedSlot);
 +  const offer = upgradeTarget(edition, stakedSlot);
    if (offer === null) return { outcome, why: `none: ${noStepWhy(rule, stakedSlot, recordedSlot)}` };
-   if (offer.chancePpm !== chancePpm) {
-     return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
+   const fair = winChancePpm(edition, rule, stakedSlot, offer, boostCents);
+   if (fair !== chancePpm) {

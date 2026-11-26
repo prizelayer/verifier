@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index e346b3b..6b1b611 100644
+index 53eb962..f9c5072 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1466,7 +1466,7 @@ function wrongChanceText(input: VerificationInput): Check | undefined {
-     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${noStepWhy(rule, stakedSlot, targetSlot)}` };
-   }
-   const fairText = stepChanceText(offer.value.chancePpm);
+@@ -2116,7 +2116,7 @@ function wrongChanceText(input: VerificationInput, rule: UpgradeRule | undefined
+   // On version 4 the fair chance is the one with the amount the record carries (absent is 0); its limits held.
+   const fair = winChancePpm(input.edition, rule, stakedSlot, offer.value, BigInt(input.expected.stepBoostCents ?? 0));
+   const fairText = stepChanceText(fair);
 -  if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
 +  if (shown.trim() !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
    const recorded = input.expected.stepChancePpm as number;
-   return recorded === offer.value.chancePpm
+   return recorded === fair
      ? undefined

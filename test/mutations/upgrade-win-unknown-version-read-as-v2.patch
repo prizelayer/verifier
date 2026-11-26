@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 65c17d6..291af20 100644
+index 53eb962..1a893b2 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1414,7 +1414,7 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
-     const expectedSlot = String(input.expected.drawnSlotIndex);
+@@ -1854,7 +1854,7 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
      const stakedSlot = input.expected.stakedSlotIndex as number;
+     const boostCents = BigInt(input.expected.stepBoostCents ?? 0);
      const step = attempt(() =>
--      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule),
-+      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule ?? UPGRADE_RULES[1]),
+-      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule, boostCents),
++      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule ?? UPGRADE_RULES[1], boostCents),
      );
      if (!step.ok) {
        checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);

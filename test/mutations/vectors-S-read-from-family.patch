@@ -1,9 +1,9 @@
 diff --git a/test/vectors.test.ts b/test/vectors.test.ts
-index fc84c21..6f5e0f3 100644
+index ed5f23e..d22bf82 100644
 --- a/test/vectors.test.ts
 +++ b/test/vectors.test.ts
-@@ -1457,7 +1457,7 @@ function rateEdition(family: RateFamily, engineVersion = 3): Edition {
- function checkRateFamily(family: RateFamily): number {
+@@ -1470,7 +1470,7 @@ function rateEdition(family: BoxFamily, engineVersion = 3): Edition {
+ function checkRateFamily(family: BoxFamily, constants: { engineVersion: number; stepRtpCapBps: number } = RATE_STEP.constants): number {
    // S and boxBps are worked out here from the box, in BigInt (S can pass 2^53 on a large box), and the
    // library's rate must be boxBps under the cap: the three written numbers are each compared, none is read.
 -  const sum = family.slots.reduce((acc, slot) => acc + BigInt(slot.probabilityPpm) * BigInt(slot.buyBackValueCents), 0n);
