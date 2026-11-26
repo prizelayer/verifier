@@ -123,6 +123,15 @@ export const NOT_PROVEN_SEEDS =
   'This page reads the fingerprint and the client seed from our server. On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed. In the player page, press "Fair" before you open a box: "Your fairness pair" shows the whole fingerprint and lets you copy it. If you kept a copy from before your open, check that it is the fingerprint in step 1. When our server creates a fingerprint for a player, it writes a record in its audit log. This page does not check that record.'
 
 /**
+ * Step 3's sentence when our record says the player set this pair's client seed. It sits after the
+ * paragraph about who makes the client seed. The words are Leo's approved set, word for word (his
+ * answer of 2026-10-18 on KAN-1013, D2 A); they change only with his answer.
+ * Refs: KAN-935, KAN-1013
+ */
+export const STEP3_SEED_SET =
+  "Our records say you set this pair's client seed after its fingerprint existed. If you kept the fingerprint from before you set it, we could not choose the secret to suit your seed."
+
+/**
  * The pending verdict: what is still locked, when it opens, and what can be checked meanwhile. Where
  * "Start a new pair" is: behind "Fair", as in NOT_PROVEN_SEEDS. Approved words (ADR-KAN-40).
  * Refs: KAN-40, KAN-1391

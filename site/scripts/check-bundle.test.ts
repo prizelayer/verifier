@@ -16,8 +16,22 @@ vi.setConfig({ testTimeout: 30_000 })
 
 const SCRIPT = join(import.meta.dirname, "check-bundle.sh")
 const [DEV, PROD] = environments()
-const REQUIRED = [...readFileSync(SCRIPT, "utf8").matchAll(/for required in ([\s\S]*?); do/g)]
-  .flatMap((m) => [...m[1].matchAll(/'([^']*)'/g)].map((q) => q[1]))
+// Each entry is in single quotes, or in double quotes when it holds an apostrophe.
+const entries = (loop: string) =>
+  [...readFileSync(SCRIPT, "utf8").matchAll(new RegExp(`for ${loop} in ([\\s\\S]*?); do`, "g"))].flatMap((m) =>
+    [...m[1].matchAll(/'([^']*)'|"([^"]*)"/g)].map((q) => q[1] ?? q[2]),
+  )
+const REQUIRED = entries("required")
+const FORBIDDEN = entries("forbidden")
+// The page's sentence about our record of the pair, read from words.ts as text: this project's
+// type-check of scripts/ does not resolve the page's imports.
+const wordsConstant = (name: string): string => {
+  const words = readFileSync(join(import.meta.dirname, "..", "src", "words.ts"), "utf8")
+  const literal = new RegExp(`export const ${name}\\b[^=]*=\\s*("(?:[^"\\\\]|\\\\.)*")`).exec(words)?.[1]
+  if (literal === undefined) throw new Error(`words.ts has no constant ${name}`)
+  return JSON.parse(literal) as string
+}
+const STEP3_SEED_SET = wordsConstant("STEP3_SEED_SET")
 
 let dist: string
 
@@ -50,6 +64,35 @@ describe("check-bundle.sh, per environment", () => {
   it("reads at least the page's words from the script, so the fixture checks something", () => {
     expect(REQUIRED).toContain("Check an open yourself")
     expect(REQUIRED.length).toBeGreaterThan(5)
+    expect(FORBIDDEN).toContain("under the Open button")
+  })
+
+  // The sentence about our record of the pair (KAN-935 PR-4): the bundle must keep it as the page says
+  // it, and it may not carry a forbidden phrase, such as the old place "under Details".
+  it("requires the page's sentence about our record word for word, and it holds no forbidden phrase", () => {
+    expect(STEP3_SEED_SET).toMatch(/^Our records say you set this pair's client seed/)
+    expect(REQUIRED).toContain(STEP3_SEED_SET)
+    for (const phrase of FORBIDDEN) expect(STEP3_SEED_SET.toLowerCase()).not.toContain(phrase.toLowerCase())
+    expect(FORBIDDEN).toEqual(expect.arrayContaining(["under Details", "We made both the secret and the client seed"]))
+  })
+
+  it.each([
+    ["the old place of the fingerprint", "var X='The fingerprint is under Details.'", "under Details"],
+    ["the sentence for a client seed nobody set", "var X='We made both the secret and the client seed.'", "We made both the secret and the client seed"],
+  ])("fails a page that carries %s", (_name, extra, phrase) => {
+    page({ extra })
+    const r = check("prod")
+    expect(r.status, r.out).toBe(1)
+    expect(r.out).toContain(`FAIL: the bundle contains: ${phrase}`)
+  })
+
+  it("fails a page that lost the step 3 sentence about the client seed", () => {
+    page()
+    const js = join(dist, "assets", "app-1.js")
+    writeFileSync(js, readFileSync(js, "utf8").replace(STEP3_SEED_SET, ""))
+    const r = check("prod")
+    expect(r.status, r.out).toBe(1)
+    expect(r.out).toContain(`FAIL: the script does not contain: ${STEP3_SEED_SET}`)
   })
 
   it("passes a prod page that names only prod's API, and says what it forbade", () => {

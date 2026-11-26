@@ -111,17 +111,24 @@ done < "$here/storage-apis.txt"
 # the two sentences that stopped being true once the player page showed the fingerprint before play and let a
 # player set the client seed, so they cannot come back. "under the Open button" stopped being true when the
 # player page moved its pair behind the word "Fair" (KAN-1052); the page names that word instead (KAN-1391).
+# Step 3's sentence about our record of the pair is required too (KAN-935 PR-4), in double quotes for its
+# apostrophe. "under Details" was the place of the fingerprint before 2026-10-21, named by the approved step 1
+# sentence that never shipped, so it is no longer true. "We made both the secret and the client seed" is the
+# sentence for a pair whose client seed the player did not set. It is often true, but the page cannot know
+# that it is: a pair whose client seed a player set before our server kept this record reads false as well.
 for required in 'Check an open yourself' 'What this does not prove' \
   'The secret we revealed is the one we registered.' 'The chances are the ones recorded on your open.' \
   'The pick itself.' 'From the number to your item.' \
   'On its own, it cannot tell whether you saw this fingerprint before your open, or who chose the client seed.' \
   'You never type a seed or a box here.' \
   'So this page cannot prove, on its own, that we did not choose the secret after your open.' \
-  'This page does not check that record.'; do
+  'This page does not check that record.' \
+  "Our records say you set this pair's client seed after its fingerprint existed. If you kept the fingerprint from before you set it, we could not choose the secret to suit your seed."; do
   grep -F -q -- "$required" $js || bad "the script does not contain: $required"
 done
 for forbidden in 'published before you played' 'could not have changed it' 'existed before your open is in our audit log' \
-  'You cannot set your own yet' 'You were not shown the fingerprint' 'under the Open button'; do
+  'You cannot set your own yet' 'You were not shown the fingerprint' 'under the Open button' \
+  'under Details' 'We made both the secret and the client seed'; do
   if grep -F -i -q -- "$forbidden" $files; then bad "the bundle contains: $forbidden"; fi
 done
 

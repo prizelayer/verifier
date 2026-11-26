@@ -29,8 +29,12 @@ interface Props {
   input: VerificationInput
 }
 
-/** The four step cards. Every step is drawn, run or not, so a missing value is named, never hidden. */
-export function StepCards({ report, input }: Props) {
+/**
+ * The four step cards. Every step is drawn, run or not, so a missing value is named, never hidden.
+ * `seedSet`: what our record says about who set this pair's client seed, added to step 3 after the
+ * paragraph about who makes the client seed; none by default. No other step gets a sentence.
+ */
+export function StepCards({ report, input, seedSet = null }: Props & { seedSet?: string | null }) {
   const failedNames = CHECK_NAMES.filter((n) => report.checks[n]?.ok === false)
   const failedSteps = new Set(failedNames.map((n) => STEP_OF[n]))
   // A step whose only failures are inputs that could not be used compared nothing: it says so.
@@ -50,6 +54,8 @@ export function StepCards({ report, input }: Props) {
         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
         const text = pending && step === 1 ? STEP1_PENDING.text : stepText
+        const said = step === 3 ? seedSet : null
+        const paragraphs = said === null ? text : [...text.slice(0, 2), said, ...text.slice(2)]
         // Shown on a failed step too: its own mismatch may only be the echo of the earlier one.
         const dependent = dependsOnFailed(step)
         return (
@@ -69,8 +75,10 @@ export function StepCards({ report, input }: Props) {
               ) : null}
             </h2>
             <SourceLine source={source} />
-            {text.map((p) => (
-              <p key={p}>{p}</p>
+            {paragraphs.map((p) => (
+              <p key={p} data-pair-record={p === said ? "yes" : undefined}>
+                {p}
+              </p>
             ))}
             {dependent ? (
               <p className="font-semibold" data-dependent="yes">
