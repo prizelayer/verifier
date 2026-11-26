@@ -1,17 +1,17 @@
-KAN-1569 planted bug M-W1: a recorded amount of 0 is read as "no amount" instead of a wrongly formed record.
-Killer: test/upgrade-v4.test.ts "refuses boostCents of 0, \"2128\", 21.5 and -1 on a step (M-W1, M-W2)".
-Refs: KAN-1569 plan v1.1 section 4
+KAN-1569 planted bug M-W1: a recorded amount of "0" is read as "no amount" instead of a wrongly formed record.
+Killer: test/upgrade-v4.test.ts "refuses boostCents as the JSON number 2128, 0, \"0\", a sign, a leading zero, a fraction or empty text on a step (M-W1, M-W2, M-W3)", and its twin on a win.
+Refs: KAN-1569 plan v1.1 section 4, cto ruling 37069
 
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 53eb962..8524f56 100644
+index 89c22f1..ae18c6d 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -1320,7 +1320,7 @@ function boostStepOf(edition: UpgradeEditionOdds, rule: UpgradeRule, rateBps: nu
-  * it is never read as "no amount".
+@@ -1321,7 +1321,7 @@ function boostStepOf(edition: UpgradeEditionOdds, rule: UpgradeRule, rateBps: nu
+  * "no amount". Shared by the step and the open record, so both fields are held by the same check.
   */
- function requireRecordedAmount(value: unknown, field: string): void {
--  if (value === undefined) return;
-+  if (value === undefined || value === 0) return;
-   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
-     throw new Error(
-       `${field} is wrongly formed: an amount is recorded as a whole number of cents from 1 (a JSON number, ` +
+ export function recordedAmountCents(value: unknown, field: string): bigint | undefined {
+-  if (value === undefined) return undefined;
++  if (value === undefined || value === '0') return undefined;
+   const wrong = (was: string) =>
+     new Error(
+       `${field} is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON ` +

@@ -1,11 +1,12 @@
 diff --git a/site/src/proof.ts b/site/src/proof.ts
+index a485135..4baa1a0 100644
 --- a/site/src/proof.ts
 +++ b/site/src/proof.ts
-@@ -68,7 +68,7 @@
+@@ -69,7 +69,7 @@ export function proofInput(text: string): VerificationInput {
    }
    // Version 4: the amount recorded with the step that made the win (contract §7), passed as it was written,
    // so the library refuses any other shape by name, and refuses it on an open that is not an upgraded win.
--  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as number
+-  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as string
 +  void open.stepBoostCents
    return input
  }
