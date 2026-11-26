@@ -66,6 +66,9 @@ export function proofInput(text: string): VerificationInput {
     input.expected.stepChanceCompact = text_(open.stepChanceCompact, "open.stepChanceCompact")
     input.expected.stepOutcome = outcome_(open.stepOutcome, "open.stepOutcome")
   }
+  // Version 4: the amount recorded with the step that made the win (contract §7), passed as it was written,
+  // so the library refuses any other shape by name, and refuses it on an open that is not an upgraded win.
+  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as number
   return input
 }
 
@@ -93,6 +96,9 @@ export function stepProofInput(text: string): UpgradeStepInput {
       drawnPpmValue: number_(step.drawnPpmValue, "step.drawnPpmValue"),
       outcome: outcome_(step.outcome, "step.outcome"),
       stepNo: number_(step.stepNo, "step.stepNo"),
+      // Version 4: the amount recorded with the step (contract §6), passed as it was written, so the library
+      // refuses any other shape by name; absent when none was recorded.
+      ...(step.boostCents === undefined ? {} : { boostCents: step.boostCents as number }),
     },
   }
 }

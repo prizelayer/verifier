@@ -1,22 +1,12 @@
-diff --git a/site/src/steps.tsx b/site/src/steps.tsx
-index 1aa732d..6f8dd9e 100644
---- a/site/src/steps.tsx
-+++ b/site/src/steps.tsx
-@@ -16,7 +16,7 @@ import {
-   STEPS,
-   type StepNumber,
-   UPGRADE_JUMP_WORDS,
--  upgradeWinStep4,
-+  UPGRADE_WIN_STEP4,
-   stepJumps,
-   unusableWords,
-   wrongChanceLabels,
-@@ -45,7 +45,7 @@ export function StepCards({ report, input }: Props) {
-       {STEPS.map((card) => {
-         // An upgraded win's number is read over the step's two ranges, so its card 4 is the step's.
-         const { step, method } = card
--        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? upgradeWinStep4(input.edition.engineVersion) : card
-+        const { title: stepTitle, text: stepText, source } = input.gameKind === "upgrade" && step === 4 ? UPGRADE_WIN_STEP4 : card
-         const failed = failedSteps.has(step)
-         // While the secret is locked, step 1 speaks of no revealed secret and of no comparison made.
-         const title = pending && step === 1 ? STEP1_PENDING.title : stepTitle
+diff --git a/site/src/words.ts b/site/src/words.ts
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -910,7 +910,7 @@
+   step2: (rateBps) => UPGRADE_V3_WORDS.step2(rateBps),
+   wrongChance: UPGRADE_V3_WORDS.wrongChance,
+   compareLabels: UPGRADE_V3_WORDS.compareLabels,
+-  winStep4: { ...UPGRADE_WIN_STEP4, source: UPGRADE_V3_WORDS.winStep4Source },
++  winStep4: UPGRADE_WIN_STEP4,
+   readsRate: true,
+   recordsAmount: false,
+ }

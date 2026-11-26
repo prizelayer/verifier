@@ -1,0 +1,12 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -174,7 +174,7 @@
+                     : "none"}
+                 </td>
+               </tr>
+-              {amount !== undefined ? (
++              {amount === -1 ? (
+                 <tr data-amount-row>
+                   <th scope="row" className="text-left font-medium">{UPGRADE_V4_WORDS.rows.amount}</th>
+                   <td>{`${String(amount)} cents (${amountText(amount)})`}</td>

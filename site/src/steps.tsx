@@ -16,7 +16,10 @@ import {
   STEPS,
   type StepNumber,
   UPGRADE_JUMP_WORDS,
+  UPGRADE_V4_WORDS,
+  amountRefusal,
   upgradeWinStep4,
+  upgradeWords,
   stepJumps,
   unusableWords,
   wrongChanceLabels,
@@ -115,8 +118,8 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
             ? CHECK_WORDS[name]
             : check.error !== undefined
               ? inputWords(check.field, check.error, input)
-              : name === "drawnSlotIndex" && wrongChanceShown(check)
-                ? wrongChanceWords(wrongChanceShown(check)!, input.edition.engineVersion)
+              : name === "drawnSlotIndex"
+                ? winFailWords(check, input)
                 : FAIL_WORDS[name]
         return (
           <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
@@ -127,6 +130,21 @@ function CheckList({ step, report, input }: Props & { step: StepNumber }) {
       })}
     </ul>
   )
+}
+
+/**
+ * Why an upgraded win's slot check failed: a refused amount in its own words (O3), a wrong chance in the
+ * chance's words, otherwise the slot's. On version 4, a win whose open record carries no amount adds that
+ * the upgrade may have had one (O4), because the upgrade's own page is where its amount is checked.
+ */
+function winFailWords(check: Check, input: VerificationInput): string {
+  const refusal = amountRefusal(check)
+  if (refusal) return UPGRADE_V4_WORDS.amountFail(refusal, "win")
+  const chance = wrongChanceShown(check)
+  const words = chance ? wrongChanceWords(chance, input.edition.engineVersion) : FAIL_WORDS.drawnSlotIndex
+  const amountMissing =
+    input.gameKind === "upgrade" && upgradeWords(input.edition.engineVersion).recordsAmount && input.expected.stepBoostCents === undefined
+  return amountMissing ? `${words} ${UPGRADE_V4_WORDS.winAmountMissing}` : words
 }
 
 /** Why an input could not be used, in a reader's words where the page knows them. */
@@ -273,13 +291,20 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
             </table>
           ) : null}
           {checks.drawnSlotIndex ? (
-            wrongChanceShown(checks.drawnSlotIndex)?.kind === "recorded" ? (
+            amountRefusal(checks.drawnSlotIndex) ? (
+              <Compare label="drawnSlotIndex" expectedLabel="Amount recorded with this win" computedLabel="What your browser found" check={checks.drawnSlotIndex} />
+            ) : wrongChanceShown(checks.drawnSlotIndex)?.kind === "recorded" ? (
               <Compare label="drawnSlotIndex" expectedLabel="Chance we recorded" computedLabel={wrongChanceLabels(input.edition.engineVersion).recorded} check={checks.drawnSlotIndex} />
             ) : wrongChanceShown(checks.drawnSlotIndex) ? (
               <Compare label="drawnSlotIndex" expectedLabel="Chance shown to you" computedLabel={wrongChanceLabels(input.edition.engineVersion).shown} check={checks.drawnSlotIndex} />
             ) : (
               <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel={slotLabel} check={checks.drawnSlotIndex} />
             )
+          ) : null}
+          {input.gameKind === "upgrade" && checks.drawnSlotIndex?.ok && typeof input.expected.stepBoostCents === "number" && upgradeWords(input.edition.engineVersion).recordsAmount ? (
+            <p className="text-sm" data-amount-chance>
+              {UPGRADE_V4_WORDS.winChance(input.expected.stepBoostCents, input.expected.stepChancePpm as number)}
+            </p>
           ) : null}
           {input.snapshot ? (
             <>

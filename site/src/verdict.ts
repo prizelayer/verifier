@@ -1,5 +1,22 @@
 import type { CheckName, UpgradeStepReport, VerificationReport } from "@verifier"
-import { FAIL_WORDS, LOCKED, wrongChanceShown, wrongChanceWords, STEP_LOCKED, UPGRADE_STEP_OF, UPGRADE_V3_WORDS, UPGRADE_VERDICT, type UpgradeStepName, unusableWords, upgradeCheckWords } from "./words"
+import {
+  amountRefusal,
+  FAIL_WORDS,
+  invalidWords,
+  LOCKED,
+  stepFailWords,
+  wrongChanceShown,
+  wrongChanceWords,
+  STEP_LOCKED,
+  UPGRADE_STEP_OF,
+  UPGRADE_V3_WORDS,
+  UPGRADE_V4_WORDS,
+  UPGRADE_VERDICT,
+  type UpgradeStepName,
+  unusableWords,
+  upgradeCheckWords,
+  upgradeWords,
+} from "./words"
 
 /** One plain sentence per check: what it means when it matches. Shown only for a check that matched. */
 export const CHECK_WORDS: Record<CheckName, string> = {
@@ -12,8 +29,13 @@ export const CHECK_WORDS: Record<CheckName, string> = {
   drawnItemId: "The item in that slot is the item recorded for your win.",
 }
 
-/** The fail words of a check; for an upgraded win shown at a wrong chance, the chance's words, not the slot's. */
+/**
+ * The fail words of a check; for an upgraded win shown at a wrong chance, the chance's words, not the slot's,
+ * and for a win whose recorded amount was refused, the amount's words (KAN-1569).
+ */
 function slotOrChanceWords(report: VerificationReport, check: CheckName, engineVersion?: number): string {
+  const refusal = check === "drawnSlotIndex" ? amountRefusal(report.checks.drawnSlotIndex) : null
+  if (refusal) return UPGRADE_V4_WORDS.amountFail(refusal, "win")
   const chance = check === "drawnSlotIndex" ? wrongChanceShown(report.checks.drawnSlotIndex) : null
   return chance ? wrongChanceWords(chance, engineVersion) : FAIL_WORDS[check]
 }
@@ -43,7 +65,7 @@ export function verdictOf(report: VerificationReport, engineVersion?: number): {
         line: LOCKED,
       }
     case "invalid":
-      return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
+      return { word: "CANNOT CHECK", line: invalidWords(report.invalid?.message, report.summary) }
   }
 }
 
@@ -73,16 +95,16 @@ export function stepVerdictOf(report: UpgradeStepReport, engineVersion?: number)
       return {
         word: "FAIL",
         line:
-          engineVersion === 3 && failure.check === "upgradeChance" && UPGRADE_V3_WORDS.underFloor(failure.message)
+          upgradeWords(engineVersion).readsRate && failure.check === "upgradeChance" && UPGRADE_V3_WORDS.underFloor(failure.message)
             ? `Step ${step} cannot be checked: ${UPGRADE_V3_WORDS.underFloorCause}.`
             : failure.field !== undefined
             ? `Step ${step} cannot be checked. ${unusableWords(failure.field, failure.message)}`
-            : `Step ${step} does not match: ${upgradeCheckWords(engineVersion, report.trace.stepRateBps).fail[failure.check as UpgradeStepName]}`,
+            : `Step ${step} does not match: ${stepFailWords(failure.check as UpgradeStepName, report.checks[failure.check], upgradeCheckWords(engineVersion, report.trace.stepRateBps))}`,
       }
     }
     case "pending":
       return { word: "CANNOT CHECK YET", line: STEP_LOCKED }
     case "invalid":
-      return { word: "CANNOT CHECK", line: report.invalid?.message ?? report.summary }
+      return { word: "CANNOT CHECK", line: invalidWords(report.invalid?.message, report.summary) }
   }
 }

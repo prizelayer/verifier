@@ -1,0 +1,12 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -144,7 +144,7 @@
+   const words = chance ? wrongChanceWords(chance, input.edition.engineVersion) : FAIL_WORDS.drawnSlotIndex
+   const amountMissing =
+     input.gameKind === "upgrade" && upgradeWords(input.edition.engineVersion).recordsAmount && input.expected.stepBoostCents === undefined
+-  return amountMissing ? `${words} ${UPGRADE_V4_WORDS.winAmountMissing}` : words
++  return amountMissing ? words : words
+ }
+ 
+ /** Why an input could not be used, in a reader's words where the page knows them. */

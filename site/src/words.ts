@@ -1,4 +1,4 @@
-import { UPGRADE_V3_CAVEATS, upgradeRule, type Check, type CheckName, type UpgradeStepCheckName } from "@verifier"
+import { UPGRADE_V3_CAVEATS, UPGRADE_V4_CAVEATS, upgradeRule, type Check, type CheckName, type UpgradeStepCheckName } from "@verifier"
 
 /** The four steps, in the words a player reads. Step 1 and step 2 never say when a value was published. */
 export const STEPS = [
@@ -334,7 +334,11 @@ export function wrongChanceShown(check: Check | undefined): WrongChance | null {
 }
 
 export function wrongChanceWords(cause: WrongChance, engineVersion?: number): string {
-  if (engineVersion === 3) return UPGRADE_V3_WORDS.wrongChance(cause)
+  return upgradeWords(engineVersion).wrongChance(cause)
+}
+
+/** Why an upgraded win's chance failed, on versions 1 and 2: "the fair chance". */
+function fairWrongChance(cause: WrongChance): string {
   switch (cause.kind) {
     case "shown":
       return `The chance shown with this upgraded win, ${cause.shown}, is not its fair chance rounded down to 0.01 %, which is ${cause.fair}.`
@@ -366,6 +370,7 @@ export const UPGRADE_STEP_OF: Record<UpgradeStepName, StepNumber> = {
   upgradeChance: 2,
   chanceCompact: 2,
   stepNo: 2,
+  boostAmount: 2,
   drawnPpmValue: 3,
   upgradeOutcome: 4,
 }
@@ -379,6 +384,7 @@ export const UPGRADE_CHECK_LABELS: Record<UpgradeStepName, string> = {
   upgradeChance: "The chance",
   chanceCompact: "The chance shown to you",
   stepNo: "How many upgrades in a row",
+  boostAmount: "The amount recorded",
   drawnPpmValue: CHECK_LABELS.drawnPpmValue,
   upgradeOutcome: "Won or lost",
 }
@@ -393,14 +399,18 @@ export const UPGRADE_CHECK_WORDS: Record<UpgradeStepName, string> = {
   upgradeChance: "The chance is the value you gave up divided by the value offered, rounded down.",
   chanceCompact: "The percent you were shown is this fair chance, rounded down to 0.01 %.",
   stepNo: "This upgrade is within the 3 a win may take.",
+  boostAmount: "This version of the upgrade rules has no amount, and none was recorded with this upgrade.",
   drawnPpmValue: "The pick, redone from the secret, the client seed and the counter, gives the number we recorded.",
   upgradeOutcome: "That number gives the result we recorded.",
 }
 
 /** What each step check means when it does not match. */
-/** KAN-1751 (listed in UPGRADE_V3_WORDS). One of the two sentences for a version this page does not check: they name version 3 since KAN-1751. */
+/**
+ * KAN-1751 (listed in UPGRADE_V3_WORDS). One of the two sentences for a version this page does not check: they
+ * name version 3 since KAN-1751, and version 4 since KAN-1569 (sentence 14 of plan v1.1 §3.3).
+ */
 const UPGRADE_UNKNOWN_VERSION_FAIL =
-  "This box uses another version of the upgrade rules. This page checks versions 1, 2 and 3 only, so it cannot confirm this upgrade."
+  "This box uses another version of the upgrade rules. This page checks versions 1, 2, 3 and 4 only, so it cannot confirm this upgrade."
 
 export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
   commitment: FAIL_WORDS.commitment,
@@ -412,6 +422,7 @@ export const UPGRADE_FAIL_WORDS: Record<UpgradeStepName, string> = {
   upgradeChance: "The chance we recorded is not the fair chance of this upgrade.",
   chanceCompact: "The percent you were shown is not this fair chance, rounded down to 0.01 %.",
   stepNo: "This would be more upgrades in a row than a win may take.",
+  boostAmount: "This upgrade records an amount, but this version of the upgrade rules has no amount.",
   drawnPpmValue: FAIL_WORDS.drawnPpmValue,
   upgradeOutcome: "With the fair chance, this number gives a different result than the one we recorded.",
 }
@@ -460,44 +471,45 @@ export function stepJumps(engineVersion: number | undefined): boolean {
   return engineVersion !== undefined && upgradeRule(engineVersion)?.jumps === true
 }
 
-/** The labels and words of a step's checks for an edition on `engineVersion`: version 2's where they differ. */
-export function upgradeCheckWords(
-  engineVersion: number | undefined,
-  rateBps?: number,
-): {
+/** The labels and the words of a step's checks, one entry for each check the library makes. */
+export interface UpgradeCheckWordSet {
   labels: Record<UpgradeStepName, string>
   ok: Record<UpgradeStepName, string>
   fail: Record<UpgradeStepName, string>
-} {
-  if (engineVersion === 3) {
-    const v3 = UPGRADE_V3_WORDS.checks(rateBps)
-    return {
-      labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
-      ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords, ...v3.ok },
-      fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords, ...v3.fail },
-    }
-  }
-  return stepJumps(engineVersion)
-    ? {
-        labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
-        ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords },
-        fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords },
-      }
-    : { labels: UPGRADE_CHECK_LABELS, ok: UPGRADE_CHECK_WORDS, fail: UPGRADE_FAIL_WORDS }
 }
 
 /**
- * Card 2 of a step on `engineVersion`: its title and its text. Version 3 has its own; version 2
- * its jump text under version 1's title; version 1, and any version this page does not check, version 1's.
+ * Every word a page shows that depends on the version of the upgrade rules. One entry per version in
+ * {@link UPGRADE_WORDS_BY_VERSION}, so a version is never worded with another version's text.
+ * `amountCents` is the amount the record carries, absent when it carries none.
  */
-export function upgradeStep2(engineVersion: number | undefined, rateBps?: number): { title: string; text: readonly string[] } {
-  if (engineVersion === 3) return UPGRADE_V3_WORDS.step2(rateBps)
-  return { title: UPGRADE_STEPS[1].title, text: stepJumps(engineVersion) ? UPGRADE_JUMP_WORDS.step2Text : UPGRADE_STEPS[1].text }
+export interface UpgradeVersionWords {
+  checks(rateBps: number | undefined, amountCents: number | undefined): UpgradeCheckWordSet
+  step2(rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[] }
+  wrongChance(cause: WrongChance): string
+  /** The labels of the two chances an upgraded win's slot check compares. */
+  compareLabels: { recorded: string; shown: string }
+  /** Card 4 of the open page for an upgraded win. */
+  winStep4: { title: string; source: string; text: readonly string[] }
+  /** Whether the version reads the box's rate, so a box under the floor gets one plain cause. */
+  readsRate: boolean
+  /** Whether a step on this version may record an amount (version 4). */
+  recordsAmount: boolean
+}
+
+/** The labels and words of a step's checks for an edition on `engineVersion`, with the amount its step records. */
+export function upgradeCheckWords(engineVersion: number | undefined, rateBps?: number, amountCents?: number): UpgradeCheckWordSet {
+  return upgradeWords(engineVersion).checks(rateBps, amountCents)
+}
+
+/** Card 2 of a step on `engineVersion`: its title and its text. */
+export function upgradeStep2(engineVersion: number | undefined, rateBps?: number, amountCents?: number): { title: string; text: readonly string[] } {
+  return upgradeWords(engineVersion).step2(rateBps, amountCents)
 }
 
 /** The labels of the two chances an upgraded win's slot check compares, by version. */
 export function wrongChanceLabels(engineVersion: number | undefined): { recorded: string; shown: string } {
-  return engineVersion === 3 ? UPGRADE_V3_WORDS.compareLabels : { recorded: "Fair chance", shown: "Fair chance, rounded down" }
+  return upgradeWords(engineVersion).compareLabels
 }
 
 /**
@@ -537,7 +549,7 @@ export const UPGRADE_V3_WORDS = {
   libraryCaveats: UPGRADE_V3_CAVEATS,
   unknownVersionFail: UPGRADE_UNKNOWN_VERSION_FAIL,
   unknownVersionChance: (shown: string, version: string): string =>
-    `The chance shown with this upgraded win, ${shown}, cannot be checked: this box uses version ${version} of the upgrade rules, and this page checks versions 1, 2 and 3 only.`,
+    `The chance shown with this upgraded win, ${shown}, cannot be checked: this box uses version ${version} of the upgrade rules, and this page checks versions 1, 2, 3 and 4 only.`,
   rateChance: (shown: string, why: string): string =>
     UPGRADE_V3_WORDS.underFloor(why)
       ? `The chance shown with this upgraded win, ${shown}, cannot be checked: ${UPGRADE_V3_WORDS.underFloorCause}.`
@@ -548,7 +560,7 @@ export const UPGRADE_V3_WORDS = {
    * for the sentences a person reads; the number stays in the check row, which shows the library's text.
    * A version 3 box whose price is not positive is a broken record, and keeps the library's own message.
    */
-  underFloor: (message: string | undefined): boolean => message !== undefined && /^the box returns \d+ bps, under the \d+ bps floor of version 3/.test(message),
+  underFloor: (message: string | undefined): boolean => message !== undefined && /^the box returns \d+ bps, under the \d+ bps floor of version (3|4)/.test(message),
   underFloorCause: "this box returns less than 93 %, which is not allowed for a box with upgrades",
 
   /**
@@ -638,9 +650,9 @@ export const UPGRADE_WIN_STEP4 = {
   text: UPGRADE_STEPS[3].text,
 } as const
 
-/** Card 4 of an upgraded win on `engineVersion`: on version 3 its source line names what fixes that chance. */
+/** Card 4 of an upgraded win on `engineVersion`: on versions 3 and 4 its source line names what fixes that chance. */
 export function upgradeWinStep4(engineVersion: number | undefined): { title: string; source: string; text: readonly string[] } {
-  return engineVersion === 3 ? { ...UPGRADE_WIN_STEP4, source: UPGRADE_V3_WORDS.winStep4Source } : UPGRADE_WIN_STEP4
+  return upgradeWords(engineVersion).winStep4
 }
 
 /** Under the open verdict, when the win was made by an upgrade. */
@@ -679,4 +691,254 @@ export function percentDown(ppm: number): string {
   if (ppm < 100) return "< 0.01%"
   const hundredths = Math.floor(ppm / 100)
   return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, "0")}%`
+}
+
+// ---------------------------------------------------------------------------
+// Version 4 of the upgrade (KAN-1569): a step may record an amount of money with the value given up.
+//
+// Every sentence a person reads only for a version 4 step or win is in this one table, with the library's
+// two version 4 caveats (UPGRADE_V4_CAVEATS). The numbers in the comments are those of plan v1.1 §3.3.
+// DRAFTS: the words are the player owner's, and Leo approves them with the merge answer.
+//
+// The rules of every sentence (the cto's go, Jira 37016): an amount is "recorded", never "added", because
+// the check reads the record and never a wallet (SHOULD 1); a wrongly formed amount is said to be wrongly
+// formed, never "not checked yet" (SHOULD 5); and the rule paragraph states what the upgrade rules allow,
+// never "you may add", because a casino may switch the amount off (SHOULD 6). No sentence says something
+// the check does not do (cto 37014).
+// ---------------------------------------------------------------------------
+
+/** An amount in cents as the page writes a value in a sentence: "21.28", "1,000.00", no currency sign. */
+export function amountText(cents: number): string {
+  const whole = Math.trunc(cents / 100).toLocaleString("en")
+  return `${whole}.${String(cents % 100).padStart(2, "0")}`
+}
+
+/** A chance to the millionth, never rounded: 500 015 ppm is "50.0015%", so a refused chance never reads as 50%. */
+export function percentExact(ppm: number): string {
+  return `${Math.trunc(ppm / 10_000)}.${String(ppm % 10_000).padStart(4, "0")}%`
+}
+
+/** Which record a sentence speaks of: the step's own page, or the open page of the win it made. */
+export type AmountSubject = "upgrade" | "win"
+
+/**
+ * A recorded amount the library refused, read from its words, or null for any other check. The library writes
+ * the limit (`boostLimitWhy` in src/verifier.ts) as the step's `boostAmount` computed text, and behind
+ * "amount refused, " as the computed text of an upgraded win's slot check. On a version with no amount the
+ * step writes expected "no amount: version <v> of the upgrade rules has none" and computed "<b> cents"; the
+ * win writes "amount refused, version <v> of the upgrade rules has no amount", with expected
+ * "amount recorded <b> cents".
+ */
+export type AmountRefusal =
+  | { limit: "reachesTarget"; cents: number }
+  | { limit: "ceiling"; cents: number }
+  | { limit: "cap"; cents: number; chancePpm: number }
+  | { limit: "lastCent"; cents: number }
+  | { limit: "version"; cents: number; version: string }
+
+export function amountRefusal(check: Check | undefined): AmountRefusal | null {
+  if (!check || check.ok || check.error !== undefined || check.expected === undefined || check.computed === undefined) return null
+  const { expected, computed } = check
+  const noAmount = /^no amount: version (\d+) of the upgrade rules has none$/.exec(expected)
+  const stepCents = /^(\d+) cents$/.exec(computed)
+  if (noAmount && stepCents) return { limit: "version", cents: Number(stepCents[1]), version: noAmount[1] }
+  const recorded = /^amount recorded (\d+) cents$/.exec(expected)
+  const winVersion = /^amount refused, version (\d+) of the upgrade rules has no amount$/.exec(computed)
+  if (recorded && winVersion) return { limit: "version", cents: Number(recorded[1]), version: winVersion[1] }
+  const why = computed.startsWith("amount refused, ") ? computed.slice("amount refused, ".length) : computed
+  const reaches = /^the value staked plus (\d+) cents reaches the target's value$/.exec(why)
+  if (reaches) return { limit: "reachesTarget", cents: Number(reaches[1]) }
+  const ceiling = /^(\d+) cents is above the ceiling of \d+ cents$/.exec(why)
+  if (ceiling) return { limit: "ceiling", cents: Number(ceiling[1]) }
+  const cap = /^(\d+) cents gives a chance of (\d+) ppm, above the cap of \d+ ppm$/.exec(why)
+  if (cap) return { limit: "cap", cents: Number(cap[1]), chancePpm: Number(cap[2]) }
+  const lastCent = /^the last cent of (\d+) cents raises nothing: \d+ cents give \d+ ppm too$/.exec(why)
+  if (lastCent) return { limit: "lastCent", cents: Number(lastCent[1]) }
+  return null
+}
+
+/**
+ * The library's message for a wrongly formed amount ("expected.boostCents is wrongly formed: …" on a step,
+ * "expected.stepBoostCents is wrongly formed: …" on an open), or null for any other message.
+ */
+export function malformedAmount(message: string | undefined): AmountSubject | null {
+  if (message === undefined) return null
+  if (message.startsWith("expected.boostCents is wrongly formed")) return "upgrade"
+  if (message.startsWith("expected.stepBoostCents is wrongly formed")) return "win"
+  return null
+}
+
+export const UPGRADE_V4_WORDS = {
+  libraryCaveats: UPGRADE_V4_CAVEATS,
+
+  /** The check lines that differ from version 3's (sentences 1 to 6, 3b and 22). */
+  checks: (rateBps: number | undefined, amountCents: number | undefined): { ok: Partial<Record<UpgradeStepName, string>>; fail: Partial<Record<UpgradeStepName, string>> } => ({
+    ok: {
+      engineVersion: "The box uses version 4 of the upgrade rules, a version this page checks.",
+      upgradeTarget: "The item you chose is worth more than the item you gave up, at a chance of 0.10% or more with no amount.",
+      // With no amount the chance is version 3's, so its approved line holds word for word.
+      upgradeChance:
+        amountCents === undefined
+          ? (UPGRADE_V3_WORDS.checks(rateBps).ok.upgradeChance as string)
+          : `Your browser computed the chance from this box's upgrade rate${rateBps === undefined ? "" : `, ${rateText(rateBps)},`} and the amount recorded with this upgrade. It is the chance we recorded.`,
+      boostAmount:
+        amountCents === undefined
+          ? "No amount was recorded with this upgrade."
+          : `The amount recorded with this upgrade, ${amountText(amountCents)}, is within the limits of the upgrade rules. It is at most 1,000.00, and the chance with it is at most 50%. Its last cent raised the chance, so no smaller amount gives the same chance.`,
+    },
+    fail: {
+      upgradeTarget:
+        "The item you chose is not one this upgrade allows: it must be worth more than the item you gave up, at a chance of 0.10% or more with no amount. An amount recorded with the upgrade does not change this.",
+      // Shown only if the library's words for a refused amount could not be read (amountFail reads them).
+      boostAmount: "The amount recorded with this upgrade is not one the upgrade rules allow.",
+    },
+  }),
+
+  /** Card 2: its title (sentences 11 and 11b) and its text: version 3's first two paragraphs, then 12, 12b and 23. */
+  step2: (rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[] } => {
+    const v3 = UPGRADE_V3_WORDS.step2(rateBps)
+    return {
+      title: amountCents === undefined ? v3.title : "The chance of your upgrade comes from this box's upgrade rate and the amount recorded with it.",
+      text: [
+        v3.text[0],
+        v3.text[1],
+        UPGRADE_V4_WORDS.rule,
+        UPGRADE_V4_WORDS.checksParagraph,
+        UPGRADE_V4_WORDS.casinoLimits,
+      ],
+    }
+  },
+
+  /** Sentence 12: the rule, as the upgrade rules state it (SHOULD 6). The example is box C of ADR-KAN-1154 §9.8. */
+  rule: "The upgrade rules allow an amount from 0.01 to 1,000.00 EUR to be recorded with an upgrade. With an amount, the chance is the upgrade rate times the value you give up plus the amount, divided by the value you could win, rounded up to a millionth. The chance with an amount is at most 50%. The last cent of the amount must raise the chance. On a box whose upgrade rate is 94.00 %, giving up 40.00 with an amount of 21.28 for a chance at 200.00 is a 28.80% chance.",
+
+  /**
+   * Sentence 12b, not on the plan's list: version 3's third paragraph says the chance is the rate times the
+   * value staked, which is false for a step with an amount, so version 4 has its own.
+   */
+  checksParagraph:
+    "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, and that the item offered is a more valuable one in the same box. It checks that the chance is the box's upgrade rate times the value staked plus the amount recorded, divided by the value of the item offered, rounded up to a millionth. It checks that the amount is within the limits of the upgrade rules. Your browser works out the upgrade rate itself, from the box's chances and its price: it is the box's return, rounded down to 0.01 %, and at most 99.90 %. There is no upgrade below a 0.10% chance with no amount. There is no limit on upgrades in a row: a chain ends at the most valuable prize of the box.",
+
+  /** Sentence 23: what the check cannot see. */
+  casinoLimits:
+    "A casino may set lower limits on the amount than the upgrade rules do. Those limits are not in the upgrade's record, so this page checks only the limits of the upgrade rules.",
+
+  /** Sentence 13: the two rows card 2's table gains on a step with an amount. */
+  rows: { amount: "Amount recorded", noAmountChance: "Chance with no amount" },
+
+  /** Sentences 7, 8, 9, 10 and 20 on the step page; O3 with "this win" on the open page. */
+  amountFail: (refusal: AmountRefusal, subject: AmountSubject): string => {
+    const amount = amountText(refusal.cents)
+    switch (refusal.limit) {
+      case "ceiling":
+        return `The amount recorded with this ${subject}, ${amount}, is more than 1,000.00, the most the upgrade rules allow.`
+      case "cap":
+        return `With the amount recorded with this ${subject}, ${amount}, the chance would be ${percentExact(refusal.chancePpm)}. That is more than 50%, the most the upgrade rules allow.`
+      case "lastCent":
+        return `The last cent of the amount recorded with this ${subject}, ${amount}, did not raise the chance: ${amountText(refusal.cents - 1)} gives the same chance. The upgrade rules do not allow this.`
+      case "version":
+        return `This ${subject} records an amount, ${amount}, but version ${refusal.version} of the upgrade rules has no amount.`
+      case "reachesTarget":
+        return `The value you gave up plus the amount recorded with this ${subject}, ${amount}, is worth as much as the item you chose, or more. The upgrade rules do not allow this, so there is no chance to compute.`
+    }
+  },
+
+  /** Sentence 21 on the step page, O5 on the open page: a CANNOT CHECK that is not a "not yet" (SHOULD 5). */
+  malformed: (subject: AmountSubject): string =>
+    `The record of this ${subject} is wrongly formed: the amount recorded with it is not a whole number of cents of 0.01 or more. This page cannot check a record in this shape.`,
+
+  /** O1: card 4's source line of an upgraded win on version 4. */
+  winStep4Source:
+    "Read from the open record: `open.stakedSlotIndex`, `open.stepBoostCents` (the amount recorded with the upgrade, absent when there is none), `open.stepChancePpm`, `open.stepChanceCompact`, `open.drawnSlotIndex` and `open.snapshotHash`; from the box record: the price, the chances and the buy-back values of `edition`, which fix the chance of the upgrade with that amount; from the prize list record: `snapshot.body`.",
+
+  /** O2: under card 4 of an upgraded win whose open record carries an amount, when its slot check matched. */
+  winChance: (amountCents: number, chancePpm: number): string =>
+    `Your browser computed the chance of the upgrade that made this win from the box's upgrade rate and the amount recorded with this win, ${amountText(amountCents)}: ${percentDown(chancePpm)}. It is the chance shown with this win.`,
+
+  /** O4: after the failure sentence of an upgraded win whose open record carries no amount. */
+  winAmountMissing:
+    "An amount may have been recorded with the upgrade but not with this win. The upgrade's own page shows its amount and checks it.",
+}
+
+/** The failure sentence of one step check: a refused amount in its own words, any other check by its version's words. */
+export function stepFailWords(name: UpgradeStepName, check: Check | undefined, words: UpgradeCheckWordSet): string {
+  const refusal = name === "boostAmount" ? amountRefusal(check) : null
+  return refusal ? UPGRADE_V4_WORDS.amountFail(refusal, "upgrade") : words.fail[name]
+}
+
+/** The line of a CANNOT CHECK: a wrongly formed amount says so, with the library's reason; any other keeps the library's. */
+export function invalidWords(message: string | undefined, summary: string): string {
+  const subject = malformedAmount(message)
+  return subject === null ? (message ?? summary) : `${UPGRADE_V4_WORDS.malformed(subject)} (${message})`
+}
+
+// ---------------------------------------------------------------------------
+// The words of each version, in one table (KAN-1569 plan v1.1 S1).
+// ---------------------------------------------------------------------------
+
+const FAIR_COMPARE_LABELS = { recorded: "Fair chance", shown: "Fair chance, rounded down" } as const
+
+const V1_WORDS: UpgradeVersionWords = {
+  checks: () => ({ labels: UPGRADE_CHECK_LABELS, ok: UPGRADE_CHECK_WORDS, fail: UPGRADE_FAIL_WORDS }),
+  step2: () => ({ title: UPGRADE_STEPS[1].title, text: UPGRADE_STEPS[1].text }),
+  wrongChance: fairWrongChance,
+  compareLabels: FAIR_COMPARE_LABELS,
+  winStep4: UPGRADE_WIN_STEP4,
+  readsRate: false,
+  recordsAmount: false,
+}
+
+const V2_WORDS: UpgradeVersionWords = {
+  ...V1_WORDS,
+  checks: () => ({
+    labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
+    ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords },
+    fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords },
+  }),
+  step2: () => ({ title: UPGRADE_STEPS[1].title, text: UPGRADE_JUMP_WORDS.step2Text }),
+}
+
+const V3_WORDS: UpgradeVersionWords = {
+  checks: (rateBps) => {
+    const v3 = UPGRADE_V3_WORDS.checks(rateBps)
+    return {
+      labels: { ...UPGRADE_CHECK_LABELS, ...UPGRADE_JUMP_WORDS.labels },
+      ok: { ...UPGRADE_CHECK_WORDS, ...UPGRADE_JUMP_WORDS.checkWords, ...v3.ok },
+      fail: { ...UPGRADE_FAIL_WORDS, ...UPGRADE_JUMP_WORDS.failWords, ...v3.fail },
+    }
+  },
+  step2: (rateBps) => UPGRADE_V3_WORDS.step2(rateBps),
+  wrongChance: UPGRADE_V3_WORDS.wrongChance,
+  compareLabels: UPGRADE_V3_WORDS.compareLabels,
+  winStep4: { ...UPGRADE_WIN_STEP4, source: UPGRADE_V3_WORDS.winStep4Source },
+  readsRate: true,
+  recordsAmount: false,
+}
+
+const V4_WORDS: UpgradeVersionWords = {
+  ...V3_WORDS,
+  checks: (rateBps, amountCents) => {
+    const v3 = V3_WORDS.checks(rateBps, undefined)
+    const v4 = UPGRADE_V4_WORDS.checks(rateBps, amountCents)
+    return { labels: v3.labels, ok: { ...v3.ok, ...v4.ok }, fail: { ...v3.fail, ...v4.fail } }
+  },
+  step2: UPGRADE_V4_WORDS.step2,
+  winStep4: { ...UPGRADE_WIN_STEP4, source: UPGRADE_V4_WORDS.winStep4Source },
+  recordsAmount: true,
+}
+
+/**
+ * The words of each version of the upgrade rules, one entry per version the library checks (a test holds
+ * that every rule of `UPGRADE_RULES` has its entry). A version not listed, or an edition with none, gets
+ * version 1's words, which name no version but version 1, the one this page checked first.
+ */
+export const UPGRADE_WORDS_BY_VERSION: Readonly<Record<number, UpgradeVersionWords>> = Object.freeze({
+  1: V1_WORDS,
+  2: V2_WORDS,
+  3: V3_WORDS,
+  4: V4_WORDS,
+})
+
+export function upgradeWords(engineVersion: number | undefined): UpgradeVersionWords {
+  return (engineVersion === undefined ? undefined : UPGRADE_WORDS_BY_VERSION[engineVersion]) ?? V1_WORDS
 }

@@ -1,0 +1,12 @@
+diff --git a/site/src/proof.ts b/site/src/proof.ts
+--- a/site/src/proof.ts
++++ b/site/src/proof.ts
+@@ -98,7 +98,7 @@
+       stepNo: number_(step.stepNo, "step.stepNo"),
+       // Version 4: the amount recorded with the step (contract §6), passed as it was written, so the library
+       // refuses any other shape by name; absent when none was recorded.
+-      ...(step.boostCents === undefined ? {} : { boostCents: step.boostCents as number }),
++      ...(step.boostCents === undefined ? {} : {}),
+     },
+   }
+ }

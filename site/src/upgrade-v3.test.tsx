@@ -236,7 +236,7 @@ describe("the version 3 word choice", () => {
     expect(upgradeCheckWords(2).ok.upgradeChance).toBe(UPGRADE_CHECK_WORDS.upgradeChance)
     expect(upgradeCheckWords(1, 9636).ok.upgradeChance).toBe(UPGRADE_CHECK_WORDS.upgradeChance)
     // A version this page does not check keeps version 1's words, as before.
-    expect(upgradeStep2(4, 9636)).toEqual({ title: UPGRADE_STEPS[1].title, text: UPGRADE_STEPS[1].text })
+    expect(upgradeStep2(5, 9636)).toEqual({ title: UPGRADE_STEPS[1].title, text: UPGRADE_STEPS[1].text })
   })
 
   it("words an upgraded win's chance by version, and reads a rate the library could not compute", () => {

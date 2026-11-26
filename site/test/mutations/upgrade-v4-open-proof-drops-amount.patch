@@ -1,0 +1,12 @@
+diff --git a/site/src/proof.ts b/site/src/proof.ts
+--- a/site/src/proof.ts
++++ b/site/src/proof.ts
+@@ -68,7 +68,7 @@
+   }
+   // Version 4: the amount recorded with the step that made the win (contract §7), passed as it was written,
+   // so the library refuses any other shape by name, and refuses it on an open that is not an upgraded win.
+-  if (open.stepBoostCents !== undefined) input.expected.stepBoostCents = open.stepBoostCents as number
++  void open.stepBoostCents
+   return input
+ }
+ 
