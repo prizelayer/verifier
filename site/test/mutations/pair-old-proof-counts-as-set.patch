@@ -1,0 +1,13 @@
+diff --git a/site/src/pairFacts.ts b/site/src/pairFacts.ts
+index 9bfc871..9a0eb38 100644
+--- a/site/src/pairFacts.ts
++++ b/site/src/pairFacts.ts
+@@ -29,7 +29,7 @@ export function seedSetFact(text: string): Fact {
+   }
+   const seedPair = objectIn(objectIn(proof)?.seedPair)
+   if (seedPair === null) return "unknown"
+-  const byPlayer = seedPair.clientSeedSetByPlayer
++  const byPlayer = seedPair.clientSeedSetByPlayer ?? true
+   const hash = seedPair.setEventRecordHash
+   if (byPlayer === true && typeof hash === "string" && RECORD_HASH.test(hash)) return "yes"
+   if (byPlayer === false && hash === null) return "no"

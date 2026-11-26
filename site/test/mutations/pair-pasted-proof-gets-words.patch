@@ -1,0 +1,13 @@
+diff --git a/site/src/App.tsx b/site/src/App.tsx
+index 5fa92f7..c4c92b7 100644
+--- a/site/src/App.tsx
++++ b/site/src/App.tsx
+@@ -23,7 +23,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
+   // may show what our records say about its pair. A pasted or edited proof shows the other words.
+   const [lookedUp, setLookedUp] = useState<string | null>(null)
+   // A proof can be megabytes and the page renders often, so only the looked-up proof is read for it.
+-  const fromLookup = lookedUp === text
++  const fromLookup = lookedUp === null || lookedUp === text
+   const fieldId = useId()
+   const report = checked?.kind === "report" ? checked.report : null
+   const input = checked?.kind === "report" ? checked.input : null
