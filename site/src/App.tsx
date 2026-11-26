@@ -3,6 +3,7 @@ import type { UpgradeStepReport, VerificationInput, VerificationReport } from "@
 import { Button } from "@/components/ui/button"
 import { EXAMPLE_TEXT } from "./example"
 import { LookupBox } from "./LookupBox"
+import { seedSetFact, seedSetSentence } from "./pairFacts"
 import { checkProof, type Checked } from "./proof"
 import { SourceLine, StepCards } from "./steps"
 import { UpgradeStepCards } from "./upgradeSteps"
@@ -18,6 +19,11 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
   const verdictRef = useRef<HTMLDivElement>(null)
   // The text on screen now, read when a check finishes: a result is kept only for the text it checked.
   const current = useRef("")
+  // The text "Look up" put in the box in this visit, until anyone changes the box: only that proof
+  // may show what our records say about its pair. A pasted or edited proof shows the other words.
+  const [lookedUp, setLookedUp] = useState<string | null>(null)
+  // A proof can be megabytes and the page renders often, so only the looked-up proof is read for it.
+  const fromLookup = lookedUp === text
   const fieldId = useId()
   const report = checked?.kind === "report" ? checked.report : null
   const input = checked?.kind === "report" ? checked.input : null
@@ -33,10 +39,11 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
     return () => window.removeEventListener("hashchange", changed)
   }, [])
 
-  function edit(value: string) {
+  function edit(value: string, fromLookup = false) {
     current.current = value
     setText(value)
     setChecked(null)
+    setLookedUp(fromLookup ? value : null)
   }
 
   async function run(proof: string) {
@@ -94,7 +101,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
         onBusy={setLookingUp}
         fetchFn={fetchFn}
         onFound={(found) => {
-          edit(found)
+          edit(found, true)
           void run(found)
         }}
       />
@@ -149,7 +156,7 @@ export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
       </div>
 
       {report && input ? (
-        <StepCards report={report} input={input} />
+        <StepCards report={report} input={input} seedSet={seedSetSentence(fromLookup ? seedSetFact(text) : "unknown", fromLookup)} />
       ) : stepReport && stepInput ? (
         <UpgradeStepCards report={stepReport} input={stepInput} />
       ) : report || stepReport ? null : (

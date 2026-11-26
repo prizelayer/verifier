@@ -27,3 +27,25 @@ export function fakeServer(answers: Map<string, Answer>) {
   }) as typeof fetch
   return { fetchFn, calls }
 }
+
+/**
+ * What our server's seed pair answer says about the pair since V070 (KAN-935 PR-2c): a pair the
+ * page showed before its first open, whose client seed the player set. The hash is made up. The page
+ * reads only the last two fields; the first is served as our server sends it, and step 1 ignores it.
+ */
+export const PAIR_RECORD = {
+  shownBeforeFirstOpen: true,
+  clientSeedSetByPlayer: true,
+  setEventRecordHash: "5c0e2b7a9d14f3e8c6a1b0d2e4f6a8c0b1d3e5f7a9c2e4f6b8d0a1c3e5f7a9b2",
+} as const
+
+/**
+ * The example's answers with `record` merged into the seed pair answer. `record` may hold any value,
+ * so a test can serve a field our server would never send.
+ */
+export function pairAnswers(record: Record<string, unknown>): Map<string, Answer> {
+  const answers = exampleAnswers()
+  const { seedPair } = EXAMPLE_PROOF
+  answers.set(`/verify/seed-pairs/${seedPair.seedPairId}`, { status: 200, body: JSON.stringify({ ...seedPair, ...record }) })
+  return answers
+}

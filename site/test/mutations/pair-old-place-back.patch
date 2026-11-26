@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+index d9de655..7e56b58 100644
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -11,6 +11,7 @@ export const STEPS = [
+       "For every player our server creates a secret number, and publishes its fingerprint. A fingerprint is a short code computed from the number. The same number always gives the same code, and nobody can find a different number that gives that code.",
+       "After the secret is retired, our server publishes the secret itself.",
+       "Your browser now computes the fingerprint of the secret we revealed. If the two are equal, the secret we revealed matches the fingerprint our server published for this pair.",
++      "A made-up sentence for a planted bug: the fingerprint is under Details.",
+     ],
+   },
+   {
