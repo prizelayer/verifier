@@ -810,14 +810,14 @@ export const UPGRADE_V4_WORDS = {
   },
 
   /** Sentence 12: the rule, as the upgrade rules state it (SHOULD 6). The example is box C of ADR-KAN-1154 §9.8. */
-  rule: "The upgrade rules allow an amount from 0.01 to 1,000.00 EUR to be recorded with an upgrade. With an amount, the chance is the upgrade rate times the value you give up plus the amount, divided by the value you could win, rounded up to a millionth. The chance with an amount is at most 50%. The last cent of the amount must raise the chance. On a box whose upgrade rate is 94.00 %, giving up 40.00 with an amount of 21.28 for a chance at 200.00 is a 28.80% chance.",
+  rule: "The upgrade rules allow an amount from 0.01 to 1,000.00 EUR to be recorded with an upgrade. With an amount, the chance is the upgrade rate times the sum of the value you give up and the amount, divided by the value you could win. It is rounded up to a millionth. The chance with an amount is at most 50%. The last cent of the amount must raise the chance. On a box whose upgrade rate is 94.00 %, giving up 40.00 with an amount of 21.28 for a chance at 200.00 is a 28.80% chance.",
 
   /**
    * Sentence 12b, not on the plan's list: version 3's third paragraph says the chance is the rate times the
    * value staked, which is false for a step with an amount, so version 4 has its own.
    */
   checksParagraph:
-    "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, and that the item offered is a more valuable one in the same box. It checks that the chance is the box's upgrade rate times the value staked plus the amount recorded, divided by the value of the item offered, rounded up to a millionth. It checks that the amount is within the limits of the upgrade rules. Your browser works out the upgrade rate itself, from the box's chances and its price: it is the box's return, rounded down to 0.01 %, and at most 99.90 %. There is no upgrade below a 0.10% chance with no amount. There is no limit on upgrades in a row: a chain ends at the most valuable prize of the box.",
+    "Your browser checks that the box is an upgrade box, that its chances match their fingerprint, and that the item offered is a more valuable one in the same box. It checks that the chance is the box's upgrade rate times the sum of the value staked and the amount recorded, divided by the value of the item offered. The chance is rounded up to a millionth. It checks that the amount is within the limits of the upgrade rules. Your browser works out the upgrade rate itself, from the box's chances and its price: it is the box's return, rounded down to 0.01 %, and at most 99.90 %. There is no upgrade below a 0.10% chance with no amount. There is no limit on upgrades in a row: a chain ends at the most valuable prize of the box.",
 
   /** Sentence 23: what the check cannot see. */
   casinoLimits:
