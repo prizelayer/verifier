@@ -229,9 +229,10 @@ jobs:
     # end is an error naming its patch, never a catch: a test run that hangs proves nothing.
     runs-on: ubuntu-latest
     # About 15 to 20 s per patch: 119 patches took 22 to 38 minutes on 2026-10-15, so 30 and then 45
-    # were too close. Splitting the patches over two jobs is the next step, once the required check
+    # were too close. 183 patches took 79 minutes on 2026-11-26 and 186 passed 90 on 2026-11-27, so the
+    # limit is 150. Splitting the patches over two jobs is the next step, once the required check
     # names can change with it.
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
 
