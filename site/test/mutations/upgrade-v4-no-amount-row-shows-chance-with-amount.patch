@@ -1,0 +1,12 @@
+diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
+--- a/site/src/upgradeSteps.tsx
++++ b/site/src/upgradeSteps.tsx
+@@ -183,7 +183,7 @@
+               {amount !== undefined ? (
+                 <tr data-no-amount-row>
+                   <th scope="row" className="text-left font-medium">{UPGRADE_V4_WORDS.rows.noAmountChance}</th>
+-                  <td>{offered ? `${offered.chancePpm.toLocaleString("en")} in 1,000,000 (${percentDown(offered.chancePpm)})` : "none"}</td>
++                  <td>{fair !== undefined ? `${fair.toLocaleString("en")} in 1,000,000 (${percentDown(fair)})` : "none"}</td>
+                 </tr>
+               ) : null}
+               <tr>

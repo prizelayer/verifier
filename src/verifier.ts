@@ -211,6 +211,11 @@ export interface VerificationInput {
     stepChanceCompact?: string;
     /** On an upgrade win: how that step ended. Required when `gameKind` is `upgrade`. */
     stepOutcome?: 'won' | 'lost';
+    /**
+     * On an upgrade win made by a version 4 step with an amount: that amount, a decimal string of whole cents
+     * from 1 (contract §7 `stepBoostCents`). Absent when none was added; any other shape makes the record unreadable.
+     */
+    stepBoostCents?: string;
   };
   /**
    * `upgrade` when the win was made by an upgrade step, not by a box draw. Its drawn value, nonce and
@@ -633,6 +638,102 @@ export const UPGRADE_V3_CAVEATS = Object.freeze({
     'run does not check.',
 });
 
+/**
+ * An amount in cents as the caveats write a value: euros with two decimals and a comma every three digits,
+ * no currency sign (2128 is "21.28", 100000 is "1,000.00").
+ */
+function centsText(cents: bigint): string {
+  const whole = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${whole}.${(cents % 100n).toString().padStart(2, '0')}`;
+}
+
+/**
+ * The caveats this library writes only for a version 4 step or win. DRAFTS: the words are the player
+ * owner's, and they are public only once approved with the merge (KAN-1569 plan v1.1 §3.3, sentences 24 and
+ * 25; the go's SHOULD 1: an amount is "recorded", because the check reads the record, never a wallet). The
+ * step number reads as on version 3, because version 4 has no limit on steps of its own either.
+ * Refs: KAN-1569
+ */
+export const UPGRADE_V4_CAVEATS = Object.freeze({
+  stepNo: UPGRADE_V3_CAVEATS.stepNo,
+  win: (stakedSlot: number, drawnSlot: number, stepId: string | undefined, boostCents: bigint | undefined): string =>
+    `This win was made by an upgrade step from slot ${stakedSlot} on version 4 of the upgrade rules` +
+    `${boostCents === undefined ? '' : `, with an amount of ${centsText(boostCents)} recorded`}. This run checks ` +
+    `that slot ${drawnSlot} is a target the edition allows from slot ${stakedSlot} on that version, that the ` +
+    "chance is the box's upgrade rate times the sum of the value staked and the amount recorded, divided by the " +
+    'value of that slot, rounded up to a millionth, that the amount is within the limits of the upgrade rules, ' +
+    "and that the step's draw wins at it over the step's own table. Which target the step named is not compared " +
+    `here: it is shown on the step's own page${stepId === undefined ? '' : ` (step ${stepId})`}, and so are that ` +
+    `the staked win really held slot ${stakedSlot}, the step number and the engine type, which this run does not ` +
+    'check.',
+});
+
+/** The caveats of one version: on the step number of a step, and on the step that made an upgraded win. */
+export interface UpgradeVersionCaveats {
+  stepNo(maxStepNo: number): string;
+  win(stakedSlot: number, drawnSlot: number, stepId: string | undefined, boostCents: bigint | undefined): string;
+}
+
+/** The step-number caveat of versions 1 and 2, whose limit on steps is the cap. */
+function capStepNoCaveat(maxStepNo: number): string {
+  return (
+    `The step number is the platform's claim. This run checks only that it is in range 1..${maxStepNo} ` +
+    '(the cap); which earlier steps led to this one is shown on their own pages.'
+  );
+}
+
+/** Version 1's win caveat, also the one a win on a version this library does not check gets. */
+function nextUpWinCaveat(stakedSlot: number, _drawnSlot: number, stepId: string | undefined): string {
+  return (
+    `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
+    'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
+    `${stakedSlot} is shown on the step's own page` +
+    `${stepId === undefined ? '' : ` (step ${stepId})`}, ` +
+    'and so are the cap on steps and the engine type and version, which this run does not check.'
+  );
+}
+
+/**
+ * The caveats of each version this library checks, one entry per version of {@link UPGRADE_RULES}, so a
+ * version can never be worded with another version's text (a test holds that every rule has its entry). A
+ * win on a version not listed keeps version 1's general words, which claim nothing about a version.
+ * Refs: KAN-1569 plan v1.1 L8
+ */
+export const UPGRADE_CAVEATS_BY_VERSION: Readonly<Record<number, UpgradeVersionCaveats>> = Object.freeze({
+  1: Object.freeze({ stepNo: capStepNoCaveat, win: nextUpWinCaveat }),
+  2: Object.freeze({
+    stepNo: capStepNoCaveat,
+    win: (stakedSlot: number, drawnSlot: number, stepId: string | undefined): string =>
+      `This win was made by an upgrade step from slot ${stakedSlot} on version 2 of the ` +
+      `upgrade rules. This run checks that slot ${drawnSlot} is a target the edition ` +
+      `allows from slot ${stakedSlot} on that version, that the chance is the formula's, and that the step's ` +
+      'draw wins at it over the step\'s own table. Which target the step named is not compared here: it is ' +
+      'shown on the step\'s own page' +
+      `${stepId === undefined ? '' : ` (step ${stepId})`}, ` +
+      `and so are that the staked win really held slot ${stakedSlot}, the cap on steps and the engine type, ` +
+      'which this run does not check.',
+  }),
+  3: Object.freeze({
+    stepNo: UPGRADE_V3_CAVEATS.stepNo,
+    win: (stakedSlot: number, drawnSlot: number, stepId: string | undefined): string => UPGRADE_V3_CAVEATS.win(stakedSlot, drawnSlot, stepId),
+  }),
+  4: UPGRADE_V4_CAVEATS,
+});
+
+/**
+ * The most a version 4 step may record as the amount added to the value staked, in cents (1,000.00). A
+ * casino may set a lower limit; the step's record does not carry it, so a check here holds only this one.
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.3
+ */
+export const UPGRADE_BOOST_CEILING_CENTS = 100_000;
+
+/**
+ * The highest chance a version 4 step may reach with an amount, in ppm (50 %). It binds only an amount: a
+ * step with no amount is a version 3 step, and its chance may be higher.
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.3
+ */
+export const UPGRADE_BOOST_MAX_CHANCE_PPM = 500_000;
+
 /** The highest rate of a version 3 step, in basis points (99.90 %): a step never gives the player the edge. */
 export const UPGRADE_STEP_RTP_CAP_BPS = 9_990;
 
@@ -654,7 +755,8 @@ export interface UpgradeOffer {
  * box or only the next one up; `maxSteps` is the limit on steps in a row, or `null` for none. The step's
  * return is `stepRtpBps` when the version fixes it, and otherwise the box's own rate, between
  * `stepRtpFloorBps` and `stepRtpCapBps` ({@link upgradeStepRateBps}). `roundsUp` says which way the chance
- * is rounded to a whole ppm.
+ * is rounded to a whole ppm. A version on which a step may record an amount added to the value staked has
+ * the engine's two limits on it: `boostCeilingCents` and `boostMaxChancePpm` ({@link boostStepLimits}).
  */
 export interface UpgradeRule {
   engineVersion: number;
@@ -666,6 +768,8 @@ export interface UpgradeRule {
   stepRtpCapBps: number | null;
   stepRtpFloorBps: number | null;
   roundsUp: boolean;
+  boostCeilingCents?: number;
+  boostMaxChancePpm?: number;
 }
 
 /**
@@ -673,8 +777,9 @@ export interface UpgradeRule {
  * listed here is failed, never checked by another version's rule (rng-fairness §6: version for version, fail
  * closed). Version 2 lets a step name any strictly higher value at 1 % or more. Version 3 has no limit on
  * steps, a minimum of 0.1 % for a named target and the single offer, and a chance at the rate of the step's
- * own box, rounded up, so every step gives back at least that rate.
- * Refs: KAN-1567, KAN-1751, ADR-KAN-1154 amendments 4 and 8
+ * own box, rounded up, so every step gives back at least that rate. Version 4 is version 3 plus an amount
+ * the step may record, added to the value staked, within the two limits of the engine.
+ * Refs: KAN-1567, KAN-1751, KAN-1569, ADR-KAN-1154 amendments 4, 8 and 9
  */
 export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
   Object.freeze({
@@ -709,6 +814,19 @@ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
     stepRtpCapBps: UPGRADE_STEP_RTP_CAP_BPS,
     stepRtpFloorBps: UPGRADE_STEP_RTP_FLOOR_BPS,
     roundsUp: true,
+  }),
+  Object.freeze({
+    engineVersion: 4,
+    minChancePpm: UPGRADE_V3_MIN_CHANCE_PPM,
+    offerMinChancePpm: UPGRADE_V3_MIN_CHANCE_PPM,
+    jumps: true,
+    maxSteps: null,
+    stepRtpBps: null,
+    stepRtpCapBps: UPGRADE_STEP_RTP_CAP_BPS,
+    stepRtpFloorBps: UPGRADE_STEP_RTP_FLOOR_BPS,
+    roundsUp: true,
+    boostCeilingCents: UPGRADE_BOOST_CEILING_CENTS,
+    boostMaxChancePpm: UPGRADE_BOOST_MAX_CHANCE_PPM,
   }),
 ]);
 
@@ -931,6 +1049,296 @@ function unknownVersionWhy(engineVersion: unknown): string {
   return `version ${String(engineVersion)} of the upgrade rules is not checked here`;
 }
 
+// ---------------------------------------------------------------------------
+// The amount of a version 4 step — rng-fairness §4b, ADR-KAN-1154 amendment 9
+// ---------------------------------------------------------------------------
+
+/**
+ * One step an amount may be added to: the edition's engine version, the step's rate (the box's own, from
+ * {@link upgradeStepRateBps}), and the buy-back values staked and named, in cents. The platform's
+ * `BoostStep` holds the same four facts.
+ */
+export interface BoostStep {
+  engineVersion: number;
+  rateBps: number;
+  stakedCents: bigint;
+  targetCents: bigint;
+}
+
+/**
+ * A casino's own two limits on an amount. The engine's two limits always apply as well and the lower of
+ * each pair wins, so a casino can only lower them. Absent means the engine's limits alone.
+ */
+export interface BoostLimits {
+  maxCents: bigint;
+  maxChancePpm: number;
+}
+
+/** Why an amount is refused, in the words of the platform's answer. */
+export type BoostRefusal = 'boost_too_high' | 'boost_cent_lost';
+
+/** The answer for one amount: accepted at a chance, or refused with the highest amount the step accepts. */
+export type BoostDecision =
+  | { decision: 'accepted'; boostCents: bigint; chancePpm: number }
+  | { decision: 'refused'; refusal: BoostRefusal; boostMaxCents: bigint };
+
+/** A key a step serves: its points, its price in cents and the chance at that price. */
+export interface BoostKey {
+  points: number;
+  boostCents: bigint;
+  chancePpm: number;
+}
+
+/** One percentage point of chance, the unit of a key: +10 is +100 000 ppm, never 10 % of anything. */
+const PPM_PER_POINT = 10_000;
+
+/** The rule of a version on which a step may record an amount, or a refusal naming the version. */
+function boostRuleOf(engineVersion: number): UpgradeRule & { boostCeilingCents: number; boostMaxChancePpm: number } {
+  const rule = requireRule(engineVersion);
+  if (rule.boostCeilingCents === undefined || rule.boostMaxChancePpm === undefined) {
+    throw new Error(`version ${engineVersion} of the upgrade rules has no amount to add`);
+  }
+  return rule as UpgradeRule & { boostCeilingCents: number; boostMaxChancePpm: number };
+}
+
+/**
+ * The chance of `step` with `boostCents` added, in ppm: version 3's chance from the value staked plus the
+ * amount, `ceil(R × 1 000 000 × (s + b) / (10 000 × t))`, so with 0 cents it is the step's chance with no
+ * amount. Exact in `bigint`. An amount that reaches the target's value has no chance to compute, and is
+ * refused by name.
+ *
+ * Box C of ADR-KAN-1154 §9.8: R 9 400, 40.00 staked for 200.00, 21.28 added gives 288 016 (and 0 cents
+ * gives 188 000).
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.2
+ */
+export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+  const rule = boostRuleOf(step.engineVersion);
+  if (typeof boostCents !== 'bigint' || boostCents < 0n) {
+    throw new Error(`an amount is a whole number of cents, 0 or more, was ${String(boostCents)}`);
+  }
+  if (step.stakedCents + boostCents >= step.targetCents) {
+    throw new Error(
+      `${boostCents} cents reach the target's value: ${step.stakedCents} + ${boostCents} >= ${step.targetCents} cents, ` +
+        'so the step has no chance to compute',
+    );
+  }
+  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, rule.roundsUp);
+}
+
+function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {
+  const engine = BigInt(rule.boostCeilingCents);
+  return limits === undefined || limits.maxCents >= engine ? engine : limits.maxCents;
+}
+
+function chanceCapOf(rule: { boostMaxChancePpm: number }, limits: BoostLimits | undefined): number {
+  return limits === undefined ? rule.boostMaxChancePpm : Math.min(rule.boostMaxChancePpm, limits.maxChancePpm);
+}
+
+function requireLimits(limits: BoostLimits | undefined): void {
+  if (limits === undefined) return;
+  if (typeof limits.maxCents !== 'bigint' || limits.maxCents < 0n) {
+    throw new Error(`a casino's money limit is a whole number of cents, 0 or more, was ${String(limits.maxCents)}`);
+  }
+  if (!Number.isInteger(limits.maxChancePpm) || limits.maxChancePpm < 0) {
+    throw new Error(`a casino's chance limit is a whole number of ppm, 0 or more, was ${limits.maxChancePpm}`);
+  }
+}
+
+/** The money limit, and one cent below the target's value: the chance of anything more is not computed. */
+function highestComputable(step: BoostStep, rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {
+  const belowTarget = step.targetCents - step.stakedCents - 1n;
+  const money = moneyCapOf(rule, limits);
+  return money < belowTarget ? money : belowTarget;
+}
+
+/** The largest amount in 0..`highest` whose chance is at most `cap`, or null when 0 is already above it. */
+function mostWithin(step: BoostStep, cap: number, highest: bigint): bigint | null {
+  if (boostChancePpm(step, 0n) > cap) return null;
+  let low = 0n;
+  let high = highest;
+  while (low < high) {
+    const middle = low + (high - low + 1n) / 2n;
+    if (boostChancePpm(step, middle) <= cap) low = middle;
+    else high = middle - 1n;
+  }
+  return low;
+}
+
+/** The least amount in `from`..`highest` whose chance is at least `chance`, or null when none reaches it. */
+function leastReaching(step: BoostStep, chance: number, from: bigint, highest: bigint): bigint | null {
+  if (boostChancePpm(step, highest) < chance) return null;
+  let low = from;
+  let high = highest;
+  while (low < high) {
+    const middle = low + (high - low) / 2n;
+    if (boostChancePpm(step, middle) >= chance) high = middle;
+    else low = middle + 1n;
+  }
+  return low;
+}
+
+/**
+ * The highest amount `step` accepts, or 0 when it accepts none: at most the engine's and the casino's money
+ * limits and one cent under the target's value, a chance of at most the engine's and the casino's chance
+ * limits, and, of the amounts with that chance, the least, so its last cent raises the chance. 0 when the
+ * chance with no amount is under the version's minimum: money never adds a target. Found by searching
+ * {@link boostChancePpm}, as the platform does, never by a second formula; the chance never falls as the
+ * amount grows.
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.3
+ */
+export function boostMaxCents(step: BoostStep, limits?: BoostLimits): bigint {
+  const rule = boostRuleOf(step.engineVersion);
+  requireLimits(limits);
+  if (boostChancePpm(step, 0n) < rule.minChancePpm) return 0n;
+  const highest = highestComputable(step, rule, limits);
+  if (highest < 1n) return 0n;
+  const top = mostWithin(step, chanceCapOf(rule, limits), highest);
+  if (top === null) return 0n;
+  return leastReaching(step, boostChancePpm(step, top), 0n, top) as bigint;
+}
+
+/**
+ * The answer for an amount of `boostCents`, from 1 cent, in the order the platform decides it: above
+ * {@link boostMaxCents} it is `boost_too_high`, before its chance is computed; then `boost_cent_lost` when
+ * its last cent leaves the chance where it was; else accepted at its chance.
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.3
+ */
+export function boostDecision(step: BoostStep, boostCents: bigint, limits?: BoostLimits): BoostDecision {
+  if (typeof boostCents !== 'bigint' || boostCents < 1n) {
+    throw new Error(`an amount to decide on is at least 1 cent, was ${String(boostCents)}`);
+  }
+  const rule = boostRuleOf(step.engineVersion);
+  const max = boostMaxCents(step, limits);
+  if (boostCents > max) return { decision: 'refused', refusal: 'boost_too_high', boostMaxCents: max };
+  const chancePpm = boostChancePpm(step, boostCents);
+  if (chancePpm <= boostChancePpm(step, boostCents - 1n)) {
+    return { decision: 'refused', refusal: 'boost_cent_lost', boostMaxCents: max };
+  }
+  // The limits that only rise with the amount hold at max, so they hold here; checked again because an
+  // accepted amount past a limit is the one answer this function must never give.
+  if (boostCents > moneyCapOf(rule, limits) || chancePpm > chanceCapOf(rule, limits)) {
+    throw new Error(`${boostCents} cents pass a limit: the search and the limits disagree`);
+  }
+  return { decision: 'accepted', boostCents, chancePpm };
+}
+
+/**
+ * The key of `points` percentage points on `step`: its price is the least amount whose chance reaches the
+ * chance with no amount plus `points` × 10 000 ppm, or null when that price is not accepted. A key is hidden,
+ * never cut down to a limit.
+ * Refs: KAN-1569, ADR-KAN-1154 amendment 9 §9.4
+ */
+export function boostKeyFor(step: BoostStep, points: number, limits?: BoostLimits): BoostKey | null {
+  if (!Number.isInteger(points) || points < 1) throw new Error(`a key adds at least 1 point, was ${points}`);
+  const rule = boostRuleOf(step.engineVersion);
+  requireLimits(limits);
+  const highest = highestComputable(step, rule, limits);
+  if (highest < 1n) return null;
+  const wanted = boostChancePpm(step, 0n) + points * PPM_PER_POINT;
+  const price = leastReaching(step, wanted, 1n, highest);
+  if (price === null) return null;
+  const decided = boostDecision(step, price, limits);
+  return decided.decision === 'accepted' ? { points, boostCents: decided.boostCents, chancePpm: decided.chancePpm } : null;
+}
+
+/** The keys of a casino's `points` that `step` serves, lowest first, each point counted once. */
+export function boostKeys(step: BoostStep, points: readonly number[], limits?: BoostLimits): BoostKey[] {
+  return [...new Set(points)]
+    .sort((a, b) => a - b)
+    .map((p) => boostKeyFor(step, p, limits))
+    .filter((key): key is BoostKey => key !== null);
+}
+
+/** The engine limit a recorded amount breaks, with the numbers the reports name. */
+export type BoostLimitFailure =
+  | { limit: 'reachesTarget' }
+  | { limit: 'ceiling'; chancePpm: number; ceilingCents: number }
+  | { limit: 'cap'; chancePpm: number; capPpm: number }
+  | { limit: 'lastCent'; chancePpm: number };
+
+/** {@link boostStepLimits}: the chance of the amount when every limit holds, or the first limit it breaks. */
+export type BoostLimitResult = { ok: true; chancePpm: number } | ({ ok: false } & BoostLimitFailure);
+
+/**
+ * The engine's limits on an amount a step RECORDS, in the order a reader meets them (plan v1.1 §2.2): the
+ * value staked plus the amount stays under the target's value; the amount is at most the ceiling; its chance
+ * is at most the cap; and its last cent raised the chance (only `b` against `b − 1`). With no amount (0) only
+ * the first applies, and it holds for every target. The minimum is not here: it is read on the chance with no
+ * amount, by the target check that runs first ({@link upgradeTargets} at the version's minimum), so one line
+ * holds it (the go's SHOULD 3). The casino's own limits are not part of the record, so they are not checked.
+ *
+ * Used by the step check and by the check of an upgraded win alike, so the two cannot disagree on a limit.
+ * Refs: KAN-1569 plan v1.1 L10, ADR-KAN-1154 amendment 9 §9.8
+ */
+export function boostStepLimits(step: BoostStep, boostCents: bigint): BoostLimitResult {
+  const rule = boostRuleOf(step.engineVersion);
+  if (typeof boostCents !== 'bigint' || boostCents < 0n) {
+    throw new Error(`a recorded amount is a whole number of cents, 0 or more, was ${String(boostCents)}`);
+  }
+  if (step.stakedCents + boostCents >= step.targetCents) return { ok: false, limit: 'reachesTarget' };
+  const chancePpm = boostChancePpm(step, boostCents);
+  if (boostCents === 0n) return { ok: true, chancePpm };
+  if (boostCents > BigInt(rule.boostCeilingCents)) return { ok: false, limit: 'ceiling', chancePpm, ceilingCents: rule.boostCeilingCents };
+  if (chancePpm > rule.boostMaxChancePpm) return { ok: false, limit: 'cap', chancePpm, capPpm: rule.boostMaxChancePpm };
+  if (chancePpm <= boostChancePpm(step, boostCents - 1n)) return { ok: false, limit: 'lastCent', chancePpm };
+  return { ok: true, chancePpm };
+}
+
+/**
+ * A broken limit in the words the reports use. The page reads them (site `words.ts`), so each form is fixed:
+ * `the value staked plus <b> cents reaches the target's value`, `<b> cents is above the ceiling of <c> cents`,
+ * `<b> cents gives a chance of <p> ppm, above the cap of <c> ppm`, `the last cent of <b> cents raises nothing:
+ * <b − 1> cents give <p> ppm too`.
+ */
+function boostLimitWhy(failure: BoostLimitFailure, boostCents: bigint): string {
+  switch (failure.limit) {
+    case 'reachesTarget':
+      return `the value staked plus ${boostCents} cents reaches the target's value`;
+    case 'ceiling':
+      return `${boostCents} cents is above the ceiling of ${failure.ceilingCents} cents`;
+    case 'cap':
+      return `${boostCents} cents gives a chance of ${failure.chancePpm} ppm, above the cap of ${failure.capPpm} ppm`;
+    case 'lastCent':
+      return `the last cent of ${boostCents} cents raises nothing: ${boostCents - 1n} cents give ${failure.chancePpm} ppm too`;
+  }
+}
+
+/** The step a recorded amount is added to, from the edition: the staked and named slots' values, at `rateBps`. */
+function boostStepOf(edition: UpgradeEditionOdds, rule: UpgradeRule, rateBps: number, stakedSlot: number, targetSlot: number): BoostStep {
+  const valueOf = (slotIndex: number): bigint => {
+    const slot = edition.slots.find((s) => s.slotIndex === slotIndex);
+    if (slot === undefined) throw new Error(`slot ${slotIndex} is not in the edition`);
+    return slot.requiredBuyBackValueCents;
+  };
+  return { engineVersion: rule.engineVersion, rateBps, stakedCents: valueOf(stakedSlot), targetCents: valueOf(targetSlot) };
+}
+
+/**
+ * The wire rule of a recorded amount (cto ruling KAN-1569 37069, which corrects 37014): on the public check every
+ * EUR amount in cents is a decimal string, so this one is too: whole cents from 1, written as `String(cents)`
+ * writes them, absent when no amount was added. It is read by the parser of `priceCents`; a JSON number, "0", a
+ * sign, a leading zero, a fraction or an empty text makes the record unreadable (`invalid`): it is never read as
+ * "no amount". Shared by the step and the open record, so both fields are held by the same check.
+ */
+export function recordedAmountCents(value: unknown, field: string): bigint | undefined {
+  if (value === undefined) return undefined;
+  const wrong = (was: string) =>
+    new Error(
+      `${field} is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON ` +
+        `number, never "0", no sign and no leading zero), was ${was}`,
+    );
+  if (typeof value !== 'string') throw wrong(typeof value === 'number' ? `the JSON number ${value}` : String(value));
+  let cents: bigint;
+  try {
+    cents = toBigInt(value, field);
+  } catch {
+    throw wrong(`the text '${value}'`);
+  }
+  // `toBigInt` takes a sign and leading zeros; a recorded amount is written one way only.
+  if (cents < 1n || cents.toString() !== value) throw wrong(`the text '${value}'`);
+  return cents;
+}
+
 /**
  * A step chance as the contract's `chanceCompact` writes it (upgrade-step contract §4, the perimeter's
  * DisplayRounding.renderFloor): percent with 2 decimals, a "." and a "%", rounded DOWN to 0.01 %, so it is
@@ -982,16 +1390,55 @@ function upgradeWinSlot(
   stakedSlot: number,
   recordedSlot: number,
   rule: UpgradeRule | undefined,
+  boostCents: bigint,
 ): { outcome: 'won' | 'lost'; slotIndex?: number; why: string } {
   const outcome = stepOutcome(v, chancePpm);
   if (outcome === 'lost') return { outcome, why: `none: ${v} loses at a chance of ${chancePpm} ppm` };
   if (rule === undefined) return { outcome, why: `none: ${unknownVersionWhy(edition.engineVersion)}` };
   const offer = stepFor(edition, rule, stakedSlot, recordedSlot);
   if (offer === null) return { outcome, why: `none: ${noStepWhy(rule, stakedSlot, recordedSlot)}` };
-  if (offer.chancePpm !== chancePpm) {
-    return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${offer.chancePpm} ppm, not ${chancePpm}` };
+  const fair = winChancePpm(edition, rule, stakedSlot, offer, boostCents);
+  if (fair !== chancePpm) {
+    return { outcome, why: `none: the step from slot ${stakedSlot} has a chance of ${fair} ppm, not ${chancePpm}` };
   }
   return { outcome, slotIndex: offer.targetSlotIndex, why: '' };
+}
+
+/**
+ * The fair chance of the step that made an upgraded win: the target's chance with no amount, or on a version
+ * with an amount, the chance with the amount the open record carries (absent is 0). The limits on that amount
+ * are checked first, by {@link winAmountWrong}.
+ */
+function winChancePpm(edition: UpgradeEditionOdds, rule: UpgradeRule, stakedSlot: number, offer: UpgradeOffer, boostCents: bigint): number {
+  if (rule.boostCeilingCents === undefined || boostCents === 0n) return offer.chancePpm;
+  return boostChancePpm(boostStepOf(edition, rule, stepRate(edition, rule), stakedSlot, offer.targetSlotIndex), boostCents);
+}
+
+/**
+ * The amount an upgraded win's open record carries, against its version (plan v1.1 L9), or undefined when it
+ * holds. Present on a version with no amount fails; on a version with one, the engine's limits are the
+ * step's own ({@link boostStepLimits}), so the open page and the step page cannot disagree on a limit. Needs
+ * no seed, so it fails before the reveal too. Undefined as well when the step itself has no fair chance (the
+ * version, the rate or the target): that cause is reported by the chance check, as on every version.
+ *
+ * The words, which the page reads (site `words.ts`): expected `amount recorded <b> cents`; computed
+ * `amount refused, version <v> of the upgrade rules has no amount`, or `amount refused, <the limit>` in the
+ * forms of {@link boostLimitWhy}.
+ */
+function winAmountWrong(input: VerificationInput, rule: UpgradeRule | undefined): Check | undefined {
+  const recorded = input.expected.stepBoostCents;
+  if (recorded === undefined || rule === undefined) return undefined;
+  const amount = BigInt(recorded);
+  const expected = `amount recorded ${amount} cents`;
+  if (rule.boostCeilingCents === undefined) {
+    return { ok: false, expected, computed: `amount refused, version ${rule.engineVersion} of the upgrade rules has no amount` };
+  }
+  const stakedSlot = input.expected.stakedSlotIndex as number;
+  const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, input.expected.drawnSlotIndex));
+  if (!offer.ok || offer.value === null) return undefined;
+  const target = offer.value.targetSlotIndex;
+  const limits = boostStepLimits(boostStepOf(input.edition, rule, stepRate(input.edition, rule), stakedSlot, target), amount);
+  return limits.ok ? undefined : { ok: false, expected, computed: `amount refused, ${boostLimitWhy(limits, amount)}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -1398,11 +1845,14 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
   // Step 4 — the slot. Needs the draw and a usable table.
   // An upgraded win is never read over the box's ranges: its table is the step's, set below once v is known.
   if (input.gameKind === 'upgrade') delete trace.cumulative;
+  // The amount the win's record carries, against the limits of its version: needs no seed, so it is decided
+  // first and is the cause reported, locked or revealed (plan v1.1 L9).
+  const amountWrong = input.gameKind === 'upgrade' && preimage.ok ? winAmountWrong(input, winRule) : undefined;
   let computedSlotIndex: number | undefined;
   if (derivation === undefined) {
     // The chance shown with an upgrade win needs no seed: its fair text comes from the edition and the staked
     // slot alone, so a wrong text fails now instead of reading pending until the reveal (owner ruling, KAN-1154).
-    const shownWrong = input.gameKind === 'upgrade' && preimage.ok ? wrongChanceText(input, winRule) : undefined;
+    const shownWrong = amountWrong ?? (input.gameKind === 'upgrade' && preimage.ok ? wrongChanceText(input, winRule) : undefined);
     if (shownWrong !== undefined) checks.drawnSlotIndex = shownWrong;
     else skip('drawnSlotIndex', seedRevealed ? 'it needs the drawn value, which could not be computed' : SEED_NOT_REVEALED);
   } else if (!preimage.ok) {
@@ -1412,8 +1862,9 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
     const chancePpm = input.expected.stepChancePpm as number;
     const expectedSlot = String(input.expected.drawnSlotIndex);
     const stakedSlot = input.expected.stakedSlotIndex as number;
+    const boostCents = BigInt(input.expected.stepBoostCents ?? 0);
     const step = attempt(() =>
-      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule),
+      upgradeWinSlot(derivation!.value, chancePpm, input.edition, stakedSlot, input.expected.drawnSlotIndex, winRule, boostCents),
     );
     if (!step.ok) {
       checks.drawnSlotIndex = unusable(expectedSlot, 'expected.stepChancePpm', step.error);
@@ -1437,26 +1888,20 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
           ? { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` }
           : slotCheck;
     }
+    if (amountWrong !== undefined) {
+      // The table and the outcome were computed with the amount just refused, so the trace keeps neither.
+      checks.drawnSlotIndex = amountWrong;
+      delete trace.cumulative;
+      delete trace.computedStepOutcome;
+      delete trace.computedSlotIndex;
+      computedSlotIndex = undefined;
+    }
     // On a version whose steps name their own target, the slot here is the one the win records: this run
     // proves it is an allowed target, not that it is the target the step named.
-    caveats.push(
-      winRule?.engineVersion === 3
-        ? UPGRADE_V3_CAVEATS.win(stakedSlot, input.expected.drawnSlotIndex, input.expected.upgradeStepId)
-        : winRule?.jumps === true
-        ? `This win was made by an upgrade step from slot ${stakedSlot} on version ${winRule.engineVersion} of the ` +
-            `upgrade rules. This run checks that slot ${input.expected.drawnSlotIndex} is a target the edition ` +
-            `allows from slot ${stakedSlot} on that version, that the chance is the formula's, and that the step's ` +
-            'draw wins at it over the step\'s own table. Which target the step named is not compared here: it is ' +
-            'shown on the step\'s own page' +
-            `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
-            `and so are that the staked win really held slot ${stakedSlot}, the cap on steps and the engine type, ` +
-            'which this run does not check.'
-        : `This win was made by an upgrade step from slot ${stakedSlot}. This run checks the step's draw, its ` +
-            'fair chance and its target over the step\'s own table. That the staked win really held slot ' +
-            `${stakedSlot} is shown on the step's own page` +
-            `${input.expected.upgradeStepId === undefined ? '' : ` (step ${input.expected.upgradeStepId})`}, ` +
-            'and so are the cap on steps and the engine type and version, which this run does not check.',
-    );
+    // Each version's own words (L8); a version this library does not check keeps version 1's general words.
+    const winCaveat = (winRule === undefined ? undefined : UPGRADE_CAVEATS_BY_VERSION[winRule.engineVersion]?.win) ?? nextUpWinCaveat;
+    const recordedAmount = input.expected.stepBoostCents === undefined ? undefined : BigInt(input.expected.stepBoostCents);
+    caveats.push(winCaveat(stakedSlot, input.expected.drawnSlotIndex, input.expected.upgradeStepId, recordedAmount));
   } else {
     computedSlotIndex = slotFor(derivation.value, input.edition.slots);
     trace.computedSlotIndex = computedSlotIndex;
@@ -1681,12 +2126,14 @@ function wrongChanceText(input: VerificationInput, rule: UpgradeRule | undefined
   if (offer.value === null) {
     return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance none, ${noStepWhy(rule, stakedSlot, targetSlot)}` };
   }
-  const fairText = stepChanceText(offer.value.chancePpm);
+  // On version 4 the fair chance is the one with the amount the record carries (absent is 0); its limits held.
+  const fair = winChancePpm(input.edition, rule, stakedSlot, offer.value, BigInt(input.expected.stepBoostCents ?? 0));
+  const fairText = stepChanceText(fair);
   if (shown !== fairText) return { ok: false, expected: `chance shown ${shown}`, computed: `fair chance ${fairText}` };
   const recorded = input.expected.stepChancePpm as number;
-  return recorded === offer.value.chancePpm
+  return recorded === fair
     ? undefined
-    : { ok: false, expected: `chance recorded ${recorded} ppm`, computed: `fair chance ${offer.value.chancePpm} ppm` };
+    : { ok: false, expected: `chance recorded ${recorded} ppm`, computed: `fair chance ${fair} ppm` };
 }
 
 /**
@@ -1714,6 +2161,11 @@ function requireShape(input: VerificationInput): void {
     need(typeof input.edition === 'object' && input.edition !== null && Array.isArray(input.edition.slots), 'edition (required on an upgrade win)');
     need(typeof input.expected.stakedSlotIndex === 'number', 'expected.stakedSlotIndex (required on an upgrade win)');
     need(input.expected.stepOutcome === 'won' || input.expected.stepOutcome === 'lost', 'expected.stepOutcome (required on an upgrade win)');
+  }
+  // The same wire rule as the step's own amount, through the same check (plan v1.1 L9, NOTE-5).
+  recordedAmountCents(input.expected.stepBoostCents, 'expected.stepBoostCents');
+  if (input.expected.stepBoostCents !== undefined && input.gameKind !== 'upgrade') {
+    throw new Error('expected.stepBoostCents is recorded only with an upgrade win, and this open is not one');
   }
   if (input.snapshot !== undefined) {
     need(typeof input.snapshot.editionFingerprint === 'string', 'snapshot.editionFingerprint');
@@ -1793,6 +2245,11 @@ export interface UpgradeStepInput {
     drawnPpmValue: number;
     outcome: 'won' | 'lost';
     stepNo: number;
+    /**
+     * Version 4 only: the amount recorded as added to the value staked, a decimal string of whole cents from 1.
+     * Absent when none was added; any other shape (a JSON number, "0", a fraction) makes the step unreadable.
+     */
+    boostCents?: string;
   };
 }
 
@@ -1804,6 +2261,7 @@ export const UPGRADE_STEP_CHECK_NAMES = [
   'engineVersion',
   'upgradeTarget',
   'upgradeChance',
+  'boostAmount',
   'chanceCompact',
   'stepNo',
   'drawnPpmValue',
@@ -1846,8 +2304,11 @@ export interface UpgradeStepReport {
 /**
  * Verify one upgrade step: the commitment, the odds, that the edition is an upgrade edition on a version
  * this library checks, that the target is one its version allows from the staked slot (version 1: the next
- * value up; version 2: any higher value at 1 % or more) and the chance its fair floor, that the step
- * number is within the cap, that the seed reproduces the drawn value, and that this value reads as the
+ * value up; version 2: any higher value at 1 % or more; versions 3 and 4: any higher value at 0.1 % or more,
+ * read on the chance with no amount) and the chance its version's (the fair floor on versions 1 and 2, the
+ * box's rate rounded up on version 3, and on version 4 the same with the amount the step records), that the
+ * amount is within the engine's limits (`boostAmount`; versions 1 to 3 record none), that the step number is
+ * within its version's limit, that the seed reproduces the drawn value, and that this value reads as the
  * recorded outcome over the step's own table. A lost step verifies exactly like a won one.
  */
 export async function verifyUpgradeStep(input: UpgradeStepInput, options: UpgradeStepOptions = {}): Promise<UpgradeStepReport> {
@@ -1920,20 +2381,41 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
       'and an engine row cannot be changed after it is published; this run did not look at that row itself.',
   );
 
+  // The amount recorded with the step. A version with no amount needs only its rule to check it: the amount
+  // must be absent. On a version with one, the limits need the two values, so they wait for the target.
+  const recordedAmount = expected.boostCents === undefined ? undefined : BigInt(expected.boostCents);
+  const boosts = rule?.boostCeilingCents !== undefined;
+  const amountWaits = (why: string) => {
+    if (boosts || rule === undefined) skip('boostAmount', why);
+  };
+  if (rule !== undefined && !boosts) {
+    checks.boostAmount =
+      recordedAmount === undefined
+        ? check('no amount', 'no amount')
+        : {
+            ok: false,
+            expected: `no amount: version ${rule.engineVersion} of the upgrade rules has none`,
+            computed: `${recordedAmount} cents`,
+          };
+  }
+
   let chance: number | undefined;
   if (rate !== undefined && !rate.ok) {
     skip('upgradeTarget', 'it needs the box\'s rate, which could not be read from the edition');
     checks.upgradeChance = unusable(String(expected.chancePpm), 'edition', rate.error);
+    amountWaits('it needs the box\'s rate, which could not be read from the edition');
     skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (offer === undefined) {
     // A version with no rule here is never read by another version's rule: the step's maths are not run.
     const why = !preimage.ok ? 'it needs the prize table, which is unusable' : unknownVersionWhy(input.edition.engineVersion);
     skip('upgradeTarget', why);
     skip('upgradeChance', why);
+    amountWaits(why);
     skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (!offer.ok) {
     checks.upgradeTarget = unusable(String(expected.targetSlotIndex), 'expected.stakedSlotIndex', offer.error);
     skip('upgradeChance', 'it needs the target, which could not be computed');
+    amountWaits('it needs the target, which could not be computed');
     skip('chanceCompact', 'it needs the step chance, which could not be computed');
   } else if (offer.value === null) {
     // An offer is only computed under a rule, so `rule` is set here.
@@ -1947,15 +2429,32 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
       ? 'the edition allows no step from the staked slot to the target'
       : 'the edition offers no step from the staked slot';
     skip('upgradeChance', why);
+    amountWaits(why);
     skip('chanceCompact', why);
   } else {
     trace.computedOffer = offer.value;
     chance = offer.value.chancePpm;
-    trace.cumulative = cumulativeTable(stepTable(chance));
     checks.upgradeTarget = check(String(expected.targetSlotIndex), String(offer.value.targetSlotIndex));
-    checks.upgradeChance = check(String(expected.chancePpm), String(chance));
-    // The string a player reads, against the FAIR chance: a right number with a rounded-up string fails here.
-    checks.chanceCompact = check(expected.chanceCompact, stepChanceText(chance));
+    if (boosts) {
+      // The target was found at the chance with no amount, so the version's minimum holds already. The amount
+      // is checked against the engine's limits (boostStepLimits), and the chance is the one with the amount.
+      const amount = recordedAmount ?? 0n;
+      const step = boostStepOf(input.edition, rule as UpgradeRule, trace.stepRateBps as number, expected.stakedSlotIndex, offer.value.targetSlotIndex);
+      const limits = boostStepLimits(step, amount);
+      const within = amount === 0n ? 'no amount' : `${amount} cents within the limits of version ${step.engineVersion}`;
+      checks.boostAmount = limits.ok ? check(within, within) : { ok: false, expected: within, computed: boostLimitWhy(limits, amount) };
+      chance = limits.ok || limits.limit !== 'reachesTarget' ? limits.chancePpm : undefined;
+    }
+    if (chance === undefined) {
+      const why = "it needs the chance with the amount, which cannot be computed: the amount reaches the target's value";
+      skip('upgradeChance', why);
+      skip('chanceCompact', why);
+    } else {
+      trace.cumulative = cumulativeTable(stepTable(chance));
+      checks.upgradeChance = check(String(expected.chancePpm), String(chance));
+      // The string a player reads, against the FAIR chance: a right number with a rounded-up string fails here.
+      checks.chanceCompact = check(expected.chanceCompact, stepChanceText(chance));
+    }
   }
   // A range check, not a recompute: the chain of earlier steps is not part of one step. The range is the
   // version's limit, or on a version with none the longest chain a box of 30 prizes allows.
@@ -1968,12 +2467,8 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
       expected: `in range 1..${maxStepNo}`,
       computed: String(expected.stepNo),
     };
-    caveats.push(
-      rule?.engineVersion === 3
-        ? UPGRADE_V3_CAVEATS.stepNo(maxStepNo)
-        : `The step number is the platform's claim. This run checks only that it is in range 1..${maxStepNo} ` +
-            '(the cap); which earlier steps led to this one is shown on their own pages.',
-    );
+    // Each version's own words, never another's (L8): a rule always has its entry in the table.
+    caveats.push((UPGRADE_CAVEATS_BY_VERSION[(rule as UpgradeRule).engineVersion]?.stepNo ?? capStepNoCaveat)(maxStepNo));
   }
 
   // The commitment and the draw. Both need the revealed seed.
@@ -2043,7 +2538,9 @@ async function verifyStepChecked(input: UpgradeStepInput, options: UpgradeStepOp
         : status === 'failed'
           ? `FAILED: ${failed.join(', ')} did not match. This step is not verified.`
           : `Verified: nonce ${input.nonce} draws ppm ${v}, which ${trace.computedOutcome === 'won' ? 'wins' : 'loses'} ` +
-            `at a chance of ${chance} ppm, the fair step from slot ${expected.stakedSlotIndex} to slot ` +
+            `at a chance of ${chance} ppm` +
+            `${recordedAmount === undefined ? '' : ` with an amount of ${recordedAmount} cents recorded`}, ` +
+            `the fair step from slot ${expected.stakedSlotIndex} to slot ` +
             `${expected.targetSlotIndex} of an edition whose published odds match its recorded fingerprint.`,
   };
   const first = failed[0];
@@ -2071,4 +2568,5 @@ function requireStepShape(input: UpgradeStepInput): void {
   }
   need(e.outcome === 'won' || e.outcome === 'lost', 'expected.outcome');
   need(typeof e.chanceCompact === 'string', 'expected.chanceCompact');
+  recordedAmountCents(e.boostCents, 'expected.boostCents');
 }

@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -784,7 +784,7 @@
+       boostAmount:
+         amountCents === undefined
+           ? "No amount was recorded with this upgrade."
+-          : `The amount recorded with this upgrade, ${amountText(amountCents)}, is within the limits of the upgrade rules. It is at most 1,000.00, and the chance with it is at most 50%. Its last cent raised the chance, so no smaller amount gives the same chance.`,
++          : `The amount recorded with this upgrade, ${amountText(amountCents)}, is within the limit of the upgrade rules. It is at most 1,000.00, and the chance with it is at most 50%. Its last cent raised the chance, so no smaller amount gives the same chance.`,
+     },
+     fail: {
+       upgradeTarget:

@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -804,7 +804,7 @@ export const UPGRADE_V4_WORDS = {
+   step2: (rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[]; source: string } => {
+     const v3 = UPGRADE_V3_WORDS.step2(rateBps)
+     return {
+-      title: amountCents === undefined ? v3.title : "The chance of your upgrade comes from this box's upgrade rate and the amount recorded with it.",
++      title: amountCents === -1 ? v3.title : "The chance of your upgrade comes from this box's upgrade rate and the amount recorded with it.",
+       text: [
+         v3.text[0],
+         ...(amountCents === undefined ? [v3.text[1]] : []),

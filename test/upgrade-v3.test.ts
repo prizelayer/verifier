@@ -93,7 +93,7 @@ describe('version 3: the box\'s rate (§8.3)', () => {
       assert.equal(upgradeStepRateBps(WORKED_9636, version), 10_000);
       assert.equal(upgradeStepRateBps(DRAFT_9198, version), 10_000);
     }
-    assert.throws(() => upgradeStepRateBps(WORKED_9636, 4), /version 4 of the upgrade engine is not one this library checks/);
+    assert.throws(() => upgradeStepRateBps(WORKED_9636, 5), /version 5 of the upgrade engine is not one this library checks/);
   });
 });
 

@@ -1,0 +1,16 @@
+KAN-1569 planted bug M-S2: the step check drops the 50 % cap.
+Killer: test/upgrade-v4.test.ts "fails 67.53 EUR on 40 to 200 EUR: 500 015 ppm, above the cap (M-S2)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..cbc11a4 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1279,7 +1279,6 @@ export function boostStepLimits(step: BoostStep, boostCents: bigint): BoostLimit
+   const chancePpm = boostChancePpm(step, boostCents);
+   if (boostCents === 0n) return { ok: true, chancePpm };
+   if (boostCents > BigInt(rule.boostCeilingCents)) return { ok: false, limit: 'ceiling', chancePpm, ceilingCents: rule.boostCeilingCents };
+-  if (chancePpm > rule.boostMaxChancePpm) return { ok: false, limit: 'cap', chancePpm, capPpm: rule.boostMaxChancePpm };
+   if (chancePpm <= boostChancePpm(step, boostCents - 1n)) return { ok: false, limit: 'lastCent', chancePpm };
+   return { ok: true, chancePpm };
+ }

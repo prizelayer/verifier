@@ -1,0 +1,12 @@
+diff --git a/site/src/words.ts b/site/src/words.ts
+--- a/site/src/words.ts
++++ b/site/src/words.ts
+@@ -936,7 +936,7 @@
+   1: V1_WORDS,
+   2: V2_WORDS,
+   3: V3_WORDS,
+-  4: V4_WORDS,
++  4: [V2_WORDS, V4_WORDS][0],
+ })
+ 
+ export function upgradeWords(engineVersion: number | undefined): UpgradeVersionWords {

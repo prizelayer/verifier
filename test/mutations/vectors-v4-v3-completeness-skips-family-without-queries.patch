@@ -1,0 +1,16 @@
+KAN-1569 planted bug M-V3: test side: the completeness check skips a family that has no queries (every version 4 family).
+Killer: test/vectors.test.ts "the completeness check fails closed (KAN-1569 plan v1.1 T2)" "refuses an extra version 4 family with cases and no steps".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/test/vectors.test.ts b/test/vectors.test.ts
+index ed5f23e..79f0cd2 100644
+--- a/test/vectors.test.ts
++++ b/test/vectors.test.ts
+@@ -1977,6 +1977,7 @@ function expectedVectorIds(fixture: Record<string, unknown>): string[] {
+       const families = (body as { families?: AnyFamily[] }).families;
+       if (families !== undefined) {
+         return families.flatMap((f) => {
++          if (f.queries === undefined) return [];
+           const where = `${section}/${f.id}`;
+           for (const [key, value] of Object.entries(f)) {
+             if (Array.isArray(value) && !FAMILY_LISTS.has(key)) {

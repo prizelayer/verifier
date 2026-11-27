@@ -3422,5 +3422,1029 @@
         ]
       }
     ]
+  },
+  "upgradeBoostChance": {
+    "specification": "specs/rng-fairness.md §4b — version 4, the chance with an amount",
+    "note": "p(b) = the ceiling of R · 1,000,000 · (s + b) / (10,000 · t): version 3's chance from the stake plus the amount, so p(0) is version 3's chance. An amount b of at least 1 cent is accepted only when b <= boostCeilingCents (constants), b <= casinoMaxCents, p(b) <= boostMaxChancePpm (constants), p(b) <= casinoMaxChancePpm, and p(b) > p(b - 1) (the lost-cent rule); nothing is accepted when p(0) < minChancePpm, and no amount reaches the target's value. boostMaxCents of a case is the highest amount it accepts, 0 when none; a refused amount carries it. The word of a refused amount: above boostMaxCents it is boost_too_high, decided before its chance is computed, so before the lost-cent rule is read; boost_cent_lost is only for an amount at or under boostMaxCents; a step with p(0) < minChancePpm answers boost_too_high with boostMaxCents 0. A key of N points costs the least amount b with p(b) >= p(0) + N · 10,000 ppm, and is listed only when that amount is accepted: a key is hidden, never cut down to a limit. R is version 3's: compute it from the slots and the price, never read stepRtpBps. A drawn step is won ⇔ v < p, as in upgradeStep, under the engine's limits only (a step's record carries no casino limit).",
+    "serverSeedHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "commitmentHex": "630dcd2966c4336691125448bbb25b4ff412a49c732db2c8abc1b8581bd710dd",
+    "constants": {
+      "engineType": "single_draw_weighted_table_fair_upgrade",
+      "engineVersion": 4,
+      "maxSteps": null,
+      "minChancePpm": 1000,
+      "offerMinChancePpm": 1000,
+      "stepRtpCapBps": 9990,
+      "stepRtpFloorBps": 9300,
+      "boostCeilingCents": 100000,
+      "boostMaxChancePpm": 500000
+    },
+    "families": [
+      {
+        "id": "boost-box-c-9400",
+        "note": "Box C of the record, exactly 94 %: R = 9400. Ana stakes 40 EUR for 200 EUR, 188000 with no money; each cent adds 47 ppm. 21.28 EUR, the +10 key, gives 288016; the cap of 500000 stops at 66.38 EUR. The same draw, v = 261902, is lost with no money and won with 21.28 EUR.",
+        "priceCents": "5000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 981250,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 13750,
+            "buyBackValueCents": 20000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 5000,
+            "buyBackValueCents": 100000
+          }
+        ],
+        "payoutTimesMillion": "4700000000",
+        "boxBps": 9400,
+        "stepRtpBps": 9400,
+        "cases": [
+          {
+            "id": "ana-40-to-200",
+            "note": "1 cent, 21.27, 21.28, the highest amount and one cent more",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 188000,
+            "boostMaxCents": 6638,
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "accepted",
+                "chancePpm": 188047,
+                "chanceCompact": "18.80%"
+              },
+              {
+                "boostCents": 2127,
+                "decision": "accepted",
+                "chancePpm": 287969,
+                "chanceCompact": "28.79%"
+              },
+              {
+                "boostCents": 2128,
+                "decision": "accepted",
+                "chancePpm": 288016,
+                "chanceCompact": "28.80%"
+              },
+              {
+                "boostCents": 6638,
+                "decision": "accepted",
+                "chancePpm": 499986,
+                "chanceCompact": "49.99%"
+              },
+              {
+                "boostCents": 6639,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 6638
+              }
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "id": "plus-10-won",
+            "note": "21.28 EUR on 40 -> 200 EUR at 288016; v = 261902 is under it",
+            "clientSeed": "alice-seed",
+            "nonce": 3,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "boostCents": 2128,
+            "chancePpm": 288016,
+            "chanceCompact": "28.80%",
+            "stepTablePpm": [
+              288016,
+              711984
+            ],
+            "v": 261902,
+            "slotIndex": 0,
+            "outcome": "won"
+          },
+          {
+            "id": "no-money-lost",
+            "note": "the same draw, no money: 188000; v = 261902 is not under it",
+            "clientSeed": "alice-seed",
+            "nonce": 3,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "boostCents": 0,
+            "chancePpm": 188000,
+            "chanceCompact": "18.80%",
+            "stepTablePpm": [
+              188000,
+              812000
+            ],
+            "v": 261902,
+            "slotIndex": 1,
+            "outcome": "lost"
+          },
+          {
+            "id": "plus-10-lost",
+            "note": "21.28 EUR at 288016; v = 459796 is not under it",
+            "clientSeed": "alice-seed",
+            "nonce": 2,
+            "heldSlotIndex": 0,
+            "stepNo": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "boostCents": 2128,
+            "chancePpm": 288016,
+            "chanceCompact": "28.80%",
+            "stepTablePpm": [
+              288016,
+              711984
+            ],
+            "v": 459796,
+            "slotIndex": 1,
+            "outcome": "lost"
+          }
+        ]
+      },
+      {
+        "id": "boost-box-a-9300",
+        "note": "Box A, just over 93 %: R = 9300. Ana 40 -> 200 EUR: 186000 with no money; 21.50 EUR gives 285975 and 21.51 EUR, the +10 key, 286022; 67.52 EUR gives 499968, 67.53 EUR is over the cap. 1,000 -> 100,000 EUR: 9300 with no money, a cent adds 0.093 ppm, so 0.01 EUR gives 9301, 0.02 to 0.10 EUR buy nothing more and are refused by the lost-cent rule, and 0.11 EUR gives 9302.",
+        "priceCents": "11333",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 960000,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 30000,
+            "buyBackValueCents": 20000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 8000,
+            "buyBackValueCents": 100000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 1500,
+            "buyBackValueCents": 200000
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 500,
+            "buyBackValueCents": 10000000
+          }
+        ],
+        "payoutTimesMillion": "10540000000",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "cases": [
+          {
+            "id": "ana-40-to-200",
+            "note": "the +10 key's price and one cent less, the cap's edge",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 186000,
+            "boostMaxCents": 6752,
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "accepted",
+                "chancePpm": 186047,
+                "chanceCompact": "18.60%"
+              },
+              {
+                "boostCents": 2150,
+                "decision": "accepted",
+                "chancePpm": 285975,
+                "chanceCompact": "28.59%"
+              },
+              {
+                "boostCents": 2151,
+                "decision": "accepted",
+                "chancePpm": 286022,
+                "chanceCompact": "28.60%"
+              },
+              {
+                "boostCents": 6752,
+                "decision": "accepted",
+                "chancePpm": 499968,
+                "chanceCompact": "49.99%"
+              },
+              {
+                "boostCents": 6753,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 6752
+              }
+            ]
+          },
+          {
+            "id": "lost-cent-1000-to-100000",
+            "note": "one cent buys a ppm, the next nine cents do not",
+            "heldSlotIndex": 2,
+            "targetSlotIndex": 4,
+            "stakedBuyBackValueCents": 100000,
+            "targetBuyBackValueCents": 10000000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 9300,
+            "boostMaxCents": 99990,
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "accepted",
+                "chancePpm": 9301,
+                "chanceCompact": "0.93%"
+              },
+              {
+                "boostCents": 2,
+                "decision": "refused",
+                "refusal": "boost_cent_lost",
+                "boostMaxCents": 99990
+              },
+              {
+                "boostCents": 10,
+                "decision": "refused",
+                "refusal": "boost_cent_lost",
+                "boostMaxCents": 99990
+              },
+              {
+                "boostCents": 11,
+                "decision": "accepted",
+                "chancePpm": 9302,
+                "chanceCompact": "0.93%"
+              },
+              {
+                "boostCents": 12,
+                "decision": "refused",
+                "refusal": "boost_cent_lost",
+                "boostMaxCents": 99990
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "boost-9990",
+        "note": "A box above 99.90 %, so R = 9990. 40 EUR for 39,960.04 EUR is exactly the minimum, 1000. One cent gives 1001 (99.975 %). 999.97 EUR gives 26000 (99.9030 %) and is the highest amount: 999.96 EUR gives 25999 and 999.98 EUR to 1,000.00 EUR give 26000 again, so 1,000.00 EUR is refused.",
+        "priceCents": "4005",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 999999,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 3996004
+          }
+        ],
+        "payoutTimesMillion": "4003992004",
+        "boxBps": 9997,
+        "stepRtpBps": 9990,
+        "cases": [
+          {
+            "id": "ninety-nine-ninety",
+            "note": "the best return per cent and the largest amount",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 3996004,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 1000,
+            "boostMaxCents": 99997,
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "accepted",
+                "chancePpm": 1001,
+                "chanceCompact": "0.10%"
+              },
+              {
+                "boostCents": 99996,
+                "decision": "refused",
+                "refusal": "boost_cent_lost",
+                "boostMaxCents": 99997
+              },
+              {
+                "boostCents": 99997,
+                "decision": "accepted",
+                "chancePpm": 26000,
+                "chanceCompact": "2.60%"
+              },
+              {
+                "boostCents": 99998,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 99997
+              },
+              {
+                "boostCents": 100000,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 99997
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "upgradeBoostLimits": {
+    "specification": "specs/rng-fairness.md §4b — version 4, the limits and the keys",
+    "note": "p(b) = the ceiling of R · 1,000,000 · (s + b) / (10,000 · t): version 3's chance from the stake plus the amount, so p(0) is version 3's chance. An amount b of at least 1 cent is accepted only when b <= boostCeilingCents (constants), b <= casinoMaxCents, p(b) <= boostMaxChancePpm (constants), p(b) <= casinoMaxChancePpm, and p(b) > p(b - 1) (the lost-cent rule); nothing is accepted when p(0) < minChancePpm, and no amount reaches the target's value. boostMaxCents of a case is the highest amount it accepts, 0 when none; a refused amount carries it. The word of a refused amount: above boostMaxCents it is boost_too_high, decided before its chance is computed, so before the lost-cent rule is read; boost_cent_lost is only for an amount at or under boostMaxCents; a step with p(0) < minChancePpm answers boost_too_high with boostMaxCents 0. A key of N points costs the least amount b with p(b) >= p(0) + N · 10,000 ppm, and is listed only when that amount is accepted: a key is hidden, never cut down to a limit. R is version 3's: compute it from the slots and the price, never read stepRtpBps. A drawn step is won ⇔ v < p, as in upgradeStep, under the engine's limits only (a step's record carries no casino limit).",
+    "constants": {
+      "engineType": "single_draw_weighted_table_fair_upgrade",
+      "engineVersion": 4,
+      "maxSteps": null,
+      "minChancePpm": 1000,
+      "offerMinChancePpm": 1000,
+      "stepRtpCapBps": 9990,
+      "stepRtpFloorBps": 9300,
+      "boostCeilingCents": 100000,
+      "boostMaxChancePpm": 500000
+    },
+    "families": [
+      {
+        "id": "boost-limits-box-a-9300",
+        "note": "Box A, R = 9300. 40 -> 2,000 EUR: the ceiling binds, 1,000.00 EUR is accepted at 483600 and 1,000.01 EUR refused, keys at 107.53, 215.06 and 537.64 EUR. 40 -> 200 EUR: the cap binds at 67.52 EUR. A casino's money limit of 200.00 EUR hides +10 and +25 on 40 -> 2,000; a chance limit of 300000 hides +25 on 40 -> 200, and a chance limit of 286022 is met exactly by +10 at 21.51 EUR, which is listed; 21.52 EUR gives 286068 and is refused. 40 -> 100,000 EUR is 372 ppm with no money, under the minimum: no amount, no key.",
+        "priceCents": "11333",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 960000,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 30000,
+            "buyBackValueCents": 20000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 8000,
+            "buyBackValueCents": 100000
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 1500,
+            "buyBackValueCents": 200000
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 500,
+            "buyBackValueCents": 10000000
+          }
+        ],
+        "payoutTimesMillion": "10540000000",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "cases": [
+          {
+            "id": "ceiling-40-to-2000",
+            "note": "the engine's ceiling, 100000 cents",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 3,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 200000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 18600,
+            "boostMaxCents": 100000,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 10753,
+                "chancePpm": 68602,
+                "chanceCompact": "6.86%"
+              },
+              {
+                "points": 10,
+                "boostCents": 21506,
+                "chancePpm": 118603,
+                "chanceCompact": "11.86%"
+              },
+              {
+                "points": 25,
+                "boostCents": 53764,
+                "chancePpm": 268603,
+                "chanceCompact": "26.86%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 100000,
+                "decision": "accepted",
+                "chancePpm": 483600,
+                "chanceCompact": "48.36%"
+              },
+              {
+                "boostCents": 100001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 100000
+              }
+            ]
+          },
+          {
+            "id": "cap-40-to-200",
+            "note": "the engine's cap, 500000 ppm",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 186000,
+            "boostMaxCents": 6752,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 1076,
+                "chancePpm": 236034,
+                "chanceCompact": "23.60%"
+              },
+              {
+                "points": 10,
+                "boostCents": 2151,
+                "chancePpm": 286022,
+                "chanceCompact": "28.60%"
+              },
+              {
+                "points": 25,
+                "boostCents": 5377,
+                "chancePpm": 436031,
+                "chanceCompact": "43.60%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 6752,
+                "decision": "accepted",
+                "chancePpm": 499968,
+                "chanceCompact": "49.99%"
+              },
+              {
+                "boostCents": 6753,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 6752
+              }
+            ]
+          },
+          {
+            "id": "casino-money-limit-40-to-2000",
+            "note": "the casino's 20000 cents is below the ceiling",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 3,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 200000,
+            "casinoMaxCents": 20000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 18600,
+            "boostMaxCents": 20000,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 10753,
+                "chancePpm": 68602,
+                "chanceCompact": "6.86%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 20000,
+                "decision": "accepted",
+                "chancePpm": 111600,
+                "chanceCompact": "11.16%"
+              },
+              {
+                "boostCents": 20001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 20000
+              }
+            ]
+          },
+          {
+            "id": "casino-chance-limit-40-to-200",
+            "note": "the casino's 300000 ppm is below the cap",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 300000,
+            "plainChancePpm": 186000,
+            "boostMaxCents": 2451,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 1076,
+                "chancePpm": 236034,
+                "chanceCompact": "23.60%"
+              },
+              {
+                "points": 10,
+                "boostCents": 2151,
+                "chancePpm": 286022,
+                "chanceCompact": "28.60%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 2451,
+                "decision": "accepted",
+                "chancePpm": 299972,
+                "chanceCompact": "29.99%"
+              },
+              {
+                "boostCents": 2452,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 2451
+              }
+            ]
+          },
+          {
+            "id": "key-on-casino-chance-limit-40-to-200",
+            "note": "+10 lands exactly on the casino's 286022 ppm",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 20000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 286022,
+            "plainChancePpm": 186000,
+            "boostMaxCents": 2151,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 1076,
+                "chancePpm": 236034,
+                "chanceCompact": "23.60%"
+              },
+              {
+                "points": 10,
+                "boostCents": 2151,
+                "chancePpm": 286022,
+                "chanceCompact": "28.60%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 2151,
+                "decision": "accepted",
+                "chancePpm": 286022,
+                "chanceCompact": "28.60%"
+              },
+              {
+                "boostCents": 2152,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 2151
+              }
+            ]
+          },
+          {
+            "id": "under-minimum-40-to-100000",
+            "note": "372 ppm with no money: money adds no target",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 4,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 10000000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 372,
+            "boostMaxCents": 0,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [],
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 0
+              },
+              {
+                "boostCents": 7001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "boost-limits-box-c-9400",
+        "note": "Box C, R = 9400. 40 -> 1,000 EUR, its far step: 37600 with no money, keys at 53.20, 106.39 and 265.96 EUR, and the cap binds at 491.91 EUR. Under the old ceiling of 100.00 EUR, now a casino's own money limit, +10 and +25 are hidden, not cut down to 100.00 EUR.",
+        "priceCents": "5000",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 981250,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 13750,
+            "buyBackValueCents": 20000
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 5000,
+            "buyBackValueCents": 100000
+          }
+        ],
+        "payoutTimesMillion": "4700000000",
+        "boxBps": 9400,
+        "stepRtpBps": 9400,
+        "cases": [
+          {
+            "id": "far-step-40-to-1000",
+            "note": "every key fits; the cap binds",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 100000,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 37600,
+            "boostMaxCents": 49191,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 5320,
+                "chancePpm": 87608,
+                "chanceCompact": "8.76%"
+              },
+              {
+                "points": 10,
+                "boostCents": 10639,
+                "chancePpm": 137607,
+                "chanceCompact": "13.76%"
+              },
+              {
+                "points": 25,
+                "boostCents": 26596,
+                "chancePpm": 287603,
+                "chanceCompact": "28.76%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 49191,
+                "decision": "accepted",
+                "chancePpm": 499996,
+                "chanceCompact": "49.99%"
+              },
+              {
+                "boostCents": 49192,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 49191
+              }
+            ]
+          },
+          {
+            "id": "far-step-casino-limit-100-eur",
+            "note": "keys above the casino's 10000 cents are hidden",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 100000,
+            "casinoMaxCents": 10000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 37600,
+            "boostMaxCents": 10000,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 5320,
+                "chancePpm": 87608,
+                "chanceCompact": "8.76%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 10000,
+                "decision": "accepted",
+                "chancePpm": 131600,
+                "chanceCompact": "13.16%"
+              },
+              {
+                "boostCents": 10001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 10000
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "boost-limits-minimum-edge-9300",
+        "note": "Version 3's box rate-9300, R = 9300, on version 4. 5 -> 4,654.65 EUR is exactly 1000 with no money, so it takes money: 0.01 EUR gives 1001, 1,000.00 EUR gives 200800, keys +5 at 250.25 EUR and +10 at 500.50 EUR, +25 hidden (1,251.25 EUR). 5 -> 4,654.66 EUR is 999: no amount is accepted, not even one cent that would give 1001, and there is no key.",
+        "priceCents": "750",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 107640,
+            "buyBackValueCents": 500
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 862356,
+            "buyBackValueCents": 700
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 900
+          },
+          {
+            "slotIndex": 3,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 1000
+          },
+          {
+            "slotIndex": 4,
+            "probabilityPpm": 10000,
+            "buyBackValueCents": 2000
+          },
+          {
+            "slotIndex": 5,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 50000
+          },
+          {
+            "slotIndex": 6,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 50001
+          },
+          {
+            "slotIndex": 7,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465465
+          },
+          {
+            "slotIndex": 8,
+            "probabilityPpm": 1,
+            "buyBackValueCents": 465466
+          }
+        ],
+        "payoutTimesMillion": "697500132",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "cases": [
+          {
+            "id": "minimum-1000-takes-money",
+            "note": "p(0) = 1000, the minimum",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 7,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 465465,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 1000,
+            "boostMaxCents": 100000,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 25025,
+                "chancePpm": 51000,
+                "chanceCompact": "5.10%"
+              },
+              {
+                "points": 10,
+                "boostCents": 50050,
+                "chancePpm": 101000,
+                "chanceCompact": "10.10%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "accepted",
+                "chancePpm": 1001,
+                "chanceCompact": "0.10%"
+              },
+              {
+                "boostCents": 100000,
+                "decision": "accepted",
+                "chancePpm": 200800,
+                "chanceCompact": "20.08%"
+              },
+              {
+                "boostCents": 100001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 100000
+              }
+            ]
+          },
+          {
+            "id": "minimum-999-takes-none",
+            "note": "p(0) = 999: one cent is refused with 0",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 8,
+            "stakedBuyBackValueCents": 500,
+            "targetBuyBackValueCents": 465466,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 999,
+            "boostMaxCents": 0,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [],
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 0
+              },
+              {
+                "boostCents": 8,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "boost-limits-exact-9300",
+        "note": "A box at exactly 93.00 %, R = 9300, built so a limit is met exactly. 40 -> 93 EUR: 400000 with no money and each cent adds exactly 100 ppm, so 10.00 EUR gives exactly 500000, the cap, and is the highest amount; 9.99 EUR gives 499900 and 10.01 EUR is refused. The +10 key costs 10.00 EUR and lands exactly on the cap, +5 costs 5.00 EUR, +25 is hidden. 40 -> 41 EUR, the small step: 907318 with no money, already above the cap, so no amount and no key.",
+        "priceCents": "4310",
+        "slots": [
+          {
+            "slotIndex": 0,
+            "probabilityPpm": 969000,
+            "buyBackValueCents": 4000
+          },
+          {
+            "slotIndex": 1,
+            "probabilityPpm": 30000,
+            "buyBackValueCents": 4100
+          },
+          {
+            "slotIndex": 2,
+            "probabilityPpm": 1000,
+            "buyBackValueCents": 9300
+          }
+        ],
+        "payoutTimesMillion": "4008300000",
+        "boxBps": 9300,
+        "stepRtpBps": 9300,
+        "cases": [
+          {
+            "id": "cap-exactly-40-to-93",
+            "note": "1,000 cents gives exactly 500000",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 2,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 9300,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 400000,
+            "boostMaxCents": 1000,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [
+              {
+                "points": 5,
+                "boostCents": 500,
+                "chancePpm": 450000,
+                "chanceCompact": "45.00%"
+              },
+              {
+                "points": 10,
+                "boostCents": 1000,
+                "chancePpm": 500000,
+                "chanceCompact": "50.00%"
+              }
+            ],
+            "amounts": [
+              {
+                "boostCents": 999,
+                "decision": "accepted",
+                "chancePpm": 499900,
+                "chanceCompact": "49.99%"
+              },
+              {
+                "boostCents": 1000,
+                "decision": "accepted",
+                "chancePpm": 500000,
+                "chanceCompact": "50.00%"
+              },
+              {
+                "boostCents": 1001,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 1000
+              }
+            ]
+          },
+          {
+            "id": "small-step-40-to-41",
+            "note": "p(0) = 907318 is above the cap: highest 0",
+            "heldSlotIndex": 0,
+            "targetSlotIndex": 1,
+            "stakedBuyBackValueCents": 4000,
+            "targetBuyBackValueCents": 4100,
+            "casinoMaxCents": 100000,
+            "casinoMaxChancePpm": 500000,
+            "plainChancePpm": 907318,
+            "boostMaxCents": 0,
+            "keyPoints": [
+              5,
+              10,
+              25
+            ],
+            "keys": [],
+            "amounts": [
+              {
+                "boostCents": 1,
+                "decision": "refused",
+                "refusal": "boost_too_high",
+                "boostMaxCents": 0
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

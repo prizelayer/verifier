@@ -121,17 +121,20 @@ describe('upgrade target', () => {
 });
 
 describe('the version table (KAN-1567)', () => {
-  it('knows versions 1, 2 and 3, each with its own rule, and nothing else', () => {
+  it('knows versions 1, 2, 3 and 4, each with its own rule, and nothing else', () => {
     assert.deepEqual(UPGRADE_RULES, [
       { engineVersion: 1, minChancePpm: 100_000, offerMinChancePpm: 100_000, jumps: false, maxSteps: 3, stepRtpBps: 10_000, stepRtpCapBps: null, stepRtpFloorBps: null, roundsUp: false },
       { engineVersion: 2, minChancePpm: 10_000, offerMinChancePpm: 100_000, jumps: true, maxSteps: 3, stepRtpBps: 10_000, stepRtpCapBps: null, stepRtpFloorBps: null, roundsUp: false },
       // Version 3 (ADR-KAN-1154 amendment 8 §8.2): no fixed return, the box's own rate between 9300 and 9990,
       // rounded up; 0.1 % for a named target and the single offer; no limit on steps.
       { engineVersion: 3, minChancePpm: 1_000, offerMinChancePpm: 1_000, jumps: true, maxSteps: null, stepRtpBps: null, stepRtpCapBps: 9_990, stepRtpFloorBps: 9_300, roundsUp: true },
+      // Version 4 (ADR-KAN-1569): version 3's rule, plus an amount the player adds to a step, from 1 cent to
+      // 1,000.00 EUR, which may not take the chance above 50 %.
+      { engineVersion: 4, minChancePpm: 1_000, offerMinChancePpm: 1_000, jumps: true, maxSteps: null, stepRtpBps: null, stepRtpCapBps: 9_990, stepRtpFloorBps: 9_300, roundsUp: true, boostCeilingCents: 100_000, boostMaxChancePpm: 500_000 },
     ]);
     assert.equal(UPGRADE_JUMP_MIN_CHANCE_PPM, 10_000);
     assert.equal(upgradeRule(1)?.minChancePpm, UPGRADE_MIN_CHANCE_PPM);
-    assert.equal(upgradeRule(4), undefined);
+    assert.equal(upgradeRule(5), undefined);
     assert.equal(upgradeRule(0), undefined);
   });
 
@@ -175,7 +178,7 @@ describe('upgrade targets', () => {
   });
 
   it('refuses a version it does not check, and a slot that is not in the edition', () => {
-    assert.throws(() => upgradeTargets(WORKED, 0, 4), /version 4 of the upgrade engine is not one this library checks/);
+    assert.throws(() => upgradeTargets(WORKED, 0, 5), /version 5 of the upgrade engine is not one this library checks/);
     assert.throws(() => upgradeTargets(WORKED, 4, 2), /slot 4 is not in the edition/);
     assert.throws(() => upgradeTargets(WORKED, 4, 1), /slot 4 is not in the edition/);
   });

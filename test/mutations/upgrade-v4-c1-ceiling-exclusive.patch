@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-C1: the engine's ceiling is taken as exclusive (>= instead of >): an amount of exactly 100000 cents is refused.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostLimits/boost-limits-box-a-9300, case ceiling-40-to-2000: 100000 cents accepted at 483600 (the bug: highest 99999, 100000 boost_too_high).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..e0b6f7c 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1126,7 +1126,7 @@ export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+ }
+ 
+ function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {
+-  const engine = BigInt(rule.boostCeilingCents);
++  const engine = BigInt(rule.boostCeilingCents) - 1n;
+   return limits === undefined || limits.maxCents >= engine ? engine : limits.maxCents;
+ }
+ 

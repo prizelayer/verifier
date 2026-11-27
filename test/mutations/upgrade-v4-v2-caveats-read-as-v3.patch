@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-V2: version 4 is dispatched as version 3 in the caveats.
+Killer: test/upgrade-v4.test.ts "writes version 4's win caveat, with the amount recorded (M-V2)" and "has a caveat entry for every version of the rules, and version 4's is its own".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..59c1f05 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -717,7 +717,7 @@ export const UPGRADE_CAVEATS_BY_VERSION: Readonly<Record<number, UpgradeVersionC
+     stepNo: UPGRADE_V3_CAVEATS.stepNo,
+     win: (stakedSlot: number, drawnSlot: number, stepId: string | undefined): string => UPGRADE_V3_CAVEATS.win(stakedSlot, drawnSlot, stepId),
+   }),
+-  4: UPGRADE_V4_CAVEATS,
++  4: UPGRADE_V3_CAVEATS,
+ });
+ 
+ /**

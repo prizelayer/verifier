@@ -1,0 +1,26 @@
+KAN-1569 planted bug M-V4: test side: the version 4 conformance reads the decisions and the key prices from the fixture instead of computing them.
+Killer: test/vectors.test.ts "the version 4 sections of the fixture (KAN-1569)" "refuses a case whose decision, refusal, highest amount or key price is changed".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/test/vectors.test.ts b/test/vectors.test.ts
+index ed5f23e..2b75008 100644
+--- a/test/vectors.test.ts
++++ b/test/vectors.test.ts
+@@ -1740,7 +1740,7 @@ function checkBoostCase(family: BoostFamily, vector: BoostCaseVector, rate: numb
+       amount.decision === 'accepted'
+         ? { decision: 'accepted', boostCents: BigInt(amount.boostCents), chancePpm: amount.chancePpm as number }
+         : { decision: 'refused', refusal: amount.refusal as BoostRefusal, boostMaxCents: BigInt(amount.boostMaxCents as number) };
+-    assert.deepEqual(boostDecision(step, BigInt(amount.boostCents), limits), expected, `${where}: ${amount.boostCents} cents`);
++    assert.deepEqual(expected, expected, `${where}: ${amount.boostCents} cents`);
+     if (amount.decision === 'accepted') {
+       assert.equal(stepChanceText(amount.chancePpm as number), amount.chanceCompact, `${where}: ${amount.boostCents} cents, chanceCompact`);
+     }
+@@ -1751,7 +1751,7 @@ function checkBoostCase(family: BoostFamily, vector: BoostCaseVector, rate: numb
+   for (const p of points) {
+     const written = keys.find((key) => key.points === p);
+     assert.deepEqual(
+-      boostKeyFor(step, p, limits),
++      written === undefined ? null : { points: p, boostCents: BigInt(written.boostCents), chancePpm: written.chancePpm },
+       written === undefined ? null : { points: p, boostCents: BigInt(written.boostCents), chancePpm: written.chancePpm },
+       `${where}: key +${p}`,
+     );

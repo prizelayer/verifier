@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-F1: the chance with an amount is rounded down instead of up (the chance with no amount still rounds up).
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostChance/boost-box-a-9300, case ana-40-to-200: 1 cent is 186047 ppm (the bug gives 186046).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..1100cb7 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1122,7 +1122,7 @@ export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+         'so the step has no chance to compute',
+     );
+   }
+-  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, rule.roundsUp);
++  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, boostCents === 0n && rule.roundsUp);
+ }
+ 
+ function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {

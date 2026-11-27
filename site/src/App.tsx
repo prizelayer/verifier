@@ -7,7 +7,7 @@ import { seedSetFact, seedSetSentence } from "./pairFacts"
 import { checkProof, type Checked } from "./proof"
 import { SourceLine, StepCards } from "./steps"
 import { UpgradeStepCards } from "./upgradeSteps"
-import { COULD_NOT_FINISH, DEMO_STEP_NOTE, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_JUMP_WORDS, UPGRADE_STEP_OF, UPGRADE_WIN, stepJumps, type UpgradeStepName } from "./words"
+import { COULD_NOT_FINISH, DEMO_STEP_NOTE, FIRST_VISIT, NOT_PROVEN_SEEDS, PROOF_EXPLAINED, STEP_PROOF_EXPLAINED, STEPS, UPGRADE_JUMP_WORDS, UPGRADE_STEP_OF, UPGRADE_V4_WORDS, UPGRADE_WIN, stepJumps, upgradeWords, type UpgradeStepName } from "./words"
 import { caveatOf, stepVerdictOf, verdictOf } from "./verdict"
 
 export function App({ fetchFn }: { fetchFn?: typeof fetch } = {}) {
@@ -190,8 +190,14 @@ function Verdict({ report, input }: { report: VerificationReport; input: Verific
   const { word, line } = verdictOf(report, input?.edition.engineVersion)
   const caveat = caveatOf(report)
   const stepId = input?.gameKind === "upgrade" ? input.expected.upgradeStepId : undefined
-  // The version comes from the fingerprinted edition, as on the step page (KAN-1567).
-  const passCaveat = stepJumps(input?.edition.engineVersion) ? UPGRADE_JUMP_WORDS.winPassCaveat : UPGRADE_WIN.passCaveat
+  // The version comes from the fingerprinted edition, as on the step page (KAN-1567); version 4 also names the
+  // amount, which the open's check takes as recorded (KAN-1569).
+  const version = input?.edition.engineVersion
+  const passCaveat = upgradeWords(version).recordsAmount
+    ? UPGRADE_V4_WORDS.winPassCaveat
+    : stepJumps(version)
+      ? UPGRADE_JUMP_WORDS.winPassCaveat
+      : UPGRADE_WIN.passCaveat
   const tone =
     // Pending is not a warning: it is neutral ink, never the colour of a pass or a fail.
     report.status === "verified" ? "text-ok" : report.status === "failed" ? "text-fail" : "text-muted-foreground"

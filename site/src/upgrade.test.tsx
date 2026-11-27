@@ -221,16 +221,18 @@ describe("the step page", () => {
     [
       "engineVersion",
       async (a) => {
-        // A version-4 box whose fingerprint is its own true one: only the version can fail. Version 4, since the
-        // page checks versions 1, 2 and 3 (KAN-1567, KAN-1751).
-        const v4 = { ...UPGRADE_EDITION, engineVersion: 4 }
-        const fp = await editionFingerprint(parseEdition(v4))
-        a.edition = { ...v4, editionFingerprint: fp }
+        // A version-5 box whose fingerprint is its own true one: only the version can fail. Version 5, since the
+        // page checks versions 1, 2, 3 and 4 (KAN-1567, KAN-1751, KAN-1569).
+        const v5 = { ...UPGRADE_EDITION, engineVersion: 5 }
+        const fp = await editionFingerprint(parseEdition(v5))
+        a.edition = { ...v5, editionFingerprint: fp }
         a.step = { ...a.step, editionFingerprint: fp }
       },
     ],
     ["upgradeTarget", (a) => void (a.step = { ...a.step, targetSlotIndex: 3 })],
     ["upgradeChance", (a) => void (a.step = { ...a.step, chancePpm: 500000 })],
+    // An amount on a version 1 step, which has none (KAN-1569).
+    ["boostAmount", (a) => void (a.step = { ...a.step, boostCents: "2128" })],
     ["chanceCompact", (a) => void (a.step = { ...a.step, chanceCompact: "41.00%" })],
     ["stepNo", (a) => void (a.step = { ...a.step, stepNo: 4 })],
     ["drawnPpmValue", (a) => void (a.step = { ...a.step, drawnPpmValue: 186670 })],
@@ -255,7 +257,10 @@ describe("the step page", () => {
       render(<App fetchFn={fakeServer(answers).fetchFn} />)
       await user.click(screen.getByRole("button", { name: "Look up" }))
       await waitFor(() => expect(verdictWord()).toBe("FAIL"))
-      expect(verdictLine()).toBe(`Step ${UPGRADE_STEP_OF[check]} does not match: ${UPGRADE_FAIL_WORDS[check]}`)
+      // A refused amount names the amount and the version (sentence 10 of KAN-1569 plan v1.1 §3.3).
+      const words =
+        check === "boostAmount" ? "This upgrade records an amount, 21.28, but version 1 of the upgrade rules has no amount." : UPGRADE_FAIL_WORDS[check]
+      expect(verdictLine()).toBe(`Step ${UPGRADE_STEP_OF[check]} does not match: ${words}`)
       expect(document.querySelector(`[data-check='${check}']`)?.getAttribute("data-state")).toBe("mismatch")
       expect(document.querySelector(`[data-step='${UPGRADE_STEP_OF[check]}']`)?.getAttribute("data-failed")).toBe("yes")
     })
@@ -550,9 +555,9 @@ describe("the step page", () => {
   })
 
   it("fails a locked win of a version the page does not check, naming the version", async () => {
-    await lockedOpenOn(4, {}, "FAIL")
+    await lockedOpenOn(5, {}, "FAIL")
     expect(verdictLine()).toBe(
-      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 4 of the upgrade rules, and this page checks versions 1, 2 and 3 only.",
+      "Step 4 does not match: The chance shown with this upgraded win, 40.00%, cannot be checked: this box uses version 5 of the upgrade rules, and this page checks versions 1, 2, 3 and 4 only.",
     )
   })
 
@@ -601,6 +606,19 @@ describe("the words", () => {
         v.queries.flatMap((q) => q.targets.map((t) => [t.chancePpm, t.chanceCompact])),
       ),
     ]
+    // Every chance with an amount of version 4: its amounts, its keys and its steps (KAN-1569).
+    const v4Pairs: [number, string][] = []
+    const collect = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(collect)
+      if (node === null || typeof node !== "object") return
+      const o = node as { chancePpm?: number; chanceCompact?: string }
+      if (o.chanceCompact !== undefined) v4Pairs.push([o.chancePpm as number, o.chanceCompact])
+      Object.values(node).forEach(collect)
+    }
+    collect([fixture.upgradeBoostChance, fixture.upgradeBoostLimits])
+    expect(v4Pairs.length).toBeGreaterThanOrEqual(40)
+    expect(v4Pairs).toContainEqual([288016, "28.80%"])
+    pairs.push(...v4Pairs)
     expect(pairs.length).toBeGreaterThanOrEqual(10)
     expect(pairs).toContainEqual([10000, "1.00%"])
     for (const [ppm, shown] of pairs) expect(percentDown(ppm)).toBe(shown)

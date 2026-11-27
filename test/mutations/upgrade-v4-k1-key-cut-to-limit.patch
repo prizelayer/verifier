@@ -1,0 +1,19 @@
+KAN-1569 planted bug M-K1: a key whose price is past a limit is cut down to the highest amount instead of hidden.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostLimits/boost-limits-box-a-9300, case casino-money-limit-40-to-2000 (only +5), and upgradeBoostLimits/boost-limits-box-c-9400, case far-step-casino-limit-100-eur (only +5).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..6acbf66 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1235,8 +1235,8 @@ export function boostKeyFor(step: BoostStep, points: number, limits?: BoostLimit
+   const highest = highestComputable(step, rule, limits);
+   if (highest < 1n) return null;
+   const wanted = boostChancePpm(step, 0n) + points * PPM_PER_POINT;
+-  const price = leastReaching(step, wanted, 1n, highest);
+-  if (price === null) return null;
++  const price = leastReaching(step, wanted, 1n, highest) ?? boostMaxCents(step, limits);
++  if (price < 1n) return null;
+   const decided = boostDecision(step, price, limits);
+   return decided.decision === 'accepted' ? { points, boostCents: decided.boostCents, chancePpm: decided.chancePpm } : null;
+ }

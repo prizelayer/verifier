@@ -1,0 +1,18 @@
+KAN-1569 planted bug M-O3: the open path does not check the amount against the engine's limits (boostStepLimits is not called).
+Killer: test/upgrade-v4.test.ts "fails an amount above the ceiling (M-O3), revealed or locked, before the draw".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..fb11582 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1427,8 +1427,7 @@ function winAmountWrong(input: VerificationInput, rule: UpgradeRule | undefined)
+   const offer = attempt(() => stepFor(input.edition, rule, stakedSlot, input.expected.drawnSlotIndex));
+   if (!offer.ok || offer.value === null) return undefined;
+   const target = offer.value.targetSlotIndex;
+-  const limits = boostStepLimits(boostStepOf(input.edition, rule, stepRate(input.edition, rule), stakedSlot, target), amount);
+-  return limits.ok ? undefined : { ok: false, expected, computed: `amount refused, ${boostLimitWhy(limits, amount)}` };
++  return undefined;
+ }
+ 
+ // ---------------------------------------------------------------------------

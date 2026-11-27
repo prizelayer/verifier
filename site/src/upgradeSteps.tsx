@@ -1,6 +1,7 @@
 import { UPGRADE_STEP_CHECK_NAMES, upgradeRule, type UpgradeStepInput, type UpgradeStepReport } from "@verifier"
 import { ByteGroups, Chunks, Compare } from "./bytes"
 import { editionGroups } from "./preimage"
+import { amountCentsOf } from "./proof"
 import { SourceLine } from "./steps"
 import {
   DEPENDENT_NOTE,
@@ -11,9 +12,12 @@ import {
   UPGRADE_STEP_OF,
   UPGRADE_STEPS,
   UPGRADE_TARGET_ROW,
+  UPGRADE_V4_WORDS,
+  amountText,
   type StepNumber,
   type UpgradeStepName,
   percentDown,
+  stepFailWords,
   upgradeCheckWords,
   upgradeStep2,
   unusableWords,
@@ -33,9 +37,11 @@ export function UpgradeStepCards({ report, input }: Props) {
   const failedSteps = new Set(names.filter((n) => report.checks[n]?.ok === false).map((n) => UPGRADE_STEP_OF[n]))
   const pending = input.serverSeedHex === null
   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
-  // Each version's words where they differ (version 2: KAN-1567; version 3, with the box's rate: KAN-1751).
-  const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps)
-  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps)
+  // Each version's words where they differ (version 2: KAN-1567; version 3, with the box's rate: KAN-1751;
+  // version 4, with the amount the step records: KAN-1569).
+  const amount = amountOf(input)
+  const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps, amount)
+  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps, amount)
 
   return (
     <div className="space-y-6">
@@ -43,6 +49,7 @@ export function UpgradeStepCards({ report, input }: Props) {
         const failed = failedSteps.has(step)
         const title = pending && step === 1 ? STEP1_PENDING.title : step === 2 ? step2.title : stepTitle
         const text = pending && step === 1 ? STEP1_PENDING.text : step === 2 ? step2.text : stepText
+        const sourceLine = step === 2 ? (step2.source ?? source) : source
         return (
           <section
             key={step}
@@ -55,7 +62,7 @@ export function UpgradeStepCards({ report, input }: Props) {
               Step {step} — {title}
               {failed ? <span className="ml-2 text-fail">(does not match)</span> : null}
             </h2>
-            <SourceLine source={source} />
+            <SourceLine source={sourceLine} />
             {text.map((p) => (
               <p key={p}>{p}</p>
             ))}
@@ -89,7 +96,7 @@ export function UpgradeStepCards({ report, input }: Props) {
                       ? words.ok[name]
                       : check.error !== undefined
                         ? unusableWords(check.field, check.error)
-                        : words.fail[name]
+                        : stepFailWords(name, check, words)
                   return (
                     <li key={name} data-check={name} data-state={check ? (check.ok ? "match" : "mismatch") : "not-run"}>
                       <span className="font-medium">{words.labels[name]}:</span>{" "}
@@ -106,6 +113,11 @@ export function UpgradeStepCards({ report, input }: Props) {
       })}
     </div>
   )
+}
+
+/** The amount the step records, in cents; a wrongly formed one never reaches a sentence. */
+function amountOf(input: UpgradeStepInput): number | undefined {
+  return amountCentsOf(input.expected.boostCents, "expected.boostCents")
 }
 
 function StepValues({ step, report, input }: Props & { step: StepNumber }) {
@@ -137,6 +149,12 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
       const staked = input.edition.slots.find((s) => s.slotIndex === input.expected.stakedSlotIndex)
       const offered = trace.computedOffer
       const target = offered ? input.edition.slots.find((s) => s.slotIndex === offered.targetSlotIndex) : undefined
+      // With an amount, the offer's chance is the one with no amount, and the chance the library checked is
+      // the one with the amount (absent when the amount reaches the target's value): both are its numbers.
+      const amount = amountOf(input)
+      const withAmount = checks.upgradeChance?.error === undefined && checks.upgradeChance?.computed !== undefined ? Number(checks.upgradeChance.computed) : undefined
+      // A refused amount has no chance under the rules, so its row shows none (S5 of the page review).
+      const fair = amount === undefined ? offered?.chancePpm : checks.boostAmount?.ok === false ? undefined : withAmount
       return (
         <div className="space-y-2">
           <table className="w-full text-xs" data-upgrade-values>
@@ -159,9 +177,21 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
                     : "none"}
                 </td>
               </tr>
+              {amount !== undefined ? (
+                <tr data-amount-row>
+                  <th scope="row" className="text-left font-medium">{UPGRADE_V4_WORDS.rows.amount}</th>
+                  <td>{`${String(amount)} cents (${amountText(amount)})`}</td>
+                </tr>
+              ) : null}
+              {amount !== undefined ? (
+                <tr data-no-amount-row>
+                  <th scope="row" className="text-left font-medium">{UPGRADE_V4_WORDS.rows.noAmountChance}</th>
+                  <td>{offered ? `${offered.chancePpm.toLocaleString("en")} in 1,000,000 (${percentDown(offered.chancePpm)})` : "none"}</td>
+                </tr>
+              ) : null}
               <tr>
-                <th scope="row" className="text-left font-medium">Fair chance</th>
-                <td>{offered ? `${offered.chancePpm.toLocaleString("en")} in 1,000,000 (${percentDown(offered.chancePpm)})` : "none"}</td>
+                <th scope="row" className="text-left font-medium">{amount === undefined ? "Fair chance" : UPGRADE_V4_WORDS.rows.withAmountChance}</th>
+                <td>{fair !== undefined ? `${fair.toLocaleString("en")} in 1,000,000 (${percentDown(fair)})` : "none"}</td>
               </tr>
             </tbody>
           </table>

@@ -1,0 +1,12 @@
+diff --git a/site/src/verdict.ts b/site/src/verdict.ts
+--- a/site/src/verdict.ts
++++ b/site/src/verdict.ts
+@@ -95,7 +95,7 @@
+       return {
+         word: "FAIL",
+         line:
+-          upgradeWords(engineVersion).readsRate && failure.check === "upgradeChance" && UPGRADE_V3_WORDS.underFloor(failure.message)
++          upgradeWords(engineVersion) === upgradeWords(3) && failure.check === "upgradeChance" && UPGRADE_V3_WORDS.underFloor(failure.message)
+             ? `Step ${step} cannot be checked: ${UPGRADE_V3_WORDS.underFloorCause}.`
+             : failure.field !== undefined
+             ? `Step ${step} cannot be checked. ${unusableWords(failure.field, failure.message)}`

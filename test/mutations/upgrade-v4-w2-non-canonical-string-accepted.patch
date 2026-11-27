@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-W2: a recorded amount with a sign or a leading zero ("02128", "-0") is read as its value instead of refused.
+Killer: test/upgrade-v4.test.ts "refuses boostCents as the JSON number 2128, 0, \"0\", a sign, a leading zero, a fraction or empty text on a step (M-W1, M-W2, M-W3)", and its twin on a win.
+Refs: KAN-1569 plan v1.1 section 4, cto ruling 37069
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 89c22f1..7c83e7a 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1335,7 +1335,7 @@ export function recordedAmountCents(value: unknown, field: string): bigint | und
+     throw wrong(`the text '${value}'`);
+   }
+   // `toBigInt` takes a sign and leading zeros; a recorded amount is written one way only.
+-  if (cents < 1n || cents.toString() !== value) throw wrong(`the text '${value}'`);
++  if (cents < 1n) throw wrong(`the text '${value}'`);
+   return cents;
+ }
+ 

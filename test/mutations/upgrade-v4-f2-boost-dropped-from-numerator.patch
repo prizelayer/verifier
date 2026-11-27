@@ -1,0 +1,17 @@
+KAN-1569 planted bug M-F2: the amount is dropped from the numerator: the chance is the one with no amount.
+Killer: test/vectors.test.ts "every version 4 step, from its inputs and through verifyUpgradeStep" boost-box-c-9400/plus-10-won: 288016 ppm (the bug gives 188000).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..749b3a1 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1122,7 +1122,7 @@ export function boostChancePpm(step: BoostStep, boostCents: bigint): number {
+         'so the step has no chance to compute',
+     );
+   }
+-  return upgradeChancePpm(step.stakedCents + boostCents, step.targetCents, step.rateBps, rule.roundsUp);
++  return upgradeChancePpm(step.stakedCents, step.targetCents, step.rateBps, rule.roundsUp);
+ }
+ 
+ function moneyCapOf(rule: { boostCeilingCents: number }, limits: BoostLimits | undefined): bigint {

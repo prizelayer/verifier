@@ -1,0 +1,16 @@
+KAN-1569 planted bug M-S3: the step check drops the lost-cent limit.
+Killer: test/upgrade-v4.test.ts "fails 0.10 EUR on 1,000 to 100,000 EUR: its last cent raises nothing (M-S3)".
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..ee4c036 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1280,7 +1280,6 @@ export function boostStepLimits(step: BoostStep, boostCents: bigint): BoostLimit
+   if (boostCents === 0n) return { ok: true, chancePpm };
+   if (boostCents > BigInt(rule.boostCeilingCents)) return { ok: false, limit: 'ceiling', chancePpm, ceilingCents: rule.boostCeilingCents };
+   if (chancePpm > rule.boostMaxChancePpm) return { ok: false, limit: 'cap', chancePpm, capPpm: rule.boostMaxChancePpm };
+-  if (chancePpm <= boostChancePpm(step, boostCents - 1n)) return { ok: false, limit: 'lastCent', chancePpm };
+   return { ok: true, chancePpm };
+ }
+ 

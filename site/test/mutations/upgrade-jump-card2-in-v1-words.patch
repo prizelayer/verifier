@@ -1,13 +1,12 @@
 diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
-index 5253d12..79f5269 100644
 --- a/site/src/upgradeSteps.tsx
 +++ b/site/src/upgradeSteps.tsx
-@@ -35,7 +35,7 @@ export function UpgradeStepCards({ report, input }: Props) {
-   const dependsOnFailed = (step: StepNumber): boolean => DEPENDS_ON[step].some((d) => failedSteps.has(d) || dependsOnFailed(d))
-   // Each version's words where they differ (version 2: KAN-1567; version 3, with the box's rate: KAN-1751).
-   const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps)
--  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps)
-+  const step2 = upgradeStep2(input.edition.engineVersion === 2 ? 1 : input.edition.engineVersion, report.trace.stepRateBps)
+@@ -40,7 +40,7 @@
+   // version 4, with the amount the step records: KAN-1569).
+   const amount = amountOf(input)
+   const words = upgradeCheckWords(input.edition.engineVersion, report.trace.stepRateBps, amount)
+-  const step2 = upgradeStep2(input.edition.engineVersion, report.trace.stepRateBps, amount)
++  const step2 = upgradeStep2(input.edition.engineVersion === 2 ? 1 : input.edition.engineVersion, report.trace.stepRateBps, amount)
  
    return (
      <div className="space-y-6">

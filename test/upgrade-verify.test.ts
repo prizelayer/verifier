@@ -82,8 +82,8 @@ describe('verifyUpgradeStep', () => {
     const report = await verifyUpgradeStep(wonStep);
     assert.equal(report.status, 'verified', report.summary);
     assert.deepEqual(Object.keys(report.checks).sort(), [
-      'chanceCompact', 'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion', 'stepNo',
-      'upgradeChance', 'upgradeOutcome', 'upgradeTarget',
+      'boostAmount', 'chanceCompact', 'commitment', 'drawnPpmValue', 'editionFingerprint', 'engineType', 'engineVersion',
+      'stepNo', 'upgradeChance', 'upgradeOutcome', 'upgradeTarget',
     ]);
     assert.deepEqual(report.trace.computedOffer, { targetSlotIndex: 2, chancePpm: 400_000 });
     assert.deepEqual(report.trace.cumulative, [
@@ -136,8 +136,8 @@ describe('verifyUpgradeStep', () => {
   });
 
   it('fails an edition on another version of the upgrade engine, even with its own true fingerprint', async () => {
-    // Version 4: versions 1 to 3 are all checked since KAN-1751.
-    const v3: Edition = { ...EDITION, engineVersion: 4 };
+    // Version 5: versions 1 to 4 are all checked since KAN-1569.
+    const v3: Edition = { ...EDITION, engineVersion: 5 };
     const report = await verifyUpgradeStep({
       ...wonStep,
       edition: v3,
@@ -146,7 +146,7 @@ describe('verifyUpgradeStep', () => {
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'engineVersion');
     assert.equal(report.checks.editionFingerprint?.ok, true);
-    assert.equal(report.checks.engineVersion?.computed, '4');
+    assert.equal(report.checks.engineVersion?.computed, '5');
   });
 
   // MUST-1 of the review of #15: each core check fails on its own forged input.
@@ -204,11 +204,13 @@ describe('verifyUpgradeStep', () => {
     editionFingerprint: async () => ({ ...wonStep, expected: { ...wonStep.expected, editionFingerprint: 'cd'.repeat(32) } }),
     engineType: async () => ({ ...wonStep, engineType: 'single_draw_weighted_table' }),
     engineVersion: async () => {
-      const v3: Edition = { ...EDITION, engineVersion: 4 };
+      const v3: Edition = { ...EDITION, engineVersion: 5 };
       return { ...wonStep, edition: v3, expected: { ...wonStep.expected, editionFingerprint: await editionFingerprint(v3) } };
     },
     upgradeTarget: async () => ({ ...wonStep, expected: { ...wonStep.expected, targetSlotIndex: 3 } }),
     upgradeChance: async () => ({ ...wonStep, expected: { ...wonStep.expected, chancePpm: 500_000 } }),
+    // Version 1 has no amount to add, so an amount recorded with its step fails on its own.
+    boostAmount: async () => ({ ...wonStep, expected: { ...wonStep.expected, boostCents: '2128' } }),
     chanceCompact: async () => ({ ...wonStep, expected: { ...wonStep.expected, chanceCompact: '41.00%' } }),
     stepNo: async () => ({ ...wonStep, expected: { ...wonStep.expected, stepNo: 4 } }),
     drawnPpmValue: async () => ({ ...wonStep, expected: { ...wonStep.expected, drawnPpmValue: 186_670 } }),
@@ -655,21 +657,22 @@ describe('version 2: a jump', () => {
     assert.deepEqual(report.checks.engineVersion, { ok: true, expected: '1', computed: '1' });
   });
 
-  it('fails closed on version 4: no other version\'s rule reads the step', async () => {
-    const v3: Edition = { ...EDITION, engineVersion: 4 };
+  it('fails closed on version 5: no other version\'s rule reads the step', async () => {
+    const v3: Edition = { ...EDITION, engineVersion: 5 };
     const report = await verifyUpgradeStep({ ...jump, edition: v3, expected: { ...jump.expected, editionFingerprint: await editionFingerprint(v3) } });
     assert.equal(report.status, 'failed');
     assert.equal(report.firstFailure?.check, 'engineVersion');
-    assert.deepEqual(report.checks.engineVersion, { ok: false, expected: '1 or 2 or 3', computed: '4' });
+    assert.deepEqual(report.checks.engineVersion, { ok: false, expected: '1 or 2 or 3 or 4', computed: '5' });
     assert.equal(report.checks.upgradeTarget, undefined);
     assert.equal(report.trace.computedOffer, undefined);
     assert.deepEqual(
       report.notRun.map((n) => [n.check, n.reason]),
       [
-        ['upgradeTarget', 'version 4 of the upgrade rules is not checked here'],
-        ['upgradeChance', 'version 4 of the upgrade rules is not checked here'],
+        ['upgradeTarget', 'version 5 of the upgrade rules is not checked here'],
+        ['upgradeChance', 'version 5 of the upgrade rules is not checked here'],
+        ['boostAmount', 'version 5 of the upgrade rules is not checked here'],
         ['chanceCompact', 'it needs the step chance, which could not be computed'],
-        ['stepNo', 'version 4 of the upgrade rules is not checked here'],
+        ['stepNo', 'version 5 of the upgrade rules is not checked here'],
         ['upgradeOutcome', 'it needs the step chance, which could not be computed'],
       ],
     );
@@ -732,18 +735,18 @@ describe('version 2: a jump', () => {
     assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: 'chance shown 16.66%', computed: 'fair chance none, slot 0 cannot step to slot 9' });
   });
 
-  it('fails closed on a win of version 4, revealed or locked', async () => {
-    const v3: Edition = { ...EDITION, engineVersion: 4 };
+  it('fails closed on a win of version 5, revealed or locked', async () => {
+    const v3: Edition = { ...EDITION, engineVersion: 5 };
     const v3Win = { ...jumpWin, edition: v3, expected: { ...jumpWin.expected, editionFingerprint: await editionFingerprint(v3) } };
     const revealed = await verify(v3Win);
     assert.equal(revealed.status, 'failed', revealed.summary);
-    assert.deepEqual(revealed.checks.drawnSlotIndex, { ok: false, expected: '2', computed: 'none: version 4 of the upgrade rules is not checked here' });
+    assert.deepEqual(revealed.checks.drawnSlotIndex, { ok: false, expected: '2', computed: 'none: version 5 of the upgrade rules is not checked here' });
     const locked = await verify({ ...v3Win, serverSeedHex: null });
     assert.equal(locked.status, 'failed', locked.summary);
     assert.deepEqual(locked.checks.drawnSlotIndex, {
       ok: false,
       expected: 'chance shown 16.66%',
-      computed: 'fair chance none, version 4 of the upgrade rules is not checked here',
+      computed: 'fair chance none, version 5 of the upgrade rules is not checked here',
     });
   });
 });

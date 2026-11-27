@@ -1,0 +1,16 @@
+KAN-1569 planted bug M-W3: a recorded amount written as a JSON number (2128) is accepted, as the wire rule of 37014 had it.
+Killer: test/upgrade-v4.test.ts "refuses boostCents as the JSON number 2128, 0, \"0\", a sign, a leading zero, a fraction or empty text on a step (M-W1, M-W2, M-W3)", and its twin on a win.
+Refs: KAN-1569 plan v1.1 section 4, cto ruling 37069
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 89c22f1..2988c5e 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1327,6 +1327,7 @@ export function recordedAmountCents(value: unknown, field: string): bigint | und
+       `${field} is wrongly formed: an amount is recorded as a decimal string of whole cents from 1 (never a JSON ` +
+         `number, never "0", no sign and no leading zero), was ${was}`,
+     );
++  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 1) return BigInt(value);
+   if (typeof value !== 'string') throw wrong(typeof value === 'number' ? `the JSON number ${value}` : String(value));
+   let cents: bigint;
+   try {

@@ -1,0 +1,18 @@
+{
+  "winId": "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e12",
+  "gameKind": "upgrade",
+  "seedPairId": "5e0d9c8b-7a6f-4e5d-8c4b-3a2918070605",
+  "nonce": 3,
+  "drawnPpmValue": 261902,
+  "drawnSlotIndex": 1,
+  "chosenProbabilityPpm": null,
+  "editionId": "0b7c2a1e-5d1f-4f3e-9a52-2c1d7e6f0a44",
+  "editionFingerprint": "3f2a00000000000000000000000000000000000000000000000000000000c044",
+  "snapshotHash": "a1b2000000000000000000000000000000000000000000000000000000c0e3f4",
+  "upgradeStepId": "9c41d2e0-1a2b-4c3d-8e4f-5a6b7c8d9e11",
+  "stakedSlotIndex": 0,
+  "stepChancePpm": 288016,
+  "stepChanceCompact": "28.80%",
+  "stepOutcome": "won",
+  "stepBoostCents": "2128"
+}

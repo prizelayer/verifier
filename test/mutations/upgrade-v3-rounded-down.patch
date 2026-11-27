@@ -1,13 +1,13 @@
 diff --git a/src/verifier.ts b/src/verifier.ts
-index 65c17d6..a2eb8b6 100644
+index 53eb962..efa4f2f 100644
 --- a/src/verifier.ts
 +++ b/src/verifier.ts
-@@ -710,7 +710,7 @@ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
+@@ -813,7 +813,7 @@ export const UPGRADE_RULES: readonly UpgradeRule[] = Object.freeze([
      stepRtpBps: null,
      stepRtpCapBps: UPGRADE_STEP_RTP_CAP_BPS,
      stepRtpFloorBps: UPGRADE_STEP_RTP_FLOOR_BPS,
 -    roundsUp: true,
 +    roundsUp: false,
    }),
- ]);
- 
+   Object.freeze({
+     engineVersion: 4,

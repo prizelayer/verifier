@@ -1,0 +1,12 @@
+diff --git a/site/src/steps.tsx b/site/src/steps.tsx
+--- a/site/src/steps.tsx
++++ b/site/src/steps.tsx
+@@ -303,7 +303,7 @@ function StepBytes({ step, report, input }: Props & { step: StepNumber }) {
+               <Compare label="drawnSlotIndex" expectedLabel="Slot we recorded" computedLabel={slotLabel} check={checks.drawnSlotIndex} />
+             )
+           ) : null}
+-          {input.gameKind === "upgrade" && checks.drawnSlotIndex?.ok && winAmount !== undefined && upgradeWords(input.edition.engineVersion).recordsAmount ? (
++          {input.gameKind === "upgrade" && winAmount !== undefined && upgradeWords(input.edition.engineVersion).recordsAmount ? (
+             <p className="text-sm" data-amount-chance>
+               {UPGRADE_V4_WORDS.winChance(winAmount, input.expected.stepChancePpm as number)}
+             </p>

@@ -1,0 +1,24 @@
+KAN-1569 planted bug M-L2: the decision reads the 0.1 % minimum on the chance with the amount instead of the chance with no amount.
+Killer: test/vectors.test.ts "every version 4 case, from its box" upgradeBoostLimits/boost-limits-minimum-edge-9300, case minimum-999-takes-none: the highest amount is 0 and 1 cent is refused (the bug: 1 cent at 1001 ppm passes the minimum).
+Refs: KAN-1569 plan v1.1 section 4
+
+diff --git a/src/verifier.ts b/src/verifier.ts
+index 53eb962..f294a69 100644
+--- a/src/verifier.ts
++++ b/src/verifier.ts
+@@ -1189,7 +1189,6 @@ function leastReaching(step: BoostStep, chance: number, from: bigint, highest: b
+ export function boostMaxCents(step: BoostStep, limits?: BoostLimits): bigint {
+   const rule = boostRuleOf(step.engineVersion);
+   requireLimits(limits);
+-  if (boostChancePpm(step, 0n) < rule.minChancePpm) return 0n;
+   const highest = highestComputable(step, rule, limits);
+   if (highest < 1n) return 0n;
+   const top = mostWithin(step, chanceCapOf(rule, limits), highest);
+@@ -1211,6 +1210,7 @@ export function boostDecision(step: BoostStep, boostCents: bigint, limits?: Boos
+   const max = boostMaxCents(step, limits);
+   if (boostCents > max) return { decision: 'refused', refusal: 'boost_too_high', boostMaxCents: max };
+   const chancePpm = boostChancePpm(step, boostCents);
++  if (chancePpm < rule.minChancePpm) return { decision: 'refused', refusal: 'boost_too_high', boostMaxCents: max };
+   if (chancePpm <= boostChancePpm(step, boostCents - 1n)) {
+     return { decision: 'refused', refusal: 'boost_cent_lost', boostMaxCents: max };
+   }
