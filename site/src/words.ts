@@ -485,7 +485,8 @@ export interface UpgradeCheckWordSet {
  */
 export interface UpgradeVersionWords {
   checks(rateBps: number | undefined, amountCents: number | undefined): UpgradeCheckWordSet
-  step2(rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[] }
+  /** Card 2: its title, its text, and on a version whose step records more fields, its own source line. */
+  step2(rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[]; source?: string }
   wrongChance(cause: WrongChance): string
   /** The labels of the two chances an upgraded win's slot check compares. */
   compareLabels: { recorded: string; shown: string }
@@ -502,8 +503,8 @@ export function upgradeCheckWords(engineVersion: number | undefined, rateBps?: n
   return upgradeWords(engineVersion).checks(rateBps, amountCents)
 }
 
-/** Card 2 of a step on `engineVersion`: its title and its text. */
-export function upgradeStep2(engineVersion: number | undefined, rateBps?: number, amountCents?: number): { title: string; text: readonly string[] } {
+/** Card 2 of a step on `engineVersion`: its title, its text, and its source line when the version has its own. */
+export function upgradeStep2(engineVersion: number | undefined, rateBps?: number, amountCents?: number): { title: string; text: readonly string[]; source?: string } {
   return upgradeWords(engineVersion).step2(rateBps, amountCents)
 }
 
@@ -794,20 +795,30 @@ export const UPGRADE_V4_WORDS = {
     },
   }),
 
-  /** Card 2: its title (sentences 11 and 11b) and its text: version 3's first two paragraphs, then 12, 12b and 23. */
-  step2: (rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[] } => {
+  /**
+   * Card 2: its title (sentences 11 and 11b), its text and its source line (S2 of the page review). The text is
+   * version 3's first paragraph, its second only when no amount is recorded, then 12, 12b and 23: version 3's
+   * second paragraph states the chance with no amount as the chance, which is false for a step with an amount
+   * (S1 of the page review), so it is left out then, like version 3's third paragraph always is (12b).
+   */
+  step2: (rateBps: number | undefined, amountCents: number | undefined): { title: string; text: readonly string[]; source: string } => {
     const v3 = UPGRADE_V3_WORDS.step2(rateBps)
     return {
       title: amountCents === undefined ? v3.title : "The chance of your upgrade comes from this box's upgrade rate and the amount recorded with it.",
       text: [
         v3.text[0],
-        v3.text[1],
+        ...(amountCents === undefined ? [v3.text[1]] : []),
         UPGRADE_V4_WORDS.rule,
         UPGRADE_V4_WORDS.checksParagraph,
         UPGRADE_V4_WORDS.casinoLimits,
       ],
+      source: UPGRADE_V4_WORDS.step2Source,
     }
   },
+
+  /** Card 2's source line on version 4: version 1's, with the amount the step records, which fixes its chance. */
+  step2Source:
+    "Read from the box record: `edition` (its prize table and chances); from the step record: `step.engineType`, `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.boostCents` (the amount recorded, absent when there is none), `step.chancePpm`, `step.chanceCompact` and `step.stepNo`.",
 
   /** Sentence 12: the rule, as the upgrade rules state it (SHOULD 6). The example is box C of ADR-KAN-1154 §9.8. */
   rule: "The upgrade rules allow an amount from 0.01 to 1,000.00 EUR to be recorded with an upgrade. With an amount, the chance is the upgrade rate times the sum of the value you give up and the amount, divided by the value you could win. It is rounded up to a millionth. The chance with an amount is at most 50%. The last cent of the amount must raise the chance. On a box whose upgrade rate is 94.00 %, giving up 40.00 with an amount of 21.28 for a chance at 200.00 is a 28.80% chance.",
@@ -823,8 +834,11 @@ export const UPGRADE_V4_WORDS = {
   casinoLimits:
     "A casino may set lower limits on the amount than the upgrade rules do. Those limits are not in the upgrade's record, so this page checks only the limits of the upgrade rules.",
 
-  /** Sentence 13: the two rows card 2's table gains on a step with an amount. */
-  rows: { amount: "Amount recorded", noAmountChance: "Chance with no amount" },
+  /**
+   * Sentence 13: the two rows card 2's table gains on a step with an amount, and the label of its chance row
+   * then (S5 of the page review): the chance with the amount, never called the fair chance.
+   */
+  rows: { amount: "Amount recorded", noAmountChance: "Chance with no amount", withAmountChance: "Chance with the amount" },
 
   /** Sentences 7, 8, 9, 10 and 20 on the step page; O3 with "this win" on the open page. */
   amountFail: (refusal: AmountRefusal, subject: AmountSubject): string => {
@@ -843,9 +857,13 @@ export const UPGRADE_V4_WORDS = {
     }
   },
 
-  /** Sentence 21 on the step page, O5 on the open page: a CANNOT CHECK that is not a "not yet" (SHOULD 5). */
+  /**
+   * Sentence 21 on the step page, O5 on the open page: a CANNOT CHECK that is not a "not yet" (SHOULD 5). It
+   * states the rule the record breaks, not a fact about the value: the JSON number 2128 is a whole number of
+   * cents, and is refused for its shape (MUST-1 of the page review; the wire rule of cto 37069).
+   */
   malformed: (subject: AmountSubject): string =>
-    `The record of this ${subject} is wrongly formed: the amount recorded with it is not a whole number of cents of 0.01 or more. This page cannot check a record in this shape.`,
+    `The record of this ${subject} is wrongly formed: an amount must be written as a whole number of cents from 1, as text with no sign and no leading zero, and this one is not. This page cannot check a record in this shape.`,
 
   /** O1: card 4's source line of an upgraded win on version 4. */
   winStep4Source:
@@ -854,6 +872,13 @@ export const UPGRADE_V4_WORDS = {
   /** O2: under card 4 of an upgraded win whose open record carries an amount, when its slot check matched. */
   winChance: (amountCents: number, chancePpm: number): string =>
     `Your browser computed the chance of the upgrade that made this win from the box's upgrade rate and the amount recorded with this win, ${amountText(amountCents)}: ${percentDown(chancePpm)}. It is the chance shown with this win.`,
+
+  /**
+   * Under the PASS of an upgraded win on version 4 (S3 of the page review): version 2's caveat, which also says
+   * that the open's check takes the win's amount as recorded and never compares it with the upgrade's own.
+   */
+  winPassCaveat:
+    "This page did not check the item given up for this upgrade, the kind of box, how many upgrades came in a row, that this is the item the upgrade aimed at, or that the amount recorded with this win is the amount recorded with the upgrade. The upgrade's own check covers the first three. It also names the item the upgrade aimed at and shows the amount recorded with it: compare them with this page.",
 
   /** O4: after the failure sentence of an upgraded win whose open record carries no amount. */
   winAmountMissing:

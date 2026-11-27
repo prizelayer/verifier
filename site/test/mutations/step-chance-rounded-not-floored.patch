@@ -1,10 +1,10 @@
 diff --git a/site/src/upgradeSteps.tsx b/site/src/upgradeSteps.tsx
 --- a/site/src/upgradeSteps.tsx
 +++ b/site/src/upgradeSteps.tsx
-@@ -188,7 +188,7 @@
+@@ -191,7 +191,7 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
                ) : null}
                <tr>
-                 <th scope="row" className="text-left font-medium">Fair chance</th>
+                 <th scope="row" className="text-left font-medium">{amount === undefined ? "Fair chance" : UPGRADE_V4_WORDS.rows.withAmountChance}</th>
 -                <td>{fair !== undefined ? `${fair.toLocaleString("en")} in 1,000,000 (${percentDown(fair)})` : "none"}</td>
 +                <td>{fair !== undefined ? `${fair.toLocaleString("en")} in 1,000,000 (${percentDown(Math.round(fair / 100) * 100)})` : "none"}</td>
                </tr>

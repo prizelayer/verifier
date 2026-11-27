@@ -49,6 +49,7 @@ export function UpgradeStepCards({ report, input }: Props) {
         const failed = failedSteps.has(step)
         const title = pending && step === 1 ? STEP1_PENDING.title : step === 2 ? step2.title : stepTitle
         const text = pending && step === 1 ? STEP1_PENDING.text : step === 2 ? step2.text : stepText
+        const sourceLine = step === 2 ? (step2.source ?? source) : source
         return (
           <section
             key={step}
@@ -61,7 +62,7 @@ export function UpgradeStepCards({ report, input }: Props) {
               Step {step} — {title}
               {failed ? <span className="ml-2 text-fail">(does not match)</span> : null}
             </h2>
-            <SourceLine source={source} />
+            <SourceLine source={sourceLine} />
             {text.map((p) => (
               <p key={p}>{p}</p>
             ))}
@@ -152,7 +153,8 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
       // the one with the amount (absent when the amount reaches the target's value): both are its numbers.
       const amount = amountOf(input)
       const withAmount = checks.upgradeChance?.error === undefined && checks.upgradeChance?.computed !== undefined ? Number(checks.upgradeChance.computed) : undefined
-      const fair = amount === undefined ? offered?.chancePpm : withAmount
+      // A refused amount has no chance under the rules, so its row shows none (S5 of the page review).
+      const fair = amount === undefined ? offered?.chancePpm : checks.boostAmount?.ok === false ? undefined : withAmount
       return (
         <div className="space-y-2">
           <table className="w-full text-xs" data-upgrade-values>
@@ -188,7 +190,7 @@ function StepValues({ step, report, input }: Props & { step: StepNumber }) {
                 </tr>
               ) : null}
               <tr>
-                <th scope="row" className="text-left font-medium">Fair chance</th>
+                <th scope="row" className="text-left font-medium">{amount === undefined ? "Fair chance" : UPGRADE_V4_WORDS.rows.withAmountChance}</th>
                 <td>{fair !== undefined ? `${fair.toLocaleString("en")} in 1,000,000 (${percentDown(fair)})` : "none"}</td>
               </tr>
             </tbody>

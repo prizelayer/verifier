@@ -20,6 +20,7 @@ import { UPGRADE_EDITION, UPGRADED_OPEN, upgradeAnswers, WON_STEP } from "./test
 import {
   amountRefusal,
   amountText,
+  UPGRADE_JUMP_WORDS,
   malformedAmount,
   percentDown,
   percentExact,
@@ -45,6 +46,8 @@ const verdictLine = () => document.querySelectorAll("[data-status] p")[1]?.textC
 const card = (step: number) => document.querySelector(`[data-step='${step}']`)?.textContent ?? ""
 const checkText = (name: string) => document.querySelector(`[data-check='${name}']`)?.textContent ?? ""
 const values = () => document.querySelector("[data-upgrade-values]")?.textContent ?? ""
+/** The slot check of a win whose recorded chance is not the fair one, seed revealed: the slot's own words, alone. */
+const WRONG_CHANCE_SLOT = "The slot: does not match. The number lands on a different slot than the one we recorded."
 
 const FIXTURE = JSON.parse(readFileSync(join(import.meta.dirname, "../../fixtures/golden-vectors-v1.json"), "utf8"))
 const SEED = EXAMPLE_PROOF.seedPair
@@ -225,11 +228,13 @@ describe("the version 4 sentences", () => {
   })
 
   it("a wrongly formed amount: sentence 21 and O5 say the record is wrongly formed, never 'not checked yet'", () => {
+    // The rule the record breaks, true for every refused shape: the JSON number 2128 is a whole number of cents
+    // and is refused for its shape (page review MUST-1).
     expect(UPGRADE_V4_WORDS.malformed("upgrade")).toBe(
-      "The record of this upgrade is wrongly formed: the amount recorded with it is not a whole number of cents of 0.01 or more. This page cannot check a record in this shape.",
+      "The record of this upgrade is wrongly formed: an amount must be written as a whole number of cents from 1, as text with no sign and no leading zero, and this one is not. This page cannot check a record in this shape.",
     )
     expect(UPGRADE_V4_WORDS.malformed("win")).toBe(
-      "The record of this win is wrongly formed: the amount recorded with it is not a whole number of cents of 0.01 or more. This page cannot check a record in this shape.",
+      "The record of this win is wrongly formed: an amount must be written as a whole number of cents from 1, as text with no sign and no leading zero, and this one is not. This page cannot check a record in this shape.",
     )
     for (const subject of ["upgrade", "win"] as const) {
       expect(UPGRADE_V4_WORDS.malformed(subject)).not.toMatch(/not (been )?checked yet|still locked|later/i)
@@ -248,10 +253,18 @@ describe("the version 4 sentences", () => {
     const casinoLimits =
       "A casino may set lower limits on the amount than the upgrade rules do. Those limits are not in the upgrade's record, so this page checks only the limits of the upgrade rules."
     const v3 = upgradeStep2(3, 9400)
-    // Version 3's first two paragraphs, kept word for word; then the rule, version 4's checks and the casino's limits.
-    for (const words of [withAmount, noAmount]) expect(words.text).toEqual([v3.text[0], v3.text[1], rule, checksParagraph, casinoLimits])
+    // Version 3's first paragraph, kept word for word, and its second only with no amount: it states the chance
+    // with no amount as the chance (page review S1). Then the rule, version 4's checks and the casino's limits.
+    expect(noAmount.text).toEqual([v3.text[0], v3.text[1], rule, checksParagraph, casinoLimits])
+    expect(withAmount.text).toEqual([v3.text[0], rule, checksParagraph, casinoLimits])
+    expect(upgradeStep2(4, undefined, 2128).text).toEqual([upgradeStep2(3, undefined).text[0], rule, checksParagraph, casinoLimits])
+    // The source line names the amount, which fixes the chance (page review S2); version 3 keeps its own.
+    const source =
+      "Read from the box record: `edition` (its prize table and chances); from the step record: `step.engineType`, `step.editionFingerprint`, `step.stakedSlotIndex`, `step.targetSlotIndex`, `step.boostCents` (the amount recorded, absent when there is none), `step.chancePpm`, `step.chanceCompact` and `step.stepNo`."
+    for (const words of [withAmount, noAmount]) expect(words.source).toBe(source)
+    expect(v3.source).toBeUndefined()
     expect(UPGRADE_V4_WORDS.rule).not.toMatch(/you may add|added/i)
-    expect(UPGRADE_V4_WORDS.rows).toEqual({ amount: "Amount recorded", noAmountChance: "Chance with no amount" })
+    expect(UPGRADE_V4_WORDS.rows).toEqual({ amount: "Amount recorded", noAmountChance: "Chance with no amount", withAmountChance: "Chance with the amount" })
   })
 
   it("the open page: O1, O2 and O4", () => {
@@ -264,6 +277,10 @@ describe("the version 4 sentences", () => {
     )
     expect(UPGRADE_V4_WORDS.winAmountMissing).toBe(
       "An amount may have been recorded with the upgrade but not with this win. The upgrade's own page shows its amount and checks it.",
+    )
+    // Under a PASS: the win's amount is taken as recorded, never compared with the upgrade's (page review S3).
+    expect(UPGRADE_V4_WORDS.winPassCaveat).toBe(
+      "This page did not check the item given up for this upgrade, the kind of box, how many upgrades came in a row, that this is the item the upgrade aimed at, or that the amount recorded with this win is the amount recorded with the upgrade. The upgrade's own check covers the first three. It also names the item the upgrade aimed at and shows the amount recorded with it: compare them with this page.",
     )
   })
 
@@ -295,8 +312,11 @@ describe("the version 4 sentences", () => {
       UPGRADE_V4_WORDS.winStep4Source,
       UPGRADE_V4_WORDS.winChance(2128, 288016),
       UPGRADE_V4_WORDS.winAmountMissing,
+      UPGRADE_V4_WORDS.winPassCaveat,
+      UPGRADE_V4_WORDS.step2Source,
       UPGRADE_V4_WORDS.rows.amount,
       UPGRADE_V4_WORDS.rows.noAmountChance,
+      UPGRADE_V4_WORDS.rows.withAmountChance,
       UPGRADE_CHECK_LABELS.boostAmount,
     ]
     // A field name in backticks is code, not a public word: `open.stepBoostCents` stays as the record writes it.
@@ -345,7 +365,12 @@ describe("a version 4 step on its page", () => {
     // Kills M-P3 (the amount row dropped) and M-P6 (the no-amount row showing the chance with the amount).
     expect(document.querySelector("[data-amount-row]")?.textContent).toBe("Amount recorded2128 cents (21.28)")
     expect(document.querySelector("[data-no-amount-row]")?.textContent).toBe("Chance with no amount188,000 in 1,000,000 (18.80%)")
-    expect(values()).toContain("Fair chance288,016 in 1,000,000 (28.80%)")
+    // The chance with the amount, never labelled the fair chance (page review S5).
+    expect(values()).toContain("Chance with the amount288,016 in 1,000,000 (28.80%)")
+    expect(values()).not.toContain("Fair chance")
+    // Version 3's second paragraph (the chance with no amount, as the chance) is left out; the source names the amount.
+    expect(card(2)).not.toContain(upgradeStep2(3, 9400).text[1])
+    expect(card(2)).toContain(UPGRADE_V4_WORDS.step2Source.replaceAll("`", ""))
     expect(checkText("boostAmount")).toBe(`The amount recorded: matches. ${upgradeCheckWords(4, 9400, 2128).ok.boostAmount}`)
     expect(checkText("upgradeChance")).toContain("It is the chance we recorded.")
     expect(document.querySelector("[data-check='boostAmount']")?.closest("[data-step]")?.getAttribute("data-step")).toBe("2")
@@ -360,6 +385,8 @@ describe("a version 4 step on its page", () => {
     expect(document.querySelector("[data-no-amount-row]")).toBeNull()
     expect(values()).toContain("Fair chance188,000 in 1,000,000 (18.80%)")
     expect(checkText("boostAmount")).toBe("The amount recorded: matches. No amount was recorded with this upgrade.")
+    expect(card(2)).toContain(upgradeStep2(3, 9400).text[1])
+    expect(card(2)).toContain(UPGRADE_V4_WORDS.step2Source.replaceAll("`", ""))
   })
 
   const refused: [string, EditionAnswer, ReturnType<typeof v4Step>, string][] = [
@@ -399,6 +426,8 @@ describe("a version 4 step on its page", () => {
       await openStep(edition, step, "FAIL")
       expect(verdictLine()).toBe(`Step 2 does not match: ${sentence}`)
       expect(checkText("boostAmount")).toBe(`The amount recorded: does not match. ${sentence}`)
+      // A refused amount has no chance under the rules: the row shows none (page review S5).
+      expect(values()).toContain("Chance with the amountnone")
     })
   }
 
@@ -409,7 +438,7 @@ describe("a version 4 step on its page", () => {
   })
 
   // The wire rule (cto 37069): a decimal string from "1"; the JSON number 2128 is the right amount in the wrong shape.
-  for (const amount of [2128, "0", "21.5", "-1", "02128", ""]) {
+  for (const amount of [2128, "0", "21.5", "-1", "+2128", "02128", ""]) {
     it(`cannot check a step whose amount is ${JSON.stringify(amount)}, and says the record is wrongly formed`, async () => {
       await openStep(BOX_C, v4Step(0, 1, 288016, { boostCents: amount }), "CANNOT CHECK")
       expect(verdictLine()).toBe(
@@ -430,6 +459,25 @@ describe("an upgraded win of version 4 on the open page", () => {
     await openWin(BOX_C, v4Win(0, 1, 288016, { stepBoostCents: "2128" }), "PASS")
     expect(card(4)).toContain(upgradeWinStep4(4).source.replaceAll("`", ""))
     expect(document.querySelector("[data-amount-chance]")?.textContent).toBe(UPGRADE_V4_WORDS.winChance(2128, 288016))
+    // The PASS says the win's amount was not compared with the upgrade's (page review S3).
+    const note = document.querySelector("[data-upgrade-win]")?.textContent ?? ""
+    expect(note).toContain(UPGRADE_V4_WORDS.winPassCaveat)
+    expect(note).not.toContain(UPGRADE_JUMP_WORDS.winPassCaveat)
+  })
+
+  it("names no amount after a wrong chance when the win records one (page review S4, the O4 guard)", async () => {
+    // Kills upgrade-v4-open-o4-with-amount.patch: O4 says the win records no amount, false here.
+    await openWin(BOX_C, v4Win(0, 1, 288017, { stepBoostCents: "2128" }), "FAIL")
+    expect(checkText("drawnSlotIndex")).toBe(WRONG_CHANCE_SLOT)
+    expect(checkText("drawnSlotIndex")).not.toContain(UPGRADE_V4_WORDS.winAmountMissing)
+    expect(document.querySelector("[data-amount-chance]")).toBeNull()
+  })
+
+  it("adds no O4 to a version 3 win with a wrong chance (page review S4, the version guard)", async () => {
+    // Kills upgrade-v4-open-o4-on-every-version.patch: O4 would change the approved words of versions 1 to 3.
+    await openWin({ ...BOX_C, editionId: "15690000-0000-4000-8000-0000000000c3", engineVersion: 3 }, v4Win(0, 1, 188001), "FAIL")
+    expect(checkText("drawnSlotIndex")).toBe(WRONG_CHANCE_SLOT)
+    expect(checkText("drawnSlotIndex")).not.toContain(UPGRADE_V4_WORDS.winAmountMissing)
   })
 
   it("adds that the upgrade may have recorded an amount, when the win records none and the chance differs (O4)", async () => {
@@ -454,6 +502,9 @@ describe("an upgraded win of version 4 on the open page", () => {
       expect(verdictLine()).toBe(`Step 4 does not match: ${sentence}`)
       expect(checkText("drawnSlotIndex")).toBe(`The slot: does not match. ${sentence}`)
       expect(card(4)).toContain("Amount recorded with this win")
+      // A refused amount is never called a computed, matching chance (page review S4; kills
+      // upgrade-v4-open-o2-on-failed-slot.patch).
+      expect(document.querySelector("[data-amount-chance]")).toBeNull()
     })
   }
 
