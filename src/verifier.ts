@@ -1889,7 +1889,10 @@ async function verifyChecked(input: VerificationInput, options: UpgradeStepOptio
           : slotCheck;
     }
     if (amountWrong !== undefined) {
+      // The table and the outcome were computed with the amount just refused, so the trace keeps neither.
       checks.drawnSlotIndex = amountWrong;
+      delete trace.cumulative;
+      delete trace.computedStepOutcome;
       delete trace.computedSlotIndex;
       computedSlotIndex = undefined;
     }
@@ -2301,8 +2304,11 @@ export interface UpgradeStepReport {
 /**
  * Verify one upgrade step: the commitment, the odds, that the edition is an upgrade edition on a version
  * this library checks, that the target is one its version allows from the staked slot (version 1: the next
- * value up; version 2: any higher value at 1 % or more) and the chance its fair floor, that the step
- * number is within the cap, that the seed reproduces the drawn value, and that this value reads as the
+ * value up; version 2: any higher value at 1 % or more; versions 3 and 4: any higher value at 0.1 % or more,
+ * read on the chance with no amount) and the chance its version's (the fair floor on versions 1 and 2, the
+ * box's rate rounded up on version 3, and on version 4 the same with the amount the step records), that the
+ * amount is within the engine's limits (`boostAmount`; versions 1 to 3 record none), that the step number is
+ * within its version's limit, that the seed reproduces the drawn value, and that this value reads as the
  * recorded outcome over the step's own table. A lost step verifies exactly like a won one.
  */
 export async function verifyUpgradeStep(input: UpgradeStepInput, options: UpgradeStepOptions = {}): Promise<UpgradeStepReport> {

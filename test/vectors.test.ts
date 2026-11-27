@@ -1948,12 +1948,48 @@ describe('the step check accepts exactly the amounts the engine accepts (SHOULD 
               decision.decision === 'accepted' ? 'verified' : 'failed',
               `${family.id}/${vector.id}, ${b} cents: the engine says ${decision.decision}, the step check says ${report.summary}`,
             );
+            // A refusal must also fail on the check the page names, for the limit the engine refused it by (library
+            // review SHOULD 2): a refusal named by the wrong limit gives the player the wrong reason.
+            if (decision.decision === 'refused') {
+              const where = `${family.id}/${vector.id}, ${b} cents (${decision.refusal})`;
+              if (boostChancePpm(step, 0n) < 1_000) {
+                // The 0.1 % minimum is read on the chance with no amount, by the target check, which runs first.
+                assert.equal(report.firstFailure?.check, 'upgradeTarget', where);
+              } else {
+                assert.equal(report.firstFailure?.check, 'boostAmount', where);
+                assert.match(report.checks.boostAmount?.computed ?? '', LIMIT_WORDS[refusedBy(step, BigInt(b), decision)], where);
+              }
+            }
           }
         }
       });
     }
   }
 });
+
+/** The words of each limit, as the step check writes its `boostAmount` computed text. */
+const LIMIT_WORDS = {
+  reachesTarget: /^the value staked plus \d+ cents reaches the target's value$/,
+  ceiling: /^\d+ cents is above the ceiling of 100000 cents$/,
+  cap: /^\d+ cents gives a chance of \d+ ppm, above the cap of 500000 ppm$/,
+  lastCent: /^the last cent of \d+ cents raises nothing: \d+ cents give \d+ ppm too$/,
+} as const;
+
+/**
+ * The limit the step check must name for an amount the engine refuses, in the order of plan v1.1 §2.2, with the
+ * engine's two limits written out (100 000 cents, 500 000 ppm) rather than read from the library. A last cent
+ * that raised nothing is `boost_cent_lost`. Above the engine's highest amount (`boost_too_high`) it is the first
+ * of: the target's value reached, the ceiling, the cap; else the amount is within both limits, and the engine's
+ * highest amount buys the same chance for less, so its last cent raised nothing either.
+ */
+function refusedBy(step: BoostStep, b: bigint, decision: Extract<BoostDecision, { decision: 'refused' }>): keyof typeof LIMIT_WORDS {
+  if (decision.refusal === 'boost_cent_lost') return 'lastCent';
+  if (step.stakedCents + b >= step.targetCents) return 'reachesTarget';
+  if (b > 100_000n) return 'ceiling';
+  if (boostChancePpm(step, b) > 500_000) return 'cap';
+  assert.equal(boostChancePpm(step, b), boostChancePpm(step, decision.boostMaxCents), `${b} cents: above the highest amount, within both limits`);
+  return 'lastCent';
+}
 
 /** The lists a family or a case may carry, each asserted by a loop above. Any other list is a new kind of vector. */
 const FAMILY_LISTS = new Set(['slots', 'queries', 'cases', 'steps']);

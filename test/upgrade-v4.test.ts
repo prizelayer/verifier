@@ -307,6 +307,9 @@ describe('a version 4 win on the open page (KAN-1569 plan v1.1 L9)', () => {
         assert.equal(report.status, 'failed', `${revealed ? 'revealed' : 'locked'}: ${report.summary}`);
         assert.deepEqual(report.checks.drawnSlotIndex, { ok: false, expected: `amount recorded ${record.expected.stepBoostCents} cents`, computed });
         assert.equal(report.trace.computedSlotIndex, undefined);
+        // No table and no outcome computed with an amount this run refuses (library review SHOULD 1).
+        assert.equal(report.trace.cumulative, undefined);
+        assert.equal(report.trace.computedStepOutcome, undefined);
       }
     });
   }

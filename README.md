@@ -223,6 +223,37 @@ Every sum and division is in `BigInt`. For example, on a box whose rate is 9 636
 for 20.00 gives `p = 481 800` ppm, shown as "48.18%". `upgradeStepRateBps()` gives `R`, and
 `upgradeChancePpm()` takes it with `roundsUp`.
 
+On version 4, a step is a version 3 step that may also record an **amount** of money, in whole cents,
+added to the value staked. With `b` the amount recorded (0 when none is recorded) and `R` the box's rate
+of version 3:
+
+- `p(b) = ceil(R × 1 000 000 × (staked + b) / (10 000 × target))` ppm, rounded up once; with no amount it is
+  `p(0)`, the version 3 chance of the same step;
+- the target and the 1 000 ppm (0.10 %) minimum are read on `p(0)`, the chance with no amount, so an amount
+  never adds a target;
+- an amount is accepted only when all of these hold, checked in this order, and the report names the first
+  that fails: the value staked plus the amount stays under the target's value, `staked + b < target`; `b` is
+  at most 100 000 cents (1,000.00 EUR); `p(b)` is at most 500 000 ppm (50 %); and its last cent raised the
+  chance, `p(b) > p(b − 1)`. The 50 % cap binds only an amount: a step with no amount may have a chance above
+  50 %;
+- a casino may set a lower money limit and a lower chance limit of its own; they are not in the step's
+  record, so a recorded amount is checked against the engine's limits above, never the casino's.
+
+On the published records the amount is a **decimal string** of whole cents, from `"1"`, with no sign and no
+leading zero, like every other published cents value: `boostCents` on a step, and `stepBoostCents` on an
+upgraded win (the amount of the step that made it). It is absent when no amount was recorded, and absent means
+`b = 0`. A JSON number (even `2128`), `"0"`, a sign, a leading zero, a fraction or an empty string makes the
+record unreadable: the report is `invalid`, and the value is never read as "no amount". The step report has one
+more check for it, `boostAmount`, in step 2. On versions 1 to 3 that check holds only when no amount is
+recorded; an amount there fails it, and on an upgraded win the same amount fails `drawnSlotIndex`. On an
+upgraded win, an amount that breaks a limit fails `drawnSlotIndex` before the draw is read, so the cause is the
+same whether the seed is revealed or not.
+
+For example, on box C of the fixture (rate 9 400, 94.00 %), staking 40.00 for 200.00 gives `p(0) = 188 000`;
+with 21.28 recorded it gives `p = 288 016` ppm (exactly 9 400 × 6 128 / 200), shown as "28.80%", and 21.27
+gives 287 969, so the last cent raised the chance. `boostChancePpm()` gives `p(b)`, `boostStepLimits()` is the
+check of a recorded amount, and `recordedAmountCents()` is the wire rule.
+
 On dev only, `verify()` and `verifyUpgradeStep()` take a second argument, `{ demoRules:
 DEMO_RULES_2026_11_17 }`: the rule of a demo on dev, where on 17 and 18 November 2026 some version 1 and
 2 steps were drawn at 93 % of their fair chance. Only that exact exported object is accepted, the report
@@ -288,13 +319,22 @@ implementations; "it passed in Node" says nothing about the engine your players 
 | `parseSnapshotBody(body)` | The published `snapshot.body` JSON (or its text) → typed snapshot. |
 | `parseSnapshot(json)` | The camelCase, decimal-string form → typed snapshot. |
 | `bytesFromHex` / `hexFromBytes` | Hex helpers. |
-| `verifyUpgradeStep(input, options?)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`). Never throws. |
+| `verifyUpgradeStep(input, options?)` | One upgrade step, won or lost (section 3b). Returns an `UpgradeStepReport`, with its own check names (`UPGRADE_STEP_CHECK_NAMES`; `boostAmount`, the amount recorded, since 0.4.0). Never throws. |
 | `upgradeTarget(edition, slotIndex, engineVersion?)` | The single step a win in that slot is offered on that version (version 1 when not given), `{ targetSlotIndex, chancePpm }`, or `null`. |
 | `upgradeTargets(edition, slotIndex, engineVersion)` | Every target a win in that slot may name on that version (section 3b), each `{ targetSlotIndex, chancePpm }`. The cap on steps is not applied here: a win at the cap still gets its list. Throws for a version it does not check. |
 | `UPGRADE_RULES` / `upgradeRule(engineVersion)` | The versions of the upgrade engine this library checks, each with its minimum chance and whether a step may jump; `undefined` for any other version. |
 | `upgradeChancePpm(current, next, rateBps?, roundsUp?)` | `rateBps × 1 000 000 × current / (10 000 × next)`, rounded down, or up when `roundsUp`; by default `floor(1 000 000 × current / next)`. Exact in `BigInt`. |
-| `upgradeStepRateBps(edition, engineVersion)` | The step's return in basis points: 10 000 on versions 1 and 2; on version 3 the box's own rate, computed from the edition (section 3b). Throws for a box under 9 300 or with no positive price. |
+| `upgradeStepRateBps(edition, engineVersion)` | The step's return in basis points: 10 000 on versions 1 and 2; on versions 3 and 4 the box's own rate, computed from the edition (section 3b). Throws for a box under 9 300 or with no positive price. |
 | `UPGRADE_V3_CAVEATS` | The two caveats a version 3 report adds: what the step number check covers, and what the check of an upgraded win covers. |
+| `UPGRADE_V4_CAVEATS` | The two caveats a version 4 report adds: the step number check, as on version 3, and what the check of an upgraded win covers, with the amount recorded. |
+| `UPGRADE_CAVEATS_BY_VERSION` | Those caveats for each version this library checks, one entry per version of `UPGRADE_RULES`. |
+| `UPGRADE_BOOST_CEILING_CENTS` / `UPGRADE_BOOST_MAX_CHANCE_PPM` | The engine's two limits on an amount of version 4: 100 000 cents and 500 000 ppm. |
+| `boostChancePpm(step, boostCents)` | The chance of a version 4 step with an amount, `p(b)` of section 3b, exact in `BigInt`; `step` is a `BoostStep`, `{ engineVersion, rateBps, stakedCents, targetCents }`. Throws for an amount that reaches the target's value. |
+| `boostStepLimits(step, boostCents)` | The check of an amount a step records, against the engine's limits in the order of section 3b: `{ ok: true, chancePpm }`, or `{ ok: false, limit }` with `limit` one of `reachesTarget`, `ceiling`, `cap`, `lastCent`. The step check and the check of an upgraded win both use it. |
+| `boostMaxCents(step, limits?)` | The highest amount a step accepts, under the engine's limits and, when given, a casino's own (`BoostLimits`, `{ maxCents, maxChancePpm }`); 0 when it accepts none. |
+| `boostDecision(step, boostCents, limits?)` | The answer for an amount from 1 cent, as the platform gives it: `accepted` at its chance, or `refused` with `boost_too_high` or `boost_cent_lost` and the highest amount accepted. |
+| `boostKeyFor(step, points, limits?)` / `boostKeys(step, points, limits?)` | The key of `points` percentage points: its price is the least amount whose chance reaches `p(0)` plus `points` × 10 000 ppm, or `null` when that price is not accepted; and the keys of a list of points, lowest first. |
+| `recordedAmountCents(value, field)` | The wire rule of a recorded amount (section 3b): a decimal string of whole cents from `"1"` gives a `bigint`, an absent value gives `undefined`, and anything else throws, naming `field`. |
 | `DEMO_RULES_2026_11_17` | The dev-only demo rule set (section 3b). |
 | `stepTable(p)` / `stepOutcome(v, p)` | The step's two-entry table, and `won` or `lost` for `v` over it. |
 
